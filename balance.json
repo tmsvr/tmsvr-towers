@@ -5,6 +5,7 @@
     "flowers.rate": "Seconds between attacks (lower = faster).",
     "flowers.kind": "single = homing seed, beam = instant hit, bolt = piercing fireball in a line, cloud = poison cloud (damage is per stack per second), pulse = hits everything in range, chomp = bite (small critters are swallowed whole).",
     "flowers.target": "first = enemy furthest along the path (default), strong = the toughest enemy (highest max health), kept until it dies.",
+    "flowerLevels.prices": "A flower's cost is its base price. Planting it (seedling to level 1) costs cost x plantPrice; going from level L to L+1 costs cost x upgradeCostMultipliers[L-1] x upgradePrice. Healing is priced off the base cost (fullHealCostFraction).",
     "flowerLevels.perLevel": "Bonus added per level above 1, e.g. damage 0.5 means +50% damage per level.",
     "flowerLevels.wearPerSecond": "Health every flower loses per second while a wave is running (the same for all flower types, none between waves), times wearMultiplierByLevel for its level. Flowers have 100 health; upgrading refills it.",
     "enemies.bite": "Damage per second an enemy does to the cottage while chomping on it (it keeps chomping until killed).",
@@ -98,6 +99,8 @@
     "maxLevel": 5,
     "loadoutSize": 3,
     "upgradeCostMultipliers": [0.8, 1.1, 1.5, 2.0],
+    "plantPrice": 0.5,
+    "upgradePrice": 0.8,
     "growSeconds": [2, 3, 4.5, 6, 7.5],
     "perLevel": {
       "damage": 0.5,

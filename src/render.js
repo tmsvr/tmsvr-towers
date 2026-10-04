@@ -10,7 +10,7 @@
 // with each entity carrying the fields schema.js sends for it.
 import {
   T, U, VIEW_W, MAP_H, HUD_H, TOTAL_WAVES, MAPS,
-  FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, flowerStats, upgradeCost, PLAYER, CATS, CAT_ORDER, GLOBAL_RANGE,
+  FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, GLOBAL_RANGE,
 } from './data.js';
 import { tileOf, canBuildAt, healCostPerHp, uprootRefund, catStats } from './sim.js';
 import { isMuted } from './audio.js';
@@ -1416,7 +1416,7 @@ function contextText(s, p, ui) {
     if (m.yard.has(k)) return 'Cottage yard · no planting here';
     if (m.blocked.has(k)) return "Something's in the way";
     const F = FLOWERS[p.loadout[p.sel]];
-    return `[${key}] plant ${F.name} (${F.cost}) · [${cyc}] next · ${F.desc}`;
+    return `[${key}] plant ${F.name} (${plantCost(p.loadout[p.sel])}) · [${cyc}] next · ${F.desc}`;
   }
   const name = FLOWERS[f.type].name;
   const midLevel = f.lvl > 0 && f.lvl < MAX_LEVEL;
@@ -1479,10 +1479,10 @@ function drawHud(c, s, time, ui) {
     (p.loadout || p.pick.chosen).forEach((t, j) => {
       const sx = x0 + 50 + j * 104, sy = y0 + 42, sw = 100, sh = 38;
       const sel = p.loadout && p.building && j === p.sel;
-      const afford = p.coins >= FLOWERS[t].cost;
+      const afford = p.coins >= plantCost(t);
       rrect(c, sx, sy, sw, sh, 8, sel ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.25)', sel ? pc : 'rgba(255,255,255,0.1)', sel ? 3 : 1);
       c.save(); c.translate(sx + 19, sy + 19); c.scale(0.8, 0.8); if (!afford) c.globalAlpha = 0.45; drawHead(c, t); c.restore();
-      label(c, `${FLOWERS[t].cost}`, sx + 54, sy + 20, 14, afford ? '#ffe27a' : '#c07070', 'center', 700, null);
+      label(c, `${plantCost(t)}`, sx + 54, sy + 20, 14, afford ? '#ffe27a' : '#c07070', 'center', 700, null);
     });
   });
 }
@@ -1580,7 +1580,7 @@ function drawPick(c, s, ui, time) {
     drawFlower(c, { id: i, type: t, lvl: 3, x: cx, y: y0 + 66, angle: Math.PI / 2, flash: Math.sin(time * 2 + i) > 0.97 ? 0.1 : 0, hurtT: 0, hp: FLOWER_HP, headIdx: 0 }, time);
     label(c, F.name, cx, y0 + 106, 15, '#ffffff', 'center', 700, null);
     coinIcon(c, cx - 14, y0 + 125, 7);
-    label(c, `${F.cost}`, cx + 2, y0 + 126, 13, '#ffe27a', 'left', 700, null);
+    label(c, `${plantCost(t)}`, cx + 2, y0 + 126, 13, '#ffe27a', 'left', 700, null);
     wrapText(c, F.desc, cw - 14, 11.5).slice(0, 3).forEach((l, j) => label(c, l, cx, y0 + 142 + j * 13, 11.5, '#cfe0ea', 'center', 500, null));
     const st = flowerStats(t, 1);
     // every card: range, damage, how often (the poison cloud says how it works)

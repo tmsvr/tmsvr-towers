@@ -6,7 +6,7 @@
 import {
   T, U, VIEW_W, MAP_H, TOTAL_WAVES, MAPS, ENEMIES,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, GROW_TIME, FLOWER_HP, WEAR_PER_SEC, WEAR_MULT, HEAL_RATE, HEAL_COST,
-  POISON_TIME, START_COINS, LOADOUT_SIZE, WAVES, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, PLAYER, CATS, CAT_ORDER,
+  POISON_TIME, START_COINS, LOADOUT_SIZE, WAVES, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER,
 } from './data.js';
 import { prune, clamp, nextSeed, randomFrom } from './util.js';
 
@@ -450,7 +450,7 @@ function plant(s, p) {
   const type = p.loadout[p.sel];
   const nf = {
     id: s.nextId++, type, lvl: 0, tx, ty, x: cx, y: cy + T / 2, cd: 0.3, angle: 0, flash: 0, hurtT: 0,
-    hp: FLOWER_HP, headIdx: 0, dead: false, grow: { to: 1, cost: FLOWERS[type].cost, paid: 0 },
+    hp: FLOWER_HP, headIdx: 0, dead: false, grow: { to: 1, cost: plantCost(type), paid: 0 },
   };
   s.flowers.push(nf);
   s.grid.set(k, nf);
