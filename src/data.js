@@ -50,10 +50,16 @@ function prepareMap(def, index) {
       obstacles.push({ ...o, w: 1, h: 1 });
     }
   }
-  // keep the cottage surroundings and the cats' starting spot clear
+  // The cottage yard: free to walk through, but nobody plants there, so
+  // monsters can always reach the walls and chomp.
   const near = (x, y, [px, py], r) => Math.abs(x - px) <= r && Math.abs(y - py) <= r;
+  const yard = new Set();
   for (let y = def.base[1] - 1; y <= def.base[1] + 1; y++)
-    for (let x = def.base[0] - 1; x <= def.base[0] + 1; x++) if (!pathTiles.has(y * w + x)) blocked.add(y * w + x);
+    for (let x = def.base[0] - 1; x <= def.base[0] + 1; x++) {
+      if (x < 0 || y < 0 || x >= w || y >= h || pathTiles.has(y * w + x)) continue;
+      yard.add(y * w + x);
+      blocked.add(y * w + x);
+    }
   const rnd = seeded(def.scatter?.seed || 1);
   for (const [type, count] of [['tree', def.scatter?.trees || 0], ['rock', def.scatter?.rocks || 0]]) {
     for (let placed = 0, tries = 0; placed < count && tries < count * 50; tries++) {
@@ -85,7 +91,7 @@ function prepareMap(def, index) {
   }
   return {
     index, id: def.id, name: def.name, desc: def.desc, W: w, H: h, waveSize: def.waveSize ?? 1, startCoins: def.startCoins ?? 1, worldW: w * T, worldH: h * T,
-    paths, base: center(def.base), start: center(def.start), pathTiles, blocked, obstacles, solids,
+    paths, base: center(def.base), baseTile: def.base, start: center(def.start), pathTiles, blocked, yard, obstacles, solids,
   };
 }
 

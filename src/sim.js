@@ -393,6 +393,7 @@ function plant(s, p) {
   const cx = (tx + 0.5) * T, cy = ty * T;
   if (s.grid.has(k)) return;
   if (PATH_TILES.has(k)) return deny(s, p, cx, cy, "Can't plant on the path");
+  if (MAP.yard.has(k)) return deny(s, p, cx, cy, 'Keep the yard clear!');
   if (BLOCKED.has(k)) return deny(s, p, cx, cy, "Something's in the way");
   if (p.coins < 1) return deny(s, p, cx, cy, 'Out of coins!');
   const type = p.loadout[p.sel];

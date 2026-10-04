@@ -128,6 +128,45 @@ function drawTree(c, o, time) {
   circle(c, cx - T * 0.08 * sc + sway, cy - T * 0.45 * sc - 6, T * 0.08 * sc, 'rgba(255,255,255,0.18)');
 }
 
+// The cottage yard: a flat, mown lawn with a pebble edging and stepping
+// stones. Nothing upright, so it reads as walkable, just not plantable.
+function drawYard(c, r) {
+  const [bx, by] = MAP.baseTile;
+  const x0 = Math.max(0, bx - 1) * T, y0 = Math.max(0, by - 1) * T;
+  const x1 = Math.min(W, bx + 2) * T, y1 = Math.min(H, by + 2) * T;
+  c.save();
+  c.beginPath(); c.roundRect(x0 + 3, y0 + 3, x1 - x0 - 6, y1 - y0 - 6, T * 0.3); c.clip();
+  // mown stripes
+  for (let x = x0, i = 0; x < x1; x += T / 2, i++) { c.fillStyle = i % 2 ? '#9ad06a' : '#a6d878'; c.fillRect(x, y0, T / 2, y1 - y0); }
+  c.restore();
+  // pebble edging: a dotted ring of flat stones you can step over
+  const per = 2 * ((x1 - x0) + (y1 - y0)) - 12;
+  for (let d = 0; d < per; d += 11) {
+    let x, y, e = d;
+    const w = x1 - x0 - 6, h = y1 - y0 - 6;
+    if (e < w) { x = x0 + 3 + e; y = y0 + 3; } else if ((e -= w) < h) { x = x1 - 3; y = y0 + 3 + e; }
+    else if ((e -= h) < w) { x = x1 - 3 - e; y = y1 - 3; } else { e -= w; x = x0 + 3; y = y1 - 3 - e; }
+    ellipse(c, x, y, 3.2 + r() * 1.2, 2.2 + r(), r() < 0.5 ? '#e9e2d0' : '#cfc6b2', 'rgba(90,80,60,0.45)', 1);
+  }
+  // stepping stones leading from the door out to each side of the yard
+  const cx = (bx + 0.5) * T, cy = (by + 0.5) * T;
+  for (const [dx, dy] of [[0, 1], [-1, 0], [1, 0], [0, -1]]) {
+    if (PATH_TILES.has((by + dy) * W + bx + dx)) continue;
+    for (const k of [0.62, 1.05]) {
+      const sx = cx + dx * T * k + (r() - 0.5) * 4, sy = cy + dy * T * k + (dy ? 0 : 8);
+      ellipse(c, sx, sy + 1.5, T * 0.15, T * 0.1, 'rgba(0,0,0,0.12)');
+      ellipse(c, sx, sy, T * 0.15, T * 0.1, '#d9d2c0', 'rgba(90,80,60,0.55)', 1.2);
+    }
+  }
+  // a few clover tufts and daisies in the lawn
+  for (let i = 0; i < 10; i++) {
+    const x = x0 + 10 + r() * (x1 - x0 - 20), y = y0 + 10 + r() * (y1 - y0 - 20);
+    if (Math.abs(x - cx) < T * 0.6 && Math.abs(y - cy) < T * 0.6) continue;
+    if (r() < 0.5) for (let k = 0; k < 3; k++) circle(c, x + Math.cos(k * 2.1) * 3, y + Math.sin(k * 2.1) * 3, 2.6, '#6fb84a');
+    else { circle(c, x, y, 2.4, '#ffffff'); circle(c, x, y, 1, '#ffd23f'); }
+  }
+}
+
 function paintBg(c) {
   const r = mulberry(7 + MAP.index * 101);
   const area = (W * H) / (36 * 22);
@@ -161,6 +200,7 @@ function paintBg(c) {
     const col = wild[Math.floor(r() * wild.length)];
     for (let k = 0; k < 3; k++) circle(c, x + (r() - 0.5) * 12, y + (r() - 0.5) * 8, 2.2, col);
   }
+  drawYard(c, r);
   for (const o of MAP.obstacles) if (o.type === 'pond') drawPond(c, o, r);
   // roads: all edges first, then all surfaces, so crossings merge cleanly
   const roads = PATHS.map((p) => [{ x: p.spawn.x - Math.cos(p.dir) * T, y: p.spawn.y - Math.sin(p.dir) * T }, ...p.waypoints]);
@@ -934,6 +974,7 @@ function contextText(s, p, ui) {
   if (!f) {
     if (!p.building) return `[${key}] or [${cyc}] build mode`;
     if (PATH_TILES.has(ty * W + tx)) return "Can't plant on the path";
+    if (MAP.yard.has(ty * W + tx)) return 'Cottage yard · no planting here';
     if (BLOCKED.has(ty * W + tx)) return "Something's in the way";
     const F = FLOWERS[p.loadout[p.sel]];
     return `[${key}] plant ${F.name} (${F.cost}) · [${cyc}] next · ${F.desc}`;
