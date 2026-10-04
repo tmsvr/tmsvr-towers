@@ -7,6 +7,7 @@
 import { createState, step, updateFx } from './sim.js';
 import { render, VIEW_W, VIEW_H } from './render.js';
 import { initAudio, play, toggleMute, setMusicMood } from './audio.js';
+import { juiceEvent, hitStopping, toggleJuice } from './juice.js';
 import { hostGame, joinGame } from './net.js';
 import { makeSnapshot, applySnapshot, interpolate, newGuestState } from './snapshot.js';
 import { PLAYER, T, W, H, WORLD_W, WORLD_H, MAP_H } from './data.js';
@@ -86,6 +87,7 @@ addEventListener('keydown', (e) => {
   held.add(code);
   pressed.add(code);
   if (code === 'KeyN') toggleMute();
+  if (code === 'KeyJ') toggleJuice();
   if (code === 'Escape') { if (mode !== 'menu') backToMenu(); return; }
   if (mode === 'menu') {
     if (code === 'Digit1' || code === 'Numpad1') startLocal(1);
@@ -224,6 +226,7 @@ function playEvents(events, forward) {
   for (const e of events) {
     if (e.type === 'shake') ui.shake = Math.max(ui.shake, e.amt);
     else play(e.type);
+    juiceEvent(e);
     if (forward && outbox.length < 60) outbox.push(e);
   }
   events.length = 0;
@@ -236,7 +239,8 @@ function pump() {
   const elapsed = Math.min(1, (now - last) / 1000);
   last = now;
   if (mode === 'local' || mode === 'host') {
-    if (!ui.paused) {
+    if (hitStopping(elapsed)) { /* freeze for a beat on big hits */ }
+    else if (!ui.paused) {
       acc += mode === 'host' ? elapsed : Math.min(elapsed, 0.1);
       let n = 0;
       while (acc >= DT && n++ < 90) {

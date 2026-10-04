@@ -21,6 +21,7 @@ with caching turned off, so edits show up on a normal reload.)
   mode removes the flower and refunds part of what was spent on it.
 - P1: WASD move · F baton · G bomb · E plant/grow (hold) · Q next flower / heal / dig-up mode
 - P2 (local): arrows · `,` baton · `.` bomb · `/` plant/grow · M next flower
+- J turns the extra effects (damage numbers, confetti, hit-stop…) on and off.
 - Online, both players use the P1 keys on their own keyboard. Your friend needs
   the game files too (or host the folder somewhere like GitHub Pages).
 

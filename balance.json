@@ -10,6 +10,7 @@
     "enemies.size": "Radius in tiles. 'light' enemies can be knocked back by the baton and swallowed by Snapdragons.",
     "difficulty": "Enemy health = base * (1 + hpPerWave*(wave-1) + hpPerWaveSquared*(wave-1)^2). Wave size budget = waveBudgetBase + waveBudgetPerWave*wave.",
     "economy.uprootRefund": "Share of the coins poured into a flower (planting + upgrades, not healing) you get back when you dig it up. uprootSeconds = how long you hold the key to dig.",
+    "juice": "Extra effects that don't change the game: damage numbers, hit squash, death pops, confetti, coin counter bounce, short freeze (hit-stop) on bombs and boss kills. J toggles them all in game; set any to false to drop just that one.",
     "waves": "Which enemies can appear: fromWave = first wave it shows up, weight = how often it is picked, cost = how much of the wave budget one group uses, group = how many spawn together."
   },
 
@@ -54,6 +55,16 @@
     "soloBossHp": 0.6,
     "coopWaveSize": 1.3,
     "coopEnemyHp": 1.1
+  },
+
+  "juice": {
+    "enabled": true,
+    "damageNumbers": true,
+    "squash": true,
+    "deathPops": true,
+    "confetti": true,
+    "coinBounce": true,
+    "hitStop": true
   },
 
   "flowerLevels": {

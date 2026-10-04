@@ -6,6 +6,7 @@ import {
 } from './data.js';
 import { tileOf, canBuildAt, healCostPerHp, uprootRefund } from './sim.js';
 import { isMuted } from './audio.js';
+import { observeJuice, drawJuiceWorld, drawJuiceScreen, hitSquash, swingSquash, coinScale } from './juice.js';
 
 export { VIEW_W };
 export const VIEW_H = MAP_H + HUD_H;
@@ -503,7 +504,7 @@ function drawEnemy(c, e, time) {
   ellipse(c, e.x, e.y + r * 0.75, r * (fly ? 0.7 : 0.95), r * 0.35, 'rgba(0,0,0,0.22)');
   c.save();
   c.translate(e.x, e.y + hop);
-  const sq = fly ? 0 : Math.sin(e.wob * 2) * (e.type === 'splitter' || e.type === 'blobling' ? 0.14 : 0.06);
+  const sq = (fly ? 0 : Math.sin(e.wob * 2) * (e.type === 'splitter' || e.type === 'blobling' ? 0.14 : 0.06)) + hitSquash(e.id) * 0.22;
   c.scale(1 + sq, 1 - sq);
   if (e.def.heals) {
     const k = (time * 1.2) % 1;
@@ -683,7 +684,8 @@ function drawCat(c, p, time) {
   ellipse(c, p.x, p.y + 14 * U, (down ? 18 : 14) * U, 5 * U, 'rgba(0,0,0,0.25)');
   c.save();
   c.translate(p.x, p.y + bob + (down ? 6 * U : 0));
-  c.scale(U * 1.15 * face, U * 1.15);
+  const st = swingSquash(p) * 0.12;
+  c.scale(U * 1.15 * face * (1 + st), U * 1.15 * (1 - st));
   if (down) c.rotate(-1.4); // knocked flat on its back
   const wag = Math.sin(time * (p.moving ? 12 : 4)) * 4;
   c.lineCap = 'round';
@@ -976,7 +978,10 @@ function drawHud(c, s, time, ui) {
     rrect(c, x0 + 10, y0 + 17, 30, 18, 9, pc);
     label(c, `P${i + 1}`, x0 + 25, y0 + 26.5, 12, '#fff', 'center', 700, null);
     coinIcon(c, x0 + 54, y0 + 26, 8);
-    label(c, `${Math.floor(p.coins)}`, x0 + 66, y0 + 27, 16, '#ffe27a', 'left', 700, null);
+    const cs = coinScale(i);
+    c.save(); c.translate(x0 + 66, y0 + 27); c.scale(cs, cs);
+    label(c, `${Math.floor(p.coins)}`, 0, 0, 16, '#ffe27a', 'left', 700, null);
+    c.restore();
     label(c, fitText(c, contextText(s, p, ui), pw - 118, 11.5), x0 + 110, y0 + 27, 11.5, p.stun > 0 ? '#ffb347' : '#dce7ef', 'left', 500, null);
     const bx = x0 + 26, by = y0 + 61;
     circle(c, bx, by, 15, 'rgba(0,0,0,0.45)', OUT, 2);
@@ -1133,7 +1138,7 @@ function drawMenu(c, time, ui) {
     'Each cat brings 4 of the 7 flowers and keeps the coins it picks up. Bombs knock cats down too!',
   ];
   tips.forEach((t, i) => label(c, t, cx, 455 + i * 24, 13.5, '#cfe0ea', 'center', 500, null));
-  label(c, 'Enter: start wave early  ·  P: pause  ·  N: sound on/off  ·  Esc: back to menu', cx, 545, 14, '#8fa5b3', 'center', 500, null);
+  label(c, 'Enter: start wave early  ·  P: pause  ·  N: sound  ·  J: effects  ·  Esc: menu', cx, 545, 14, '#8fa5b3', 'center', 500, null);
   label(c, 'Online, both players use the P1 keys (or arrows) on their own keyboard.', cx, 570, 13, '#8fa5b3', 'center', 500, null);
 }
 
@@ -1160,6 +1165,7 @@ export function render(c, s, ui) {
     drawMenu(c, time, ui);
     return;
   }
+  observeJuice(s);
   // only draw what's on (or near) the screen
   const M = T * 1.5;
   const vis = (o) => o.x > camX - M && o.x < camX + VIEW_W + M && o.y > camY - M && o.y < camY + MAP_H + M;
@@ -1181,6 +1187,7 @@ export function render(c, s, ui) {
   for (const pr of s.projs) if (vis(pr)) drawProj(c, pr, time);
   for (const b of s.bombs) drawBomb(c, b, time);
   drawFx(c, s);
+  drawJuiceWorld(c);
   c.restore();
   c.save();
   drawEdgeMarkers(c, s, ui);
@@ -1188,6 +1195,7 @@ export function render(c, s, ui) {
   drawMinimap(c, s, ui);
   c.restore();
   drawHud(c, s, time, ui);
+  drawJuiceScreen(c);
   if (ui.netLabel) {
     c.font = `600 13px ${FONT}`;
     const w = c.measureText(ui.netLabel).width + 26;
