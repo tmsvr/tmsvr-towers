@@ -52,6 +52,7 @@ them.
 |---|---|
 | `balance.json` | Every flower, enemy, level, economy and difficulty number, in tiles and seconds. The `_help` section explains each field. |
 | `maps.json` | Map layouts: roads, base, obstacles, plus per-map `waveSize` and `startCoins`. |
+| `tools/gallery.html` | Every flower at every level, drawn with the game's own code (http://localhost:8765/tools/gallery.html). |
 | `tools/balance-test.html` | Open http://localhost:8765/tools/balance-test.html to run an autopilot through whole games with the current numbers. |
 
 The autopilot never uses bombs and picks flowers crudely, so treat its

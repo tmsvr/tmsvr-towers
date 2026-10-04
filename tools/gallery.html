@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flower Gallery</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #141b22; --text: #e8f1f7; --muted: #8fa5b3; }
+  body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 1200px; margin: 0 auto; }
+  h1 { margin: 0 0 4px; font-size: 24px; }
+  p { color: var(--muted); margin: 0 0 16px; }
+  canvas { width: 100%; height: auto; border-radius: 12px; display: block; }
+  label { color: var(--muted); margin-right: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Flower gallery</h1>
+  <p>Every flower at every level, drawn with the game's own code. Edit <code>src/render.js</code> and reload.</p>
+  <p><label><input id="fire" type="checkbox"> firing</label><label><input id="hurt" type="checkbox"> hurt (40% health)</label></p>
+  <canvas id="c"></canvas>
+</main>
+<script type="module">
+import { drawFlower } from '../src/render.js';
+import { FLOWER_ORDER, FLOWERS, MAX_LEVEL, T } from '../src/data.js';
+
+const ZOOM = 2.2, COL = T * 1.5, ROW = T * 1.9, LEFT = 110, TOP = 40;
+const cv = document.getElementById('c'), dpr = Math.min(2, devicePixelRatio || 1);
+const W = LEFT + (MAX_LEVEL + 1) * COL, H = TOP + FLOWER_ORDER.length * ROW;
+cv.width = W * ZOOM * dpr; cv.height = H * ZOOM * dpr;
+const c = cv.getContext('2d');
+
+function frame() {
+  const time = performance.now() / 1000, fire = document.getElementById('fire').checked, hurt = document.getElementById('hurt').checked;
+  c.setTransform(ZOOM * dpr, 0, 0, ZOOM * dpr, 0, 0);
+  c.fillStyle = '#86c35a'; c.fillRect(0, 0, W, H);
+  c.font = '600 12px Fredoka, sans-serif'; c.fillStyle = '#20301a'; c.textAlign = 'center';
+  for (let l = 0; l <= MAX_LEVEL; l++) c.fillText(l ? `Level ${l}` : 'Seedling', LEFT + (l + 0.5) * COL, 22);
+  FLOWER_ORDER.forEach((type, r) => {
+    c.textAlign = 'left'; c.fillText(FLOWERS[type].name, 10, TOP + (r + 0.6) * ROW);
+    for (let l = 0; l <= MAX_LEVEL; l++) {
+      drawFlower(c, {
+        id: r * 7 + l, type, lvl: l, x: LEFT + (l + 0.5) * COL, y: TOP + (r + 0.55) * ROW,
+        angle: Math.sin(time * 0.7 + r) * 1.2 - Math.PI / 2, flash: fire && (time * 2 % 1) < 0.2 ? 0.1 : 0,
+        hurtT: 0, hp: hurt ? 40 : 100, headIdx: Math.floor(time * 2) % Math.min(Math.max(l, 1), 5),
+        grow: l ? null : { to: 1, cost: 10, paid: 7 },
+      }, time);
+    }
+  });
+  requestAnimationFrame(frame);
+}
+await document.fonts.ready;
+frame();
+</script>
+</body>
+</html>
