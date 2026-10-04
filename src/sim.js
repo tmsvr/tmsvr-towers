@@ -4,7 +4,7 @@
 import {
   T, U, W, H, WORLD_W, WORLD_H, VIEW_W, MAP_H, TOTAL_WAVES, WAYPOINTS, SPAWN, BASE, PATH_TILES, ENEMIES,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, GROW_TIME, FLOWER_HP, WEAR_PER_SEC, WEAR_MULT, HEAL_RATE, HEAL_COST,
-  CHEW_DPS, POISON_TIME, START_COINS, LOADOUT_SIZE, flowerStats, upgradeCost, PLAYER,
+  POISON_TIME, START_COINS, LOADOUT_SIZE, WAVES, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, PLAYER,
 } from './data.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -18,14 +18,15 @@ function rnd(s) {
 }
 
 // Difficulty knobs (exported so balance can be swept from the console).
-export const TUNE = { hpLinear: 0.3, hpQuad: 0.015, budgetBase: 8, budgetPerWave: 11, coinMult: 1, waveBonus: 1, soloWaves: 0.6 };
+// Difficulty and economy knobs come from balance.json (exported so balance can be swept from the console).
+export const TUNE = DIFFICULTY;
 
 // sharedScreen: both cats share one camera, so they can't wander further apart than the view.
 // loadouts: last game's flower picks per player, pre-selected on the pick screen.
 export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, loadouts = [] } = {}) {
   const s = {
-    t: 0, nextId: 1, rng: seed, wave: 0, phase: 'pick', timer: 30, queue: [], spawnWait: 0,
-    lives: 20, players: [], flowers: [], enemies: [], drops: [], bombs: [], projs: [], clouds: [],
+    t: 0, nextId: 1, rng: seed, wave: 0, phase: 'pick', timer: DIFFICULTY.firstWaveDelay, queue: [], spawnWait: 0,
+    lives: DIFFICULTY.lives, players: [], flowers: [], enemies: [], drops: [], bombs: [], projs: [], clouds: [],
     fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, sharedScreen,
   };
   const coins = nPlayers > 1 ? START_COINS.coop : START_COINS.solo;
@@ -69,7 +70,8 @@ export const healCostPerHp = (f) => (FLOWERS[f.type].cost * HEAL_COST) / FLOWER_
 function spawnEnemy(s, type, from) {
   const d = ENEMIES[type];
   const w = Math.max(0, s.wave - 1);
-  const hpScale = (1 + w * TUNE.hpLinear + w * w * TUNE.hpQuad) * (d.boss && s.players.length === 1 ? TUNE.soloWaves : 1);
+  const solo = s.players.length === 1;
+  const hpScale = (1 + w * TUNE.hpPerWave + w * w * TUNE.hpPerWaveSquared) * (solo ? (d.boss ? TUNE.soloBossHp : 1) : TUNE.coopEnemyHp);
   const j = () => (rnd(s) - 0.5) * 18 * U;
   s.enemies.push({
     id: s.nextId++, type, def: d,
@@ -99,11 +101,11 @@ function killEnemy(s, e) {
   ev(s, e.def.boss ? 'bossDie' : 'die');
   if (e.def.boss) ev(s, 'shake', { amt: 10 });
   if (e.def.split) {
-    for (let i = 0; i < e.def.split.n; i++) spawnEnemy(s, e.def.split.type, e);
+    for (let i = 0; i < e.def.split.count; i++) spawnEnemy(s, e.def.split.into, e);
     puff(s, e.x, e.y, '#e08ae8', 12, 120);
     ev(s, 'split');
   }
-  const v = Math.max(1, Math.round(e.def.coin * TUNE.coinMult));
+  const v = Math.max(1, Math.round(e.def.coin * ECONOMY.coinDropMultiplier));
   // Large drops split into a few pickups so they scatter nicely.
   const pieces = v >= 20 ? 6 : v >= 5 ? 2 : 1;
   const base = Math.floor(v / pieces);
@@ -139,7 +141,7 @@ function updateEnemies(s, dt) {
     }
     if (e.def.heals) {
       for (const o of s.enemies) {
-        if (o !== e && !o.dead && o.hp < o.maxhp && dist(o, e) < 80 * U) o.hp = Math.min(o.maxhp, o.hp + 7 * dt);
+        if (o !== e && !o.dead && o.hp < o.maxhp && dist(o, e) < e.def.heals.radius) o.hp = Math.min(o.maxhp, o.hp + e.def.heals.perSecond * dt);
       }
     }
     if (e.stun > 0) { e.stun -= dt; continue; }
@@ -147,13 +149,13 @@ function updateEnemies(s, dt) {
       e.spawnT += dt;
       if (e.spawnT >= e.def.spawns.every) {
         e.spawnT = 0;
-        for (let i = 0; i < e.def.spawns.n; i++) spawnEnemy(s, e.def.spawns.type, e);
+        for (let i = 0; i < e.def.spawns.count; i++) spawnEnemy(s, e.def.spawns.type, e);
         ev(s, 'spawn');
       }
     }
     if (e.def.burrow) {
       e.phaseT += dt;
-      if (e.phaseT >= (e.under ? 1.8 : 2.6)) {
+      if (e.phaseT >= (e.under ? e.def.burrow.belowSeconds : e.def.burrow.aboveSeconds)) {
         e.phaseT = 0;
         e.under = !e.under;
         puff(s, e.x, e.y, '#8a6038', 8, 70);
@@ -163,7 +165,7 @@ function updateEnemies(s, dt) {
     if (e.def.dash) {
       e.phaseT += dt;
       const was = e.dashing;
-      e.dashing = e.phaseT % 2.4 > 1.85;
+      e.dashing = e.phaseT % e.def.dash.every > e.def.dash.every - e.def.dash.duration;
       if (e.dashing && !was) ev(s, 'dash');
     }
     if (e.def.eats) {
@@ -172,18 +174,18 @@ function updateEnemies(s, dt) {
         else {
           e.chewT -= dt;
           e.wob += dt * 14;
-          hurtFlower(s, e.chew, CHEW_DPS * dt);
+          hurtFlower(s, e.chew, e.def.eats.damagePerSecond * dt);
           ev(s, 'chomp');
-          if (e.chewT <= 0) { e.chew = null; e.chewCd = 4; }
+          if (e.chewT <= 0) { e.chew = null; e.chewCd = e.def.eats.cooldown; }
           continue;
         }
       } else if ((e.chewCd -= dt) <= 0) {
-        const f = s.flowers.find((f) => !f.dead && f.lvl < MAX_LEVEL && dist(e, f) < T * 1.25);
-        if (f) { e.chew = f; e.chewT = 3.5; e.ang = Math.atan2(f.y - e.y, f.x - e.x); continue; }
+        const f = s.flowers.find((f) => !f.dead && f.lvl < MAX_LEVEL && dist(e, f) < e.def.eats.reach);
+        if (f) { e.chew = f; e.chewT = e.def.eats.chewSeconds; e.ang = Math.atan2(f.y - e.y, f.x - e.x); continue; }
       }
     }
     e.wob += dt * 8 * e.slow;
-    const sp = e.def.speed * U * e.slow * (e.dashing ? 3.2 : 1) * (e.under ? 1.5 : 1);
+    const sp = e.def.speed * e.slow * (e.dashing ? e.def.dash.speedMultiplier : 1) * (e.under ? e.def.burrow.speedMultiplier : 1);
     const tgt = e.def.flying ? BASE : WAYPOINTS[e.seg];
     const dx = tgt.x - e.x, dy = tgt.y - e.y;
     const d = Math.hypot(dx, dy);
@@ -209,27 +211,20 @@ function leak(s, e) {
 }
 
 // ---- Waves ----------------------------------------------------------------
-const UNLOCK = [
-  // type, first wave, weight, budget cost, group size
-  ['grunt', 1, 5, 1, 1], ['swarm', 2, 3, 2, 5], ['runner', 3, 2, 1.3, 1], ['dasher', 3, 3, 1.5, 1],
-  ['flyer', 4, 2, 1.6, 1], ['splitter', 4, 3, 3, 1], ['aphid', 5, 3, 1.6, 1], ['shield', 5, 2, 2.5, 1],
-  ['tank', 6, 2, 4.5, 1], ['mole', 6, 3, 2, 1], ['healer', 7, 2, 3, 1], ['hive', 8, 2, 5, 1],
-  ['wasp', 9, 2, 3, 3],
-];
-
 function buildQueue(s, n) {
   const q = [];
-  let budget = (TUNE.budgetBase + n * TUNE.budgetPerWave) * (s.players.length > 1 ? 1 : TUNE.soloWaves);
-  const avail = UNLOCK.filter((u) => u[1] <= n);
-  if (n % 5 === 0) budget *= 0.6;
+  let budget = (TUNE.waveBudgetBase + n * TUNE.waveBudgetPerWave) * (s.players.length > 1 ? TUNE.coopWaveSize : TUNE.soloWaveSize);
+  const avail = WAVES.filter((u) => u.fromWave <= n);
+  const bossWave = n % TUNE.bossEvery === 0;
+  if (bossWave) budget *= TUNE.bossWaveBudget;
   while (budget > 0) {
-    const total = avail.reduce((a, u) => a + u[2], 0);
+    const total = avail.reduce((a, u) => a + u.weight, 0);
     let r = rnd(s) * total, pick = avail[0];
-    for (const u of avail) { r -= u[2]; if (r <= 0) { pick = u; break; } }
-    for (let i = 0; i < pick[4]; i++) q.push({ type: pick[0], wait: pick[4] > 1 ? 0.22 : 0.4 + rnd(s) * 0.8 });
-    budget -= pick[3];
+    for (const u of avail) { r -= u.weight; if (r <= 0) { pick = u; break; } }
+    for (let i = 0; i < pick.group; i++) q.push({ type: pick.enemy, wait: pick.group > 1 ? 0.22 : 0.4 + rnd(s) * 0.8 });
+    budget -= pick.cost;
   }
-  if (n % 5 === 0) q.push({ type: 'boss', wait: 3 });
+  if (bossWave) q.push({ type: 'boss', wait: 3 });
   const k = Math.max(0.5, 1 - n * 0.03);
   for (const e of q) e.wait *= k;
   return q;
@@ -240,7 +235,7 @@ function startWave(s) {
   s.phase = 'wave';
   s.queue = buildQueue(s, s.wave);
   s.spawnWait = 0.5;
-  const boss = s.wave % 5 === 0;
+  const boss = s.wave % TUNE.bossEvery === 0;
   s.fx.push({ kind: 'banner', txt: boss ? `Wave ${s.wave} — BOSS!` : `Wave ${s.wave}`, life: 2.2, max: 2.2 });
   ev(s, boss ? 'boss' : 'wave');
 }
@@ -262,9 +257,9 @@ function updateWaves(s, dt, ready) {
   } else if (!s.enemies.some((e) => !e.dead)) {
     if (s.wave >= TOTAL_WAVES) { s.won = true; ev(s, 'win'); return; }
     s.phase = 'prep';
-    s.timer = 15;
+    s.timer = TUNE.timeBetweenWaves;
     // Everyone gets a share; in co-op each cat gets a bit more than half.
-    const bonus = Math.round((10 + s.wave * 2) * TUNE.waveBonus * (s.players.length > 1 ? 0.6 : 1));
+    const bonus = Math.round((ECONOMY.waveBonusBase + s.wave * ECONOMY.waveBonusPerWave) * (s.players.length > 1 ? ECONOMY.coopBonusShare : 1));
     for (const p of s.players) p.coins += bonus;
     s.fx.push({ kind: 'banner', txt: `Wave cleared!  +${bonus} each`, life: 2.2, max: 2.2 });
     ev(s, 'clear');
@@ -313,7 +308,7 @@ function explode(s, b) {
   for (const e of s.enemies) {
     if (!hittable(e)) continue;
     if (Math.hypot(e.x - b.tx, e.y - b.ty) <= PLAYER.bombRadius + e.def.r) {
-      damage(s, e, 4, true);
+      damage(s, e, PLAYER.bombDmg, true);
       applyStun(e, PLAYER.bombStun);
     }
   }

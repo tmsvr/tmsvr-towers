@@ -1,0 +1,119 @@
+{
+  "_help": {
+    "units": "Distances and sizes are in tiles (1 tile = one grass square). Speeds are tiles per second. Times are seconds.",
+    "reload": "Save this file and reload the page to apply changes.",
+    "flowers.rate": "Seconds between attacks (lower = faster).",
+    "flowers.kind": "single = homing seed, beam = instant hit, bolt = piercing fireball in a line, cloud = poison cloud (damage is per stack per second), pulse = hits everything in range, chomp = bite (small critters are swallowed whole).",
+    "flowers.target": "first = enemy furthest along the path (default), strong = enemy with the most health.",
+    "flowerLevels.perLevel": "Bonus added per level above 1, e.g. damage 0.5 means +50% damage per level.",
+    "enemies.size": "Radius in tiles. 'light' enemies can be knocked back by the baton and swallowed by Snapdragons.",
+    "difficulty": "Enemy health = base * (1 + hpPerWave*(wave-1) + hpPerWaveSquared*(wave-1)^2). Wave size budget = waveBudgetBase + waveBudgetPerWave*wave.",
+    "waves": "Which enemies can appear: fromWave = first wave it shows up, weight = how often it is picked, cost = how much of the wave budget one group uses, group = how many spawn together."
+  },
+
+  "player": {
+    "speed": 4.1,
+    "batonDamage": 10,
+    "batonCooldown": 0.38,
+    "batonRange": 1.45,
+    "batonArcDegrees": 126,
+    "batonKnockback": 5,
+    "bombThrowDistance": 3.75,
+    "bombRadius": 1.9,
+    "bombDamage": 4,
+    "bombStunEnemies": 2.5,
+    "bombStunCats": 1.8,
+    "bombRecharge": 14
+  },
+
+  "economy": {
+    "startCoinsSolo": 60,
+    "startCoinsCoop": 40,
+    "coinDropMultiplier": 1,
+    "waveBonusBase": 10,
+    "waveBonusPerWave": 2,
+    "coopBonusShare": 0.6
+  },
+
+  "difficulty": {
+    "totalWaves": 15,
+    "lives": 20,
+    "firstWaveDelay": 30,
+    "timeBetweenWaves": 15,
+    "hpPerWave": 0.3,
+    "hpPerWaveSquared": 0.015,
+    "waveBudgetBase": 8,
+    "waveBudgetPerWave": 11,
+    "bossEvery": 5,
+    "bossWaveBudget": 0.6,
+    "soloWaveSize": 0.6,
+    "soloBossHp": 0.6,
+    "coopWaveSize": 1.0,
+    "coopEnemyHp": 1.0
+  },
+
+  "flowerLevels": {
+    "maxLevel": 5,
+    "loadoutSize": 4,
+    "upgradeCostMultipliers": [0.8, 1.1, 1.5, 2.0],
+    "growSeconds": [2, 3, 4.5, 6, 7.5],
+    "perLevel": {
+      "damage": 0.5,
+      "range": 0.06,
+      "fasterFiring": 0.07,
+      "slowStrength": 0.07,
+      "poisonStacks": 1,
+      "cloudSize": 0.08
+    },
+    "health": 100,
+    "wearPerSecond": 0.55,
+    "wearMultiplierByLevel": [1, 0.8, 0.65, 0.5, 0],
+    "healPerSecond": 40,
+    "fullHealCostFraction": 0.3,
+    "poisonSeconds": 3
+  },
+
+  "flowers": {
+    "daisy":     { "name": "Daisy",      "desc": "Rapid little seeds", "cost": 20, "range": 2.2, "damage": 5, "rate": 0.4, "kind": "single", "color": "#ffffff" },
+    "sunflower": { "name": "Sunflower",  "desc": "Huge range, slow, massive damage to the strongest", "cost": 55, "range": 5.5, "damage": 75, "rate": 3.2, "kind": "beam", "target": "strong", "color": "#ffd23f" },
+    "firelily":  { "name": "Fire Lily",  "desc": "Fireball pierces everything in a line", "cost": 45, "range": 3, "damage": 14, "rate": 1.6, "kind": "bolt", "color": "#ff7a2f" },
+    "stink":     { "name": "Stinkbloom", "desc": "Poison clouds stack, ignore armor (ground)", "cost": 45, "range": 2.6, "damage": 2.2, "rate": 2.4, "kind": "cloud", "cloudRadius": 0.95, "cloudSeconds": 3.5, "maxStacks": 5, "groundOnly": true, "color": "#9ad14b" },
+    "frost":     { "name": "Frostbloom", "desc": "Slows everything nearby", "cost": 35, "range": 1.8, "damage": 2, "rate": 0.8, "kind": "pulse", "slow": 0.55, "color": "#8fe3ff" },
+    "thorn":     { "name": "Thornrose",  "desc": "Spiky pulse hits all close enemies (ground)", "cost": 35, "range": 1.3, "damage": 11, "rate": 0.6, "kind": "pulse", "groundOnly": true, "color": "#ff4d5e" },
+    "snap":      { "name": "Snapdragon", "desc": "Swallows small critters whole, big bite on the rest (ground)", "cost": 40, "range": 1.3, "damage": 45, "rate": 2.4, "kind": "chomp", "groundOnly": true, "color": "#e0569b" }
+  },
+
+  "enemies": {
+    "grunt":    { "hp": 32,   "speed": 1.88, "coins": 2,  "livesLost": 1, "size": 0.28, "armor": 0 },
+    "swarm":    { "hp": 9,    "speed": 2.7,  "coins": 1,  "livesLost": 1, "size": 0.18, "armor": 0, "light": true },
+    "runner":   { "hp": 20,   "speed": 3.75, "coins": 2,  "livesLost": 1, "size": 0.25, "armor": 0, "light": true },
+    "flyer":    { "hp": 26,   "speed": 2.33, "coins": 3,  "livesLost": 1, "size": 0.25, "armor": 0, "flying": true },
+    "wasp":     { "hp": 16,   "speed": 4.43, "coins": 2,  "livesLost": 1, "size": 0.2,  "armor": 0, "flying": true, "light": true },
+    "shield":   { "hp": 70,   "speed": 1.58, "coins": 4,  "livesLost": 1, "size": 0.33, "armor": 3 },
+    "healer":   { "hp": 44,   "speed": 1.73, "coins": 4,  "livesLost": 1, "size": 0.28, "armor": 0, "heals": { "radius": 2, "perSecond": 7 } },
+    "tank":     { "hp": 170,  "speed": 1.2,  "coins": 7,  "livesLost": 2, "size": 0.4,  "armor": 1 },
+    "dasher":   { "hp": 30,   "speed": 1.65, "coins": 3,  "livesLost": 1, "size": 0.25, "armor": 0, "dash": { "every": 2.4, "duration": 0.55, "speedMultiplier": 3.2 } },
+    "splitter": { "hp": 60,   "speed": 1.5,  "coins": 3,  "livesLost": 1, "size": 0.35, "armor": 0, "split": { "into": "blobling", "count": 3 } },
+    "blobling": { "hp": 12,   "speed": 3.68, "coins": 1,  "livesLost": 1, "size": 0.18, "armor": 0, "light": true },
+    "mole":     { "hp": 48,   "speed": 1.8,  "coins": 3,  "livesLost": 1, "size": 0.28, "armor": 0, "burrow": { "aboveSeconds": 2.6, "belowSeconds": 1.8, "speedMultiplier": 1.5 } },
+    "aphid":    { "hp": 28,   "speed": 1.95, "coins": 2,  "livesLost": 1, "size": 0.23, "armor": 0, "light": true, "eats": { "damagePerSecond": 8, "chewSeconds": 3.5, "cooldown": 4, "reach": 1.25 } },
+    "hive":     { "hp": 150,  "speed": 1.05, "coins": 7,  "livesLost": 2, "size": 0.43, "armor": 1, "spawns": { "type": "swarm", "every": 4.5, "count": 2 } },
+    "boss":     { "hp": 1000, "speed": 0.98, "coins": 40, "livesLost": 5, "size": 0.6,  "armor": 2, "boss": true, "spawns": { "type": "grunt", "every": 6, "count": 2 } }
+  },
+
+  "waves": [
+    { "enemy": "grunt",    "fromWave": 1, "weight": 5, "cost": 1,   "group": 1 },
+    { "enemy": "swarm",    "fromWave": 2, "weight": 3, "cost": 2,   "group": 5 },
+    { "enemy": "runner",   "fromWave": 3, "weight": 2, "cost": 1.3, "group": 1 },
+    { "enemy": "dasher",   "fromWave": 3, "weight": 3, "cost": 1.5, "group": 1 },
+    { "enemy": "flyer",    "fromWave": 4, "weight": 2, "cost": 1.6, "group": 1 },
+    { "enemy": "splitter", "fromWave": 4, "weight": 3, "cost": 3,   "group": 1 },
+    { "enemy": "aphid",    "fromWave": 5, "weight": 3, "cost": 1.6, "group": 1 },
+    { "enemy": "shield",   "fromWave": 5, "weight": 2, "cost": 2.5, "group": 1 },
+    { "enemy": "tank",     "fromWave": 6, "weight": 2, "cost": 4.5, "group": 1 },
+    { "enemy": "mole",     "fromWave": 6, "weight": 3, "cost": 2,   "group": 1 },
+    { "enemy": "healer",   "fromWave": 7, "weight": 2, "cost": 3,   "group": 1 },
+    { "enemy": "hive",     "fromWave": 8, "weight": 2, "cost": 5,   "group": 1 },
+    { "enemy": "wasp",     "fromWave": 9, "weight": 2, "cost": 3,   "group": 3 }
+  ]
+}
