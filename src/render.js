@@ -1477,7 +1477,7 @@ function drawHud(c, s, time, ui) {
     rrect(c, bx - 16, by + 18, 32, 6, 3, 'rgba(0,0,0,0.45)');
     if (p.stam > 0.01) rrect(c, bx - 15, by + 19, 30 * p.stam, 4, 2, p.tired ? '#ff8a5a' : p.sprinting ? '#ffffff' : '#7fd4ff');
     (p.loadout || p.pick.chosen).forEach((t, j) => {
-      const sx = x0 + 50 + j * 79, sy = y0 + 42, sw = 75, sh = 38;
+      const sx = x0 + 50 + j * 104, sy = y0 + 42, sw = 100, sh = 38;
       const sel = p.loadout && p.building && j === p.sel;
       const afford = p.coins >= FLOWERS[t].cost;
       rrect(c, sx, sy, sw, sh, 8, sel ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.25)', sel ? pc : 'rgba(255,255,255,0.1)', sel ? 3 : 1);
@@ -1581,10 +1581,16 @@ function drawPick(c, s, ui, time) {
     label(c, F.name, cx, y0 + 106, 15, '#ffffff', 'center', 700, null);
     coinIcon(c, cx - 14, y0 + 125, 7);
     label(c, `${F.cost}`, cx + 2, y0 + 126, 13, '#ffe27a', 'left', 700, null);
-    wrapText(c, F.desc, cw - 14, 11.5).slice(0, 3).forEach((l, j) => label(c, l, cx, y0 + 146 + j * 14, 11.5, '#cfe0ea', 'center', 500, null));
+    wrapText(c, F.desc, cw - 14, 11.5).slice(0, 3).forEach((l, j) => label(c, l, cx, y0 + 142 + j * 13, 11.5, '#cfe0ea', 'center', 500, null));
     const st = flowerStats(t, 1);
-    label(c, st.range >= GLOBAL_RANGE ? 'Range: whole map' : `Range ${(st.range / T).toFixed(1)}`, cx, y0 + 194, 11, '#8fa5b3', 'center', 500, null);
-    label(c, F.kind === 'cloud' ? `${st.dmg}/s per stack` : F.kind === 'chomp' ? `Bite ${st.dmg}` : `Dmg ${st.dmg} · every ${st.rate}s`, cx, y0 + 209, 11, '#8fa5b3', 'center', 500, null);
+    // every card: range, damage, how often (the poison cloud says how it works)
+    const lines = [st.range >= GLOBAL_RANGE ? 'Range: whole map' : `Range ${(st.range / T).toFixed(1)}`];
+    if (F.kind === 'cloud') lines.push(`${st.dmg} dmg/s per stack (x${st.stacks})`, `cloud every ${+st.rate.toFixed(2)}s`);
+    else {
+      lines.push(F.kind === 'chomp' ? `${st.dmg} dmg bite` : F.kind === 'bolt' ? `${st.dmg} dmg, pierces` : F.kind === 'pulse' ? (st.slow ? `${st.dmg} dmg + slows all` : `${st.dmg} dmg to all near`) : `${st.dmg} dmg`);
+      lines.push(`every ${+st.rate.toFixed(2)}s`);
+    }
+    lines.forEach((t, j) => label(c, fitText(c, t, cw - 8, 11), cx, y0 + 215 - (lines.length - 1 - j) * 13, 11, j ? '#cfe0ea' : '#8fa5b3', 'center', 500, null));
     pickedBy.forEach((p) => {
       const n = p.pick.chosen.indexOf(t) + 1;
       const bx = p.id === 0 ? x + 18 : x + cw - 18;
@@ -1603,7 +1609,7 @@ function drawPick(c, s, ui, time) {
       : p.pick.row === 1 ? `[${L(k.left)}/${L(k.right)}] change cat · [${L(k.up)}] map · [${L(k.down)}] flowers`
       : `[${L(k.left)}/${L(k.right)}] move · [${L(k.build)}] pick · [${L(k.up)}] cats · [${L(k.atk)}] ready`;
     const who = `${CATS[p.cat].name}, `;
-    const msg = p.pick.ready ? `Ready with ${CATS[p.cat].name}! ✓` : n < LOADOUT_SIZE ? `${who}${n}/${LOADOUT_SIZE} flowers   ${keys}` : `${who}4/4 — [${L(k.atk)}] when ready   ${keys}`;
+    const msg = p.pick.ready ? `Ready with ${CATS[p.cat].name}! ✓` : n < LOADOUT_SIZE ? `${who}${n}/${LOADOUT_SIZE} flowers   ${keys}` : `${who}${LOADOUT_SIZE}/${LOADOUT_SIZE} — [${L(k.atk)}] when ready   ${keys}`;
     rrect(c, VIEW_W / 2 - 360, y - 11, 32, 22, 11, PLAYER.scarves[p.id]);
     label(c, `P${p.id + 1}`, VIEW_W / 2 - 344, y + 0.5, 12, '#fff', 'center', 700, null);
     label(c, fitText(c, msg, 700, 14, 600), VIEW_W / 2 - 318, y + 1, 14, p.pick.ready ? '#8dff9a' : '#e8f1f7', 'left', 600, null);
@@ -1644,7 +1650,7 @@ function drawMenu(c, time, ui) {
   const tips = [
     'Plant key: build mode, again to plant a seedling, then HOLD to pour coins in. Next-flower key cycles.',
     'Flowers wear out as they fight: stand on one and HOLD the heal key. Mode key on a flower: dig it up for 60% back.',
-    'Each player picks a different cat and 4 of the 7 flowers. In co-op, coins picked up are shared.',
+    `Each player picks a different cat and ${LOADOUT_SIZE} of the ${FLOWER_ORDER.length} flowers. In co-op, coins picked up are shared.`,
   ];
   tips.forEach((t, i) => label(c, t, cx, 455 + i * 24, 13.5, '#cfe0ea', 'center', 500, null));
   label(c, 'Enter: start wave early  ·  P: pause  ·  N: sound  ·  J: effects  ·  Esc: menu', cx, 545, 14, '#8fa5b3', 'center', 500, null);

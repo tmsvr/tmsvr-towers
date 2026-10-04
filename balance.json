@@ -94,7 +94,7 @@
 
   "flowerLevels": {
     "maxLevel": 5,
-    "loadoutSize": 4,
+    "loadoutSize": 3,
     "upgradeCostMultipliers": [0.8, 1.1, 1.5, 2.0],
     "growSeconds": [2, 3, 4.5, 6, 7.5],
     "perLevel": {

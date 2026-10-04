@@ -32,7 +32,7 @@ them.
 ## Playing
 
 - **1** solo · **2** local co-op (one keyboard) · **3** host online · **4** join online
-- Before each game, pick a map, a cat and 4 of the 7 flowers. Two players can't
+- Before each game, pick a map, a cat and 3 of the 7 flowers. Two players can't
   pick the same cat: Brick (slow, big hits), Zip (fast, light hits), Fern
   (grows and heals faster) or Boom (faster, bigger bombs).
 - Standing on a flower, hold E to upgrade it and R to heal it. Q switches E to
