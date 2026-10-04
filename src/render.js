@@ -1,19 +1,28 @@
 // Canvas rendering. Reads game state, never mutates it.
 // The world is bigger than the screen: everything on the map is drawn relative to ui.cam.
+//
+// The state is either the host's (sim.js createState) or the guest's, rebuilt
+// from snapshots (snapshot.js newGuestState); both must provide what this
+// file reads:
+//   m (the map), phase, wave, timer, lives, maxLives, baseHitT, over, won, kills,
+//   queue (an array; only its length is used), grid (tile -> flower),
+//   players, flowers, enemies (each with its def), drops, projs, bombs, clouds,
+// with each entity carrying the fields schema.js sends for it.
 import {
-  T, U, W, H, WORLD_W, WORLD_H, VIEW_W, MAP_H, HUD_H, TOTAL_WAVES, PATHS, BASE, PATH_TILES, BLOCKED, MAP, MAPS,
+  T, U, VIEW_W, MAP_H, HUD_H, TOTAL_WAVES, MAPS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, flowerStats, upgradeCost, PLAYER, CATS, CAT_ORDER, GLOBAL_RANGE,
 } from './data.js';
 import { tileOf, canBuildAt, healCostPerHp, uprootRefund, catStats } from './sim.js';
 import { isMuted } from './audio.js';
 import { observeJuice, drawJuiceWorld, drawJuiceScreen, hitSquash, swingSquash, coinScale } from './juice.js';
+import { liveEffects } from './fx.js';
+import { clamp, seededRandom } from './util.js';
 
 export { VIEW_W };
 export const VIEW_H = MAP_H + HUD_H;
 
 const FONT = '"Fredoka", system-ui, -apple-system, sans-serif';
 const OUT = '#2b2118';
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 // ---- primitives -------------------------------------------------------------
 function circle(c, x, y, r, fill, stroke, lw = 2) {
@@ -51,32 +60,34 @@ function fitText(c, txt, maxW, size, weight = 500) {
   while (txt.length > 4 && c.measureText(txt + '…').width > maxW) txt = txt.slice(0, -1);
   return txt + '…';
 }
+// Blend two #rrggbb colours. Withering flowers ask for this every frame, so
+// results are remembered (t is rounded to 1/64, which nobody can see).
+const mixed = new Map();
 function mix(a, b, t) {
-  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
-  const ch = (p, s) => (p >> s) & 255;
-  const m = (s) => Math.round(ch(pa, s) + (ch(pb, s) - ch(pa, s)) * t);
-  return `rgb(${m(16)},${m(8)},${m(0)})`;
+  t = Math.round(t * 64) / 64;
+  const key = a + b + t;
+  let out = mixed.get(key);
+  if (!out) {
+    const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+    const ch = (p, s) => (p >> s) & 255;
+    const m = (s) => Math.round(ch(pa, s) + (ch(pb, s) - ch(pa, s)) * t);
+    out = `rgb(${m(16)},${m(8)},${m(0)})`;
+    if (mixed.size > 4000) mixed.clear();
+    mixed.set(key, out);
+  }
+  return out;
 }
-function mulberry(seed) {
-  return () => {
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-const isPath = (x, y) => PATH_TILES.has(Math.floor(y / T) * W + Math.floor(x / T));
 
 // ---- static background (pre-rendered once per map) -------------------------
 let bgCache = null;
-function getBg(dpr) {
-  if (bgCache && bgCache.dpr === dpr && bgCache.map === MAP) return bgCache.cv;
+function getBg(m, dpr) {
+  if (bgCache && bgCache.dpr === dpr && bgCache.map === m) return bgCache.cv;
   const cv = document.createElement('canvas');
-  cv.width = WORLD_W * dpr; cv.height = WORLD_H * dpr;
+  cv.width = m.worldW * dpr; cv.height = m.worldH * dpr;
   const c = cv.getContext('2d');
   c.scale(dpr, dpr);
-  paintBg(c);
-  bgCache = { dpr, cv, map: MAP };
+  paintBg(c, m);
+  bgCache = { dpr, cv, map: m };
   return cv;
 }
 
@@ -130,10 +141,10 @@ function drawTree(c, o, time) {
 
 // The cottage yard: a flat, mown lawn with a pebble edging and stepping
 // stones. Nothing upright, so it reads as walkable, just not plantable.
-function drawYard(c, r) {
-  const [bx, by] = MAP.baseTile;
+function drawYard(c, m, r) {
+  const [bx, by] = m.baseTile;
   const x0 = Math.max(0, bx - 1) * T, y0 = Math.max(0, by - 1) * T;
-  const x1 = Math.min(W, bx + 2) * T, y1 = Math.min(H, by + 2) * T;
+  const x1 = Math.min(m.W, bx + 2) * T, y1 = Math.min(m.H, by + 2) * T;
   c.save();
   c.beginPath(); c.roundRect(x0 + 3, y0 + 3, x1 - x0 - 6, y1 - y0 - 6, T * 0.3); c.clip();
   // mown stripes
@@ -151,7 +162,7 @@ function drawYard(c, r) {
   // stepping stones leading from the door out to each side of the yard
   const cx = (bx + 0.5) * T, cy = (by + 0.5) * T;
   for (const [dx, dy] of [[0, 1], [-1, 0], [1, 0], [0, -1]]) {
-    if (PATH_TILES.has((by + dy) * W + bx + dx)) continue;
+    if (m.pathTiles.has((by + dy) * m.W + bx + dx)) continue;
     for (const k of [0.62, 1.05]) {
       const sx = cx + dx * T * k + (r() - 0.5) * 4, sy = cy + dy * T * k + (dy ? 0 : 8);
       ellipse(c, sx, sy + 1.5, T * 0.15, T * 0.1, 'rgba(0,0,0,0.12)');
@@ -167,8 +178,9 @@ function drawYard(c, r) {
   }
 }
 
-function paintBg(c) {
-  const r = mulberry(7 + MAP.index * 101);
+function paintBg(c, m) {
+  const { W, H, worldW: WORLD_W, worldH: WORLD_H, paths: PATHS, pathTiles: PATH_TILES, blocked: BLOCKED } = m;
+  const r = seededRandom(7 + m.index * 101);
   const area = (W * H) / (36 * 22);
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) { c.fillStyle = (x + y) % 2 ? '#86c35a' : '#7fbd52'; c.fillRect(x * T, y * T, T, T); }
@@ -184,7 +196,8 @@ function paintBg(c) {
     c.fillStyle = r() < 0.5 ? 'rgba(255,255,255,0.07)' : 'rgba(0,70,0,0.09)';
     c.fillRect(r() * WORLD_W, r() * WORLD_H, 2, 2);
   }
-  const free = (x, y) => !isPath(x, y) && !BLOCKED.has(Math.floor(y / T) * W + Math.floor(x / T));
+  const tile = (x, y) => Math.floor(y / T) * W + Math.floor(x / T);
+  const free = (x, y) => !PATH_TILES.has(tile(x, y)) && !BLOCKED.has(tile(x, y));
   c.strokeStyle = '#5f9e3c'; c.lineWidth = 2; c.lineCap = 'round';
   for (let i = 0; i < 640 * area; i++) {
     const x = r() * WORLD_W, y = r() * WORLD_H;
@@ -200,8 +213,8 @@ function paintBg(c) {
     const col = wild[Math.floor(r() * wild.length)];
     for (let k = 0; k < 3; k++) circle(c, x + (r() - 0.5) * 12, y + (r() - 0.5) * 8, 2.2, col);
   }
-  drawYard(c, r);
-  for (const o of MAP.obstacles) if (o.type === 'pond') drawPond(c, o, r);
+  drawYard(c, m, r);
+  for (const o of m.obstacles) if (o.type === 'pond') drawPond(c, o, r);
   // roads: all edges first, then all surfaces, so crossings merge cleanly
   const roads = PATHS.map((p) => [{ x: p.spawn.x - Math.cos(p.dir) * T, y: p.spawn.y - Math.sin(p.dir) * T }, ...p.waypoints]);
   for (const pts of roads) strokePoly(c, pts.map((p) => ({ x: p.x, y: p.y + 4 })), T * 0.94, 'rgba(0,0,0,0.12)');
@@ -228,9 +241,9 @@ function paintBg(c) {
       }
     }
   }
-  for (const o of MAP.obstacles) if (o.type === 'rock') drawRock(c, o);
+  for (const o of m.obstacles) if (o.type === 'rock') drawRock(c, o);
   // a monster cave where each road enters the map
-  for (const path of PATHS) {
+  for (const path of m.paths) {
     const ex = path.waypoints[0].x - Math.cos(path.dir) * T * 0.55, ey = path.waypoints[0].y - Math.sin(path.dir) * T * 0.55;
     c.save(); c.translate(ex, ey); c.rotate(path.dir);
     ellipse(c, -6, 0, T * 0.75, T * 0.85, '#5e5a66', OUT, 3);
@@ -290,14 +303,53 @@ const HEADS = [
 const LEVEL_SCALE = [0, 0.8, 0.9, 1, 1.08, 1.16];
 const WITHER = '#9a7b55';
 
+// ---- flower heads, painted once and reused ---------------------------------
+// A head has up to 14 stroked petals; a garden of level-5 flowers would mean
+// thousands of path operations a frame. Each look (type × how withered ×
+// mouth × crown) is painted once into a small canvas and stamped from then
+// on. Only the pupils are drawn live, so the flowers still watch their targets.
+const SPRITE_R = 20;        // head-local units from the centre to the sprite edge
+let spriteScale = 4;        // sprite pixels per unit; follows the screen's pixel ratio
+const sprites = new Map();
+
+function sprite(key, paint) {
+  let cv = sprites.get(key);
+  if (!cv) {
+    cv = document.createElement('canvas');
+    cv.width = cv.height = Math.ceil(SPRITE_R * 2 * spriteScale);
+    const g = cv.getContext('2d');
+    g.scale(spriteScale, spriteScale);
+    g.translate(SPRITE_R, SPRITE_R);
+    paint(g);
+    sprites.set(key, cv);
+  }
+  return cv;
+}
+const stamp = (c, cv) => c.drawImage(cv, -SPRITE_R, -SPRITE_R, SPRITE_R * 2, SPRITE_R * 2);
+
+function setSpriteScale(dpr) {
+  const k = 2 * dpr; // heads are drawn at up to ~1.7 screen pixels per unit
+  if (k !== spriteScale) { spriteScale = k; sprites.clear(); }
+}
+
 // A flower face: petals around a disc with eyes and a mouth.
+// o: { wither 0..1, spin (radians, petals only), look (radians), mouth, crown }
 function drawHead(c, type, o = {}) {
+  const w = Math.round((o.wither || 0) * 8) / 8;
+  const mouth = o.mouth || 'smile';
+  const petals = sprite(`p${type}${w}`, (g) => paintPetals(g, type, w));
+  if (o.spin) { c.save(); c.rotate(o.spin); stamp(c, petals); c.restore(); } else stamp(c, petals);
+  stamp(c, sprite(`f${type}${w}${mouth}${o.crown ? 1 : 0}`, (g) => paintFace(g, type, w, mouth, o.crown)));
+  if (mouth !== 'sleep') {
+    const lx = o.look != null ? Math.cos(o.look) * 1.1 : 0, ly = o.look != null ? Math.sin(o.look) * 0.8 : 0;
+    for (const ex of [-2.4, 2.4]) circle(c, ex + lx, -1.1 + ly, 1, '#1a1a1a');
+  }
+}
+
+function paintPetals(c, type, w) {
   const sp = SPEC[type];
-  const w = o.wither || 0;
   const petal = w ? mix(sp.petal, WITHER, w * 0.8) : sp.petal;
-  c.save();
   if (sp.big) c.scale(sp.big, sp.big);
-  if (o.spin) c.rotate(o.spin);
   for (let i = 0; i < sp.n; i++) {
     c.save(); c.rotate((i / sp.n) * Math.PI * 2);
     if (type === 'frost' || sp.pointy) {
@@ -311,26 +363,26 @@ function drawHead(c, type, o = {}) {
     c.restore();
   }
   if (type === 'thorn') for (let i = 0; i < 5; i++) { c.save(); c.rotate((i / 5) * Math.PI * 2 + 0.3); ellipse(c, 4.5, 0, 4.5, 3.6, w ? mix('#e0283d', WITHER, w) : '#e0283d', OUT, 1.1); c.restore(); }
-  c.restore();
+}
+
+// Everything on the face except the pupils.
+function paintFace(c, type, w, mouth, crown) {
+  const sp = SPEC[type];
   const fr = (type === 'sunflower' ? 7.5 : 6.2) * (sp.big || 1);
   circle(c, 0, 0, fr, w ? mix(sp.face, WITHER, w * 0.6) : sp.face, OUT, 1.5);
   if (type === 'sunflower') for (let i = 0; i < 6; i++) circle(c, Math.cos(i * 1.3) * 6, 3.5 + Math.sin(i * 2.3) * 1.8, 0.8, '#3d220c');
   // eyes
-  const lx = o.look != null ? Math.cos(o.look) * 1.1 : 0, ly = o.look != null ? Math.sin(o.look) * 0.8 : 0;
   const eyeWhite = type === 'stink' ? '#e6ffb0' : '#ffffff';
-  if (o.mouth === 'sleep') {
+  if (mouth === 'sleep') {
     c.strokeStyle = OUT; c.lineWidth = 1.1;
     for (const ex of [-2.4, 2.4]) { c.beginPath(); c.arc(ex, -1, 1.4, 0.2, Math.PI - 0.2); c.stroke(); }
   } else {
-    for (const ex of [-2.4, 2.4]) {
-      ellipse(c, ex, -1.2, 1.7, 2.1, eyeWhite, OUT, 0.9);
-      circle(c, ex + lx, -1.1 + ly, 1, '#1a1a1a');
-    }
+    for (const ex of [-2.4, 2.4]) ellipse(c, ex, -1.2, 1.7, 2.1, eyeWhite, OUT, 0.9);
     if (type === 'sunflower') { // squinting sniper
       c.strokeStyle = OUT; c.lineWidth = 1.2; c.beginPath(); c.moveTo(-4.5, -3.3); c.lineTo(4.5, -3.3); c.stroke();
     }
   }
-  if (type === 'thorn' || type === 'firelily' || type === 'snap' || o.mouth === 'open') {
+  if (type === 'thorn' || type === 'firelily' || type === 'snap' || mouth === 'open') {
     c.strokeStyle = OUT; c.lineWidth = 1.1; c.lineCap = 'round';
     c.beginPath(); c.moveTo(-3.8, -4); c.lineTo(-1.2, -3); c.moveTo(3.8, -4); c.lineTo(1.2, -3); c.stroke();
   }
@@ -338,15 +390,15 @@ function drawHead(c, type, o = {}) {
   c.strokeStyle = OUT; c.lineWidth = 1.1; c.lineCap = 'round';
   if (sp.teeth) {
     // a big toothy jaw that gapes when it bites
-    const open = o.mouth === 'open' ? 3.4 : 1.7;
+    const open = mouth === 'open' ? 3.4 : 1.7;
     ellipse(c, 0, 3, 4.6, open, '#5a1a2a', OUT, 0.9);
     c.fillStyle = '#ffffff';
     for (const tx of [-2.8, -0.9, 1, 2.9]) { c.beginPath(); c.moveTo(tx - 0.8, 3 - open + 0.3); c.lineTo(tx + 0.8, 3 - open + 0.3); c.lineTo(tx, 3 - open + 1.8); c.fill(); }
-  } else if (o.mouth === 'open') ellipse(c, 0, 2.6, 1.8, 2, type === 'firelily' ? '#ff9a3c' : type === 'stink' ? '#9ad14b' : '#5a1a1a', OUT, 0.9);
-  else if (o.mouth === 'sad') { c.beginPath(); c.arc(0, 4.2, 1.6, Math.PI + 0.4, -0.4); c.stroke(); }
+  } else if (mouth === 'open') ellipse(c, 0, 2.6, 1.8, 2, type === 'firelily' ? '#ff9a3c' : type === 'stink' ? '#9ad14b' : '#5a1a1a', OUT, 0.9);
+  else if (mouth === 'sad') { c.beginPath(); c.arc(0, 4.2, 1.6, Math.PI + 0.4, -0.4); c.stroke(); }
   else if (type === 'stink') { c.beginPath(); c.moveTo(-2, 2.5); c.quadraticCurveTo(0, 1.5, 2, 2.8); c.stroke(); }
-  else if (o.mouth !== 'sleep') { c.beginPath(); c.arc(0, 1.6, 1.6, 0.3, Math.PI - 0.3); c.stroke(); }
-  if (o.crown) {
+  else if (mouth !== 'sleep') { c.beginPath(); c.arc(0, 1.6, 1.6, 0.3, Math.PI - 0.3); c.stroke(); }
+  if (crown) {
     c.fillStyle = '#ffd23f'; c.strokeStyle = OUT; c.lineWidth = 1.2; c.lineJoin = 'round';
     c.beginPath(); c.moveTo(-5, -fr - 1); c.lineTo(-5.5, -fr - 7); c.lineTo(-2.5, -fr - 4); c.lineTo(0, -fr - 8.5);
     c.lineTo(2.5, -fr - 4); c.lineTo(5.5, -fr - 7); c.lineTo(5, -fr - 1); c.closePath(); c.fill(); c.stroke();
@@ -807,7 +859,7 @@ function drawCat(c, p, time) {
     const bx = p.x, by = p.y + bob;
     let a, inner = 10 * U, outer = 34 * U;
     if (p.swingT > 0) {
-      const k = 1 - p.swingT / 0.18;
+      const k = 1 - p.swingT / PLAYER.swingTime;
       const a0 = p.swingDir - PLAYER.atkArc / 2, reach = catStats(p).atkRange;
       a = a0 + PLAYER.atkArc * k;
       c.globalAlpha = 0.6;
@@ -833,8 +885,8 @@ function drawCat(c, p, time) {
 
 function drawBuildGhost(c, p, s, time) {
   if (!p.loadout) return;
-  const { tx, ty } = tileOf(p);
-  const f = s.grid.get(ty * W + tx);
+  const { tx, ty } = tileOf(s.m, p);
+  const f = s.grid.get(ty * s.m.W + tx);
   if (!f && !p.building) return; // the placeholder only shows in build mode
   const type = p.loadout[p.sel];
   const valid = f ? true : canBuildAt(s, tx, ty);
@@ -904,8 +956,8 @@ function drawBomb(c, b, time) {
   star(c, b.x + 9, y - 13, 4 + Math.sin(time * 40) * 1.5, '#ffdd55');
 }
 
-function drawFx(c, s) {
-  for (const f of s.fx) {
+function drawFx(c) {
+  for (const f of liveEffects()) {
     const k = f.life / f.max;
     if (f.kind === 'ring') {
       c.globalAlpha = k * 0.8;
@@ -943,8 +995,8 @@ function drawFx(c, s) {
   }
 }
 
-function drawBanners(c, s) {
-  for (const f of s.fx) {
+function drawBanners(c) {
+  for (const f of liveEffects()) {
     if (f.kind !== 'banner') continue;
     const k = f.life / f.max;
     const inT = Math.min(1, (f.max - f.life) * 6);
@@ -960,23 +1012,48 @@ function drawBanners(c, s) {
 
 // ---- minimap ---------------------------------------------------------------
 const MM_W = 216, MM_X = VIEW_W - MM_W - 10, MM_Y = 10;
+// The minimap's picture of the map never changes, so it is shrunk from the big
+// background once per map. Shrinking that ~4000 px image every frame was the
+// most expensive thing in the whole frame on a computer without GPU canvas.
+let mmCache = null;
+function minimapBg(m, dpr, w, h) {
+  if (mmCache && mmCache.map === m && mmCache.dpr === dpr) return mmCache.cv;
+  let src = getBg(m, dpr);
+  // halve step by step; one big jump would skip pixels and look grainy
+  while (src.width / 2 >= w * dpr * 1.5) {
+    const half = document.createElement('canvas');
+    half.width = Math.ceil(src.width / 2); half.height = Math.ceil(src.height / 2);
+    half.getContext('2d').drawImage(src, 0, 0, half.width, half.height);
+    src = half;
+  }
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  const c = cv.getContext('2d');
+  c.scale(dpr, dpr);
+  c.globalAlpha = 0.85;
+  c.drawImage(src, 0, 0, w, h);
+  c.globalAlpha = 1;
+  const sx = w / m.worldW, sy = h / m.worldH;
+  for (const o of m.obstacles) if (o.type === 'tree') circle(c, (o.x + 0.5) * T * sx, (o.y + 0.5) * T * sy, 1.8, '#2f6f2c');
+  mmCache = { map: m, dpr, cv };
+  return cv;
+}
+
 function drawMinimap(c, s, ui) {
-  const MM_H = Math.round(MM_W * WORLD_H / WORLD_W);
-  const sx = MM_W / WORLD_W, sy = MM_H / WORLD_H;
+  const m = s.m, base = m.base;
+  const MM_H = Math.round(MM_W * m.worldH / m.worldW);
+  const sx = MM_W / m.worldW, sy = MM_H / m.worldH;
   const mx = (x) => MM_X + x * sx, my = (y) => MM_Y + y * sy;
   c.save();
   rrect(c, MM_X - 3, MM_Y - 3, MM_W + 6, MM_H + 6, 8, 'rgba(20,28,36,0.8)', 'rgba(255,255,255,0.35)', 1.5);
-  c.globalAlpha = 0.85;
-  c.drawImage(getBg(ui.dpr), MM_X, MM_Y, MM_W, MM_H);
-  c.globalAlpha = 1;
-  for (const o of MAP.obstacles) if (o.type === 'tree') circle(c, mx((o.x + 0.5) * T), my((o.y + 0.5) * T), 1.8, '#2f6f2c');
+  c.drawImage(minimapBg(m, ui.dpr, MM_W, MM_H), MM_X, MM_Y, MM_W, MM_H);
   for (const f of s.flowers) {
     const r = 1.6 + f.lvl * 0.5;
     c.fillStyle = f.lvl === 0 ? '#3e8a2e' : FLOWERS[f.type].color;
     c.fillRect(mx(f.x) - r, my(f.y) - r, r * 2, r * 2);
   }
   for (const e of s.enemies) circle(c, mx(e.x), my(e.y), e.def.boss ? 4.5 : e.def.r > 14 * U ? 3 : 2, e.def.boss ? '#ff3030' : '#e0405a');
-  circle(c, mx(BASE.x), my(BASE.y), s.baseHitT > 0 ? 6 + Math.sin(performance.now() / 80) * 2 : 4, s.baseHitT > 0 ? '#ff4040' : '#ffffff', OUT, 1.5);
+  circle(c, mx(base.x), my(base.y), s.baseHitT > 0 ? 6 + Math.sin(performance.now() / 80) * 2 : 4, s.baseHitT > 0 ? '#ff4040' : '#ffffff', OUT, 1.5);
   for (const p of s.players) circle(c, mx(p.x), my(p.y), 4.5, PLAYER.scarves[p.id], '#ffffff', 1.5);
   c.strokeStyle = 'rgba(255,255,255,0.9)'; c.lineWidth = 1.5;
   c.strokeRect(mx(ui.cam.x), my(ui.cam.y), VIEW_W * sx, MAP_H * sy);
@@ -986,7 +1063,7 @@ function drawMinimap(c, s, ui) {
 // Arrows at the screen edge pointing at off-screen cats and the base when it's under attack.
 function drawEdgeMarkers(c, s, ui) {
   const markers = s.players.map((p) => ({ x: p.x, y: p.y, col: PLAYER.scarves[p.id], txt: `P${p.id + 1}` }));
-  if (s.baseHitT > 0) markers.push({ x: BASE.x, y: BASE.y, col: '#ff4040', txt: '🏠!' });
+  if (s.baseHitT > 0) markers.push({ x: s.m.base.x, y: s.m.base.y, col: '#ff4040', txt: '🏠!' });
   for (const m of markers) {
     const vx = m.x - ui.cam.x, vy = m.y - ui.cam.y;
     if (vx > 0 && vx < VIEW_W && vy > 0 && vy < MAP_H) continue;
@@ -1011,13 +1088,15 @@ function contextText(s, p, ui) {
   if (!p.loadout) return p.pick.ready ? 'Ready! Waiting for the other cat…' : 'Choosing flowers…';
   if (p.stun > 0) return 'Knocked down!';
   const key = ui.keyLabel(ui.keysFor(p.id).build), cyc = ui.keyLabel(ui.keysFor(p.id).cycle);
-  const { tx, ty } = tileOf(p);
-  const f = s.grid.get(ty * W + tx);
+  const m = s.m;
+  const { tx, ty } = tileOf(m, p);
+  const k = ty * m.W + tx;
+  const f = s.grid.get(k);
   if (!f) {
     if (!p.building) return `[${key}] or [${cyc}] build mode`;
-    if (PATH_TILES.has(ty * W + tx)) return "Can't plant on the path";
-    if (MAP.yard.has(ty * W + tx)) return 'Cottage yard · no planting here';
-    if (BLOCKED.has(ty * W + tx)) return "Something's in the way";
+    if (m.pathTiles.has(k)) return "Can't plant on the path";
+    if (m.yard.has(k)) return 'Cottage yard · no planting here';
+    if (m.blocked.has(k)) return "Something's in the way";
     const F = FLOWERS[p.loadout[p.sel]];
     return `[${key}] plant ${F.name} (${F.cost}) · [${cyc}] next · ${F.desc}`;
   }
@@ -1055,7 +1134,7 @@ function drawHud(c, s, time, ui) {
 
   const pw = 370;
   s.players.forEach((p, i) => {
-    const x0 = 250 + i * (pw + 12) - (s.players.length === 1 ? 0 : 0);
+    const x0 = 250 + i * (pw + 12);
     const pc = PLAYER.scarves[i];
     rrect(c, x0, y0 + 9, pw, HUD_H - 18, 12, 'rgba(255,255,255,0.06)', pc, 2);
     rrect(c, x0 + 10, y0 + 17, 30, 18, 9, pc);
@@ -1255,16 +1334,28 @@ function drawMenu(c, time, ui) {
   label(c, 'Online, both players use the P1 keys (or arrows) on their own keyboard.', cx, 570, 13, '#8fa5b3', 'center', 500, null);
 }
 
+// The depth-sorted draw list, reused every frame.
+const FLOWER = 0, ENEMY = 1, CAT = 2, TREE = 3;
+const actors = [], actorPool = [];
+function addActor(y, kind, o) {
+  const a = actorPool[actors.length] || (actorPool[actors.length] = {});
+  a.y = y; a.kind = kind; a.o = o;
+  actors.push(a);
+}
+const byY = (a, b) => a.y - b.y;
+
 export function render(c, s, ui) {
   const time = performance.now() / 1000;
+  setSpriteScale(ui.dpr);
   c.clearRect(0, 0, VIEW_W, VIEW_H);
   const camX = Math.round(ui.cam.x), camY = Math.round(ui.cam.y);
   c.save();
   if (ui.shake > 0) c.translate((Math.random() - 0.5) * ui.shake * 2, (Math.random() - 0.5) * ui.shake * 2);
-  const bg = getBg(ui.dpr);
+  const m = s ? s.m : ui.menuMap; // the menu shows the last map played
+  const bg = getBg(m, ui.dpr);
   c.drawImage(bg, camX * ui.dpr, camY * ui.dpr, VIEW_W * ui.dpr, MAP_H * ui.dpr, 0, 0, VIEW_W, MAP_H);
   c.translate(-camX, -camY);
-  for (const path of PATHS) {
+  for (const path of m.paths) {
     const ex = path.waypoints[0].x - Math.cos(path.dir) * T * 0.55, ey = path.waypoints[0].y - Math.sin(path.dir) * T * 0.55;
     for (let i = 0; i < 3; i++) {
       const a = time * 2 + i * 2.1;
@@ -1272,8 +1363,8 @@ export function render(c, s, ui) {
     }
   }
   if (!s) {
-    for (const o of MAP.obstacles) if (o.type === 'tree') drawTree(c, o, time);
-    drawCottage(c, BASE.x, BASE.y, 1, 1, 0, time);
+    for (const o of m.obstacles) if (o.type === 'tree') drawTree(c, o, time);
+    drawCottage(c, m.base.x, m.base.y, 1, 1, 0, time);
     c.restore();
     drawMenu(c, time, ui);
     return;
@@ -1283,28 +1374,35 @@ export function render(c, s, ui) {
   const M = T * 1.5;
   const vis = (o) => o.x > camX - M && o.x < camX + VIEW_W + M && o.y > camY - M && o.y < camY + MAP_H + M;
   for (const p of s.players) drawBuildGhost(c, p, s, time);
-  drawCottage(c, BASE.x, BASE.y, s.lives, s.maxLives, s.baseHitT, time);
+  drawCottage(c, m.base.x, m.base.y, s.lives, s.maxLives, s.baseHitT, time);
   for (const cl of s.clouds) if (vis(cl)) drawCloud(c, cl, time);
   for (const d of s.drops) if (vis(d)) drawDrop(c, d, time);
-  const actors = [
-    ...s.flowers.filter(vis).map((f) => ({ y: f.y + T * 0.2, draw: () => drawFlower(c, f, time) })),
-    ...s.enemies.filter((e) => !e.def.flying && vis(e)).map((e) => ({ y: e.y, draw: () => drawEnemy(c, e, time) })),
-    ...s.players.map((p) => ({ y: p.y, draw: () => drawCat(c, p, time) })),
-    ...MAP.obstacles.filter((o) => o.type === 'tree' && vis({ x: (o.x + 0.5) * T, y: (o.y + 0.5) * T }))
-      .map((o) => ({ y: (o.y + 0.75) * T, draw: () => drawTree(c, o, time) })),
-  ].sort((a, b) => a.y - b.y);
-  for (const a of actors) a.draw();
+  // things standing on the ground, drawn back to front
+  actors.length = 0;
+  for (const f of s.flowers) if (vis(f)) addActor(f.y + T * 0.2, FLOWER, f);
+  for (const e of s.enemies) if (!e.def.flying && vis(e)) addActor(e.y, ENEMY, e);
+  for (const p of s.players) addActor(p.y, CAT, p);
+  for (const o of m.obstacles) {
+    if (o.type === 'tree' && vis({ x: (o.x + 0.5) * T, y: (o.y + 0.5) * T })) addActor((o.y + 0.75) * T, TREE, o);
+  }
+  actors.sort(byY);
+  for (const a of actors) {
+    if (a.kind === FLOWER) drawFlower(c, a.o, time);
+    else if (a.kind === ENEMY) drawEnemy(c, a.o, time);
+    else if (a.kind === CAT) drawCat(c, a.o, time);
+    else drawTree(c, a.o, time);
+  }
   for (const f of s.flowers) if (vis(f)) drawFlowerStatus(c, f, s);
   for (const p of s.players) if (p.working) drawWorkStream(c, p, time);
   for (const e of s.enemies) if (e.def.flying && vis(e)) drawEnemy(c, e, time);
   for (const pr of s.projs) if (vis(pr)) drawProj(c, pr, time);
   for (const b of s.bombs) drawBomb(c, b, time);
-  drawFx(c, s);
+  drawFx(c);
   drawJuiceWorld(c);
   c.restore();
   c.save();
   drawEdgeMarkers(c, s, ui);
-  drawBanners(c, s);
+  drawBanners(c);
   drawMinimap(c, s, ui);
   c.restore();
   drawHud(c, s, time, ui);

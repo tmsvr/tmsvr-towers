@@ -3,7 +3,8 @@
 // moments. It is purely presentational: it watches the state and events and
 // never changes the game. J toggles it in game; balance.json → "juice" sets
 // the default and switches single effects off.
-import { BALANCE } from './data.js';
+import { BALANCE, PLAYER } from './data.js';
+import { prune } from './util.js';
 
 const CFG = {
   enabled: true, damageNumbers: true, squash: true, deathPops: true, confetti: true, coinBounce: true, hitStop: true,
@@ -14,12 +15,13 @@ let on = CFG.enabled;
 const want = (k) => on && CFG[k];
 
 const seen = new Map(); // enemy id -> { hp, x, y, r, squash, pending, pendingT }
-let nums = [], pops = [], confetti = [], coinT = [], lastCoins = [];
+const nums = [], pops = [], confetti = [];
+let coinT = [], lastCoins = [];
 let stop = 0, last = 0, lastState = null, toast = null;
 
 function reset() {
   seen.clear();
-  nums = []; pops = []; confetti = []; coinT = []; lastCoins = [];
+  nums.length = 0; pops.length = 0; confetti.length = 0; coinT = []; lastCoins = [];
   stop = 0;
 }
 
@@ -93,11 +95,11 @@ export function observeJuice(s) {
     coinT[i] = Math.max(0, (coinT[i] || 0) - dt);
   });
   for (const n of nums) { n.t += dt; n.y -= 34 * dt; }
-  nums = nums.filter((n) => n.t < 0.8);
+  prune(nums, (n) => n.t >= 0.8);
   for (const p of pops) p.t += dt;
-  pops = pops.filter((p) => p.t < 0.3);
+  prune(pops, (p) => p.t >= 0.3);
   for (const k of confetti) { k.t += dt; k.x += k.vx * dt; k.y += k.vy * dt; k.vx *= 0.99; k.rot += k.vr * dt; }
-  confetti = confetti.filter((k) => k.y < 760 && k.t < 6);
+  prune(confetti, (k) => k.y >= 760 || k.t >= 6);
   if (toast) { toast.t -= dt; if (toast.t <= 0) toast = null; }
 }
 
@@ -117,7 +119,7 @@ export function hitSquash(id) {
 
 // 0..1 stretch of a cat mid-swing.
 export function swingSquash(p) {
-  return want('squash') && p.swingT > 0 ? Math.sin((1 - p.swingT / 0.18) * Math.PI) : 0;
+  return want('squash') && p.swingT > 0 ? Math.sin((1 - p.swingT / PLAYER.swingTime) * Math.PI) : 0;
 }
 
 // Scale for a player's coin counter in the HUD.

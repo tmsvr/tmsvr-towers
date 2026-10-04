@@ -44,7 +44,13 @@ results as a lower bound on what real players can survive.
 |---|---|
 | `src/sim.js` | Game rules; no drawing, so it can run on the host for online play |
 | `src/render.js` | Draws everything on a canvas (all art is procedural) |
+| `src/fx.js` | Particles and other visual effects the sim asks for |
 | `src/audio.js` | Procedural sound effects and music |
 | `src/main.js` | Input, game loop, menus, online lobby |
-| `src/net.js`, `src/snapshot.js` | Online co-op (PeerJS/WebRTC, host-authoritative) |
+| `src/net.js` | Online connection (PeerJS/WebRTC): a reliable lane and a fast, lossy one |
+| `src/schema.js` | What a snapshot and guest input contain, and their binary encoding |
+| `src/host.js`, `src/guest.js` | Each side of an online game (host-authoritative) |
+| `src/snapshot.js` | The guest's view: snapshots blended on the host's clock |
+| `src/predict.js` | The guest's own cat, moved at once and checked against the host |
 | `src/data.js` | Loads the JSON files and converts them to game units |
+| `src/util.js` | Small shared helpers (seeded random numbers, clamp, prune) |

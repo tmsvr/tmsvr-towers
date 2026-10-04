@@ -1,91 +1,154 @@
 // Packing the host's game state into compact snapshots, and rebuilding a
-// render-ready state from them on the guest (with smoothing between snapshots).
-import { T, W, ENEMIES, FLOWER_ORDER, CAT_ORDER, loadMap } from './data.js';
+// render-ready state from them on the guest.
+//
+// The guest draws the world a little in the past (DELAY), blending between the
+// two snapshots either side of that moment. Every snapshot carries the host's
+// clock, so uneven arrival times don't turn into uneven movement, and one lost
+// snapshot just means blending across a slightly longer gap.
+import { T, ENEMIES, MAPS } from './data.js';
+import { encodeSnapshot } from './schema.js';
+import { spawnEffect } from './fx.js';
+import { clamp } from './util.js';
 
 const r1 = (v) => Math.round(v * 10) / 10;
-const r2 = (v) => Math.round(v * 100) / 100;
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const MODES = ['grow', 'heal', 'dig'];
 
-function packFx(f) {
-  const o = {};
-  for (const k in f) if (k !== '_sent') o[k] = typeof f[k] === 'number' ? r1(f[k]) : f[k];
-  return o;
+const DELAY = 90;     // ms the guest's view trails the host: about three snapshots
+const KEEP = 1000;    // ms of snapshots kept around
+const MOVING = ['players', 'enemies', 'drops', 'projs', 'bombs'];
+// Angles that should turn the short way round when blended.
+const ANGLES = { players: ['dir'], enemies: ['ang'], projs: ['ang'] };
+
+const packFx = (f) => Object.fromEntries(Object.entries(f).map(([k, v]) => [k, typeof v === 'number' ? r1(v) : v]));
+
+// Effect descriptions and sound/shake events since the last snapshot. Sent on
+// the reliable lane, since a lost snapshot must not lose a sound or a pop.
+// `at` is the host clock, so the guest can show them in step with the world.
+export function effectsMessage(fx, events, at) {
+  return fx.length || events.length ? { t: 'fx', at, fx: fx.map(packFx), events } : null;
 }
 
-export function makeSnapshot(s, events, paused) {
-  const fx = [];
-  for (const f of s.fx) if (!f._sent) { f._sent = true; fx.push(packFx(f)); }
-  return {
-    t: 'snap', paused, fx, events,
-    g: [r1(s.lives), s.wave, ['wave', 'prep', 'pick'].indexOf(s.phase), r1(s.timer), s.queue.length, s.over ? 1 : 0, s.won ? 1 : 0, s.kills, s.map, r2(s.baseHitT), s.maxLives],
-    p: s.players.map((p) => [p.id, r1(p.x), r1(p.y), r2(p.dir), p.moving ? 1 : 0, r2(p.swingT), r2(p.swingDir || 0), r2(p.bombs), p.sel, MODES.indexOf(p.mode), p.working ? p.working.id : 0, r1(p.coins), r2(p.stun),
-      p.loadout ? p.loadout.map((t) => FLOWER_ORDER.indexOf(t)) : 0,
-      [p.pick.cursor, p.pick.chosen.map((t) => FLOWER_ORDER.indexOf(t)), p.pick.ready ? 1 : 0, p.pick.row], p.building ? 1 : 0, r2(p.dig || 0), CAT_ORDER.indexOf(p.cat), r2(p.stam), (p.tired ? 1 : 0) + (p.sprinting ? 2 : 0)]),
-    f: s.flowers.map((f) => [f.id, FLOWER_ORDER.indexOf(f.type), f.lvl, f.tx, f.ty, r2(f.angle), r2(f.flash), r2(f.hurtT), r1(f.hp), f.headIdx, f.grow ? [f.grow.to, f.grow.cost, r1(f.grow.paid)] : 0, r1(f.spent || 0)]),
-    e: s.enemies.map((e) => [e.id, e.type, r1(e.x), r1(e.y), r1(e.hp), r1(e.maxhp), r2(e.flash), r2(e.wob), r2(e.ang), r2(e.slowT), r2(e.stun), e.under ? 1 : 0, e.dashing ? 1 : 0, e.chew ? 1 : 0, e.psn, e.atBase ? 1 : 0]),
-    d: s.drops.map((d) => [d.id, r1(d.x), r1(d.y), d.meat ? 1 : 0, r1(d.age)]),
-    pr: s.projs.map((p) => [p.id, p.kind, r1(p.x), r1(p.y), p.big || 0, p.color, r2(p.ang || 0), r2(p.k || 0)]),
-    b: s.bombs.map((b) => [b.id, r1(b.x), r1(b.y), r1(b.h)]),
-    c: s.clouds.map((c) => [c.id, r1(c.x), r1(c.y), r1(c.r), r2(c.t), c.dur]),
-  };
+// The world as it is at host time `at`. Sent on the fast lane: any snapshot can
+// be lost or arrive out of order, so each one is complete on its own.
+// `ack` is the last guest input applied, for the guest's prediction.
+export function makeSnapshot(s, seq, at, paused, ack) {
+  return encodeSnapshot(s, { seq, at, paused, ack });
 }
 
+// The guest's state has the same shape as the host's wherever render.js
+// reads it (see the top of that file); the _ fields are the guest's own.
 export function newGuestState() {
   return {
-    players: [], flowers: [], enemies: [], drops: [], projs: [], bombs: [], clouds: [], fx: [], events: [],
-    grid: new Map(), queue: { length: 0 }, lives: 20, wave: 0, phase: 'prep', timer: 0,
-    over: false, won: false, kills: 0, paused: false, _at: 0, _interval: 33,
+    players: [], flowers: [], enemies: [], drops: [], projs: [], bombs: [], clouds: [], events: [],
+    m: MAPS[0], grid: new Map(), queue: [], lives: 20, maxLives: 20, baseHitT: 0, wave: 0, phase: 'prep', timer: 0,
+    over: false, won: false, kills: 0, paused: false,
+    _frames: [], _shown: null, _offset: null, _waiting: [],
   };
 }
 
-// Each entity keeps where it was (ox, oy) and where the snapshot says it is now (nx, ny).
-function withMotion(prevList, list) {
-  const prev = new Map(prevList.map((o) => [o.id, o]));
-  for (const o of list) {
-    const p = prev.get(o.id);
-    o.ox = p ? p.x : o.nx;
-    o.oy = p ? p.y : o.ny;
-    o.x = o.ox; o.y = o.oy;
+// Host clock minus guest clock, as seen through the fastest recent delivery.
+// A quicker-than-usual arrival is believed at once; slower ones only nudge it,
+// so a late snapshot doesn't drag the whole view back.
+function trackClock(gs, hostAt, now) {
+  const o = hostAt - now;
+  if (gs._offset === null || o > gs._offset || o < gs._offset - 500) gs._offset = o;
+  else gs._offset += (o - gs._offset) * 0.02;
+}
+
+const hostNow = (gs, now) => now + gs._offset;
+
+// A received snapshot (decoded by schema.js) made ready to draw.
+function decode(m) {
+  const u = m.state;
+  // anything of a kind we don't know can't be drawn (the version check should prevent this)
+  for (const e of u.enemies) e.def = ENEMIES[e.type];
+  u.enemies = u.enemies.filter((e) => e.def);
+  u.flowers = u.flowers.filter((f) => f.type);
+  const fr = { seq: m.seq, at: m.at, paused: m.paused, ack: m.ack, game: u.game, clouds: u.clouds, flowers: u.flowers, byId: {} };
+  for (const f of u.flowers) { f.x = (f.tx + 0.5) * T; f.y = (f.ty + 0.5) * T; }
+  const W = (MAPS[u.game.map] || MAPS[0]).W;
+  fr.grid = new Map(u.flowers.map((f) => [f.ty * W + f.tx, f]));
+  const flowerById = new Map(u.flowers.map((f) => [f.id, f]));
+  for (const p of u.players) {
+    p.working = flowerById.get(p.working) || null;
+    p.pick ||= { cursor: 0, chosen: [], ready: false, row: 1 }; // only sent on the pick screen
   }
-  return list;
+  for (const key of MOVING) {
+    fr[key] = u[key];
+    const angles = ANGLES[key] || [];
+    for (const o of u[key]) {
+      // what the snapshot says; x, y (and angles) get rewritten every frame
+      if (key === 'players') o.snap = { ...o }; // the guest's prediction starts from these
+      else {
+        o.snap = { x: o.x, y: o.y };
+        for (const n of angles) o.snap[n] = o[n];
+      }
+    }
+    fr.byId[key] = new Map(u[key].map((o) => [o.id, o]));
+  }
+  return fr;
 }
 
 export function applySnapshot(gs, m, now) {
-  gs._interval = gs._at ? clamp(now - gs._at, 16, 250) : 33;
-  gs._at = now;
-  const [lives, wave, prep, timer, qlen, over, won, kills, map, baseHitT, maxLives] = m.g;
-  if (gs.map !== map) { loadMap(map); gs.map = map; } // the host picked a different map
-  Object.assign(gs, { lives, baseHitT, maxLives, wave, phase: ['wave', 'prep', 'pick'][prep], timer, over: !!over, won: !!won, kills, paused: m.paused });
-  gs.queue = { length: qlen };
-
-  gs.flowers = m.f.map(([id, ti, lvl, tx, ty, angle, flash, hurtT, hp, headIdx, g, spent]) => ({
-    id, type: FLOWER_ORDER[ti], lvl, tx, ty, x: (tx + 0.5) * T, y: (ty + 0.5) * T, angle, flash, hurtT, hp, headIdx, spent,
-    grow: g ? { to: g[0], cost: g[1], paid: g[2] } : null,
-  }));
-  gs.grid = new Map(gs.flowers.map((f) => [f.ty * W + f.tx, f]));
-  const flowerById = new Map(gs.flowers.map((f) => [f.id, f]));
-
-  gs.players = withMotion(gs.players, m.p.map(([id, nx, ny, dir, moving, swingT, swingDir, bombs, sel, mode, working, coins, stun, loadout, pick, building, dig, cat, stam, run]) => ({
-    id, nx, ny, dir, moving: !!moving, swingT, swingDir, bombs, sel, mode: MODES[mode] || 'grow', dig, cat: CAT_ORDER[cat], stam, tired: !!(run & 1), sprinting: !!(run & 2), working: flowerById.get(working) || null, coins, stun, building: !!building,
-    loadout: loadout ? loadout.map((i) => FLOWER_ORDER[i]) : null,
-    pick: { cursor: pick[0], chosen: pick[1].map((i) => FLOWER_ORDER[i]), ready: !!pick[2], row: pick[3] },
-  })));
-  gs.enemies = withMotion(gs.enemies, m.e.map(([id, type, nx, ny, hp, maxhp, flash, wob, ang, slowT, stun, under, dashing, chew, psn, atBase]) => ({
-    id, type, def: ENEMIES[type], nx, ny, hp, maxhp, flash, wob, ang, slowT, stun, under: !!under, dashing: !!dashing, chew: !!chew, psn, atBase: !!atBase,
-  })));
-  gs.drops = withMotion(gs.drops, m.d.map(([id, nx, ny, meat, age]) => ({ id, nx, ny, meat: !!meat, age })));
-  gs.projs = withMotion(gs.projs, m.pr.map(([id, kind, nx, ny, big, color, ang, k]) => ({ id, kind, nx, ny, big, color, ang, k })));
-  gs.bombs = withMotion(gs.bombs, m.b.map(([id, nx, ny, h]) => ({ id, nx, ny, h })));
-  gs.clouds = m.c.map(([id, x, y, r, t, dur]) => ({ id, x, y, r, t, dur }));
-  gs.fx.push(...m.fx);
-  gs.events.push(...m.events);
+  const frames = gs._frames;
+  if (frames.length && m.seq <= frames[frames.length - 1].seq) return false; // overtaken by a newer one
+  trackClock(gs, m.at, now);
+  frames.push(decode(m));
+  const oldest = m.at - KEEP;
+  while (frames.length > 2 && frames[1].at < oldest) frames.shift();
+  return true;
 }
 
-// Slide everything from its previous position towards the latest snapshot.
+export function applyEffects(gs, m, now) {
+  if (gs._offset === null) trackClock(gs, m.at, now);
+  gs._waiting.push(m);
+}
+
+// The newest snapshot received (ahead of what's drawn).
+export const newestFrame = (gs) => gs._frames[gs._frames.length - 1] || null;
+
+const lerp = (a, b, k) => a + (b - a) * k;
+function lerpAngle(a, b, k) {
+  const d = Math.atan2(Math.sin(b - a), Math.cos(b - a));
+  return a + d * k;
+}
+
+// Show the world as it was DELAY ms ago on the host's clock.
 export function interpolate(gs, now) {
-  const a = clamp((now - gs._at) / gs._interval, 0, 1);
-  for (const list of [gs.players, gs.enemies, gs.drops, gs.projs, gs.bombs]) {
-    for (const o of list) { o.x = o.ox + (o.nx - o.ox) * a; o.y = o.oy + (o.ny - o.oy) * a; }
+  const frames = gs._frames;
+  if (!frames.length) return;
+  const t = hostNow(gs, now) - DELAY;
+  let i = frames.length - 1;
+  while (i > 0 && frames[i - 1].at > t) i--;
+  // b is the first snapshot after t (or the newest), a the one before it
+  const b = frames[i], a = i > 0 ? frames[i - 1] : b;
+  const k = b === a ? 1 : clamp((t - a.at) / (b.at - a.at), 0, 1);
+
+  if (gs._shown !== b) {
+    gs._shown = b;
+    gs.m = MAPS[b.game.map] || MAPS[0]; // the host may have picked another map
+    Object.assign(gs, b.game, { paused: b.paused, grid: b.grid, flowers: b.flowers, clouds: b.clouds });
+    for (const key of MOVING) gs[key] = b[key];
+  }
+  for (const key of MOVING) {
+    const before = a.byId[key], angles = ANGLES[key] || [];
+    for (const o of b[key]) {
+      const p = a === b ? null : before.get(o.id);
+      const from = p ? p.snap : o.snap, to = o.snap;
+      o.x = lerp(from.x, to.x, k);
+      o.y = lerp(from.y, to.y, k);
+      for (const n of angles) o[n] = lerpAngle(from[n], to[n], k);
+    }
+  }
+  releaseEffects(gs, t);
+}
+
+// Effects and sounds wait until the view reaches the moment they happened.
+function releaseEffects(gs, t) {
+  const waiting = gs._waiting;
+  let n = 0;
+  while (n < waiting.length && waiting[n].at <= t) n++;
+  for (const m of waiting.splice(0, n)) {
+    m.fx.forEach(spawnEffect);
+    gs.events.push(...m.events);
   }
 }

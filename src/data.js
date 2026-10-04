@@ -1,9 +1,18 @@
 // Game data. All tunable numbers live in /balance.json (in tiles and seconds);
 // this module loads it and converts to the pixel units the game uses.
+import { seededRandom } from './util.js';
 const BAL = await (await fetch(new URL('../balance.json', import.meta.url), { cache: 'no-store' })).json();
 export const BALANCE = BAL;
 
 const MAP_DEFS = (await (await fetch(new URL('../maps.json', import.meta.url), { cache: 'no-store' })).json()).maps;
+
+// A short fingerprint of the numbers and maps, so two online players can
+// check they are playing the same game (FNV-1a over the JSON).
+export const DATA_HASH = (() => {
+  let h = 0x811c9dc5;
+  for (const ch of JSON.stringify([BAL, MAP_DEFS])) h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193);
+  return (h >>> 0).toString(16);
+})();
 
 export const T = 56;
 export const U = T / 40;           // sprite scale (art is authored for a 40px tile)
@@ -13,14 +22,6 @@ export const HUD_H = 96;
 export const TOTAL_WAVES = BAL.difficulty.totalWaves;
 
 // ---- maps ----
-function seeded(seed) {
-  return () => {
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 function prepareMap(def, index) {
   const w = def.width, h = def.height;
@@ -60,7 +61,7 @@ function prepareMap(def, index) {
       yard.add(y * w + x);
       blocked.add(y * w + x);
     }
-  const rnd = seeded(def.scatter?.seed || 1);
+  const rnd = seededRandom(def.scatter?.seed || 1);
   for (const [type, count] of [['tree', def.scatter?.trees || 0], ['rock', def.scatter?.rocks || 0]]) {
     for (let placed = 0, tries = 0; placed < count && tries < count * 50; tries++) {
       const x = Math.floor(rnd() * w), y = Math.floor(rnd() * h), k = y * w + x;
@@ -95,17 +96,8 @@ function prepareMap(def, index) {
   };
 }
 
+// Every map, ready to play. A game keeps the one it is on as s.m.
 export const MAPS = MAP_DEFS.map(prepareMap);
-
-// The current map. These are live bindings: every module that imports them
-// sees the new values after loadMap().
-export let MAP, W, H, WORLD_W, WORLD_H, PATHS, BASE, PATH_TILES, BLOCKED;
-export function loadMap(i) {
-  MAP = MAPS[i] || MAPS[0];
-  ({ W, H, worldW: WORLD_W, worldH: WORLD_H, paths: PATHS, base: BASE, pathTiles: PATH_TILES, blocked: BLOCKED } = MAP);
-  return MAP;
-}
-loadMap(0);
 
 // ---- enemies (pixels, pixels/second) ----
 export const ENEMIES = {};
@@ -148,7 +140,19 @@ export const HEAL_RATE = LV.healPerSecond;
 export const HEAL_COST = LV.fullHealCostFraction;
 export const POISON_TIME = LV.poisonSeconds;
 
+// A flower's numbers at a level. Every flower looks these up every tick, so
+// each type and level is worked out once (callers must not change the result).
+const statsCache = new Map();
 export function flowerStats(type, lvl) {
+  const key = type + lvl;
+  let st = statsCache.get(key);
+  if (!st) { st = Object.freeze(computeStats(type, lvl)); statsCache.set(key, st); }
+  return st;
+}
+// For console balance experiments that change FLOWERS in place.
+export const clearFlowerStats = () => statsCache.clear();
+
+function computeStats(type, lvl) {
   const b = FLOWERS[type];
   const l = lvl - 1;
   const pl = LV.perLevel;
@@ -193,6 +197,7 @@ export const PLAYER = {
   bombStun: P.bombStunEnemies,
   catStun: P.bombStunCats,
   bombMax: 1,
+  swingTime: 0.18, // seconds the baton's arc is on screen
   bombRecharge: P.bombRecharge,
   sprintSpeed: P.sprintSpeed,
   sprintSeconds: P.sprintSeconds,
