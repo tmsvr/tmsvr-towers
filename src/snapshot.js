@@ -20,7 +20,7 @@ export function makeSnapshot(s, events, paused) {
     g: [s.lives, s.wave, ['wave', 'prep', 'pick'].indexOf(s.phase), r1(s.timer), s.queue.length, s.over ? 1 : 0, s.won ? 1 : 0, s.kills],
     p: s.players.map((p) => [p.id, r1(p.x), r1(p.y), r2(p.dir), p.moving ? 1 : 0, r2(p.swingT), r2(p.swingDir || 0), r2(p.bombs), p.sel, p.mode === 'heal' ? 1 : 0, p.working ? p.working.id : 0, r1(p.coins), r2(p.stun),
       p.loadout ? p.loadout.map((t) => FLOWER_ORDER.indexOf(t)) : 0,
-      [p.pick.cursor, p.pick.chosen.map((t) => FLOWER_ORDER.indexOf(t)), p.pick.ready ? 1 : 0]]),
+      [p.pick.cursor, p.pick.chosen.map((t) => FLOWER_ORDER.indexOf(t)), p.pick.ready ? 1 : 0], p.building ? 1 : 0]),
     f: s.flowers.map((f) => [f.id, FLOWER_ORDER.indexOf(f.type), f.lvl, f.tx, f.ty, r2(f.angle), r2(f.flash), r2(f.hurtT), r1(f.hp), f.headIdx, f.grow ? [f.grow.to, f.grow.cost, r1(f.grow.paid)] : 0]),
     e: s.enemies.map((e) => [e.id, e.type, r1(e.x), r1(e.y), r1(e.hp), r1(e.maxhp), r2(e.flash), r2(e.wob), r2(e.ang), r2(e.slowT), r2(e.stun), e.under ? 1 : 0, e.dashing ? 1 : 0, e.chew ? 1 : 0, e.psn]),
     d: s.drops.map((d) => [d.id, r1(d.x), r1(d.y), d.meat ? 1 : 0, r1(d.age)]),
@@ -64,8 +64,8 @@ export function applySnapshot(gs, m, now) {
   gs.grid = new Map(gs.flowers.map((f) => [f.ty * W + f.tx, f]));
   const flowerById = new Map(gs.flowers.map((f) => [f.id, f]));
 
-  gs.players = withMotion(gs.players, m.p.map(([id, nx, ny, dir, moving, swingT, swingDir, bombs, sel, heal, working, coins, stun, loadout, pick]) => ({
-    id, nx, ny, dir, moving: !!moving, swingT, swingDir, bombs, sel, mode: heal ? 'heal' : 'grow', working: flowerById.get(working) || null, coins, stun,
+  gs.players = withMotion(gs.players, m.p.map(([id, nx, ny, dir, moving, swingT, swingDir, bombs, sel, heal, working, coins, stun, loadout, pick, building]) => ({
+    id, nx, ny, dir, moving: !!moving, swingT, swingDir, bombs, sel, mode: heal ? 'heal' : 'grow', working: flowerById.get(working) || null, coins, stun, building: !!building,
     loadout: loadout ? loadout.map((i) => FLOWER_ORDER[i]) : null,
     pick: { cursor: pick[0], chosen: pick[1].map((i) => FLOWER_ORDER[i]), ready: !!pick[2] },
   })));

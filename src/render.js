@@ -669,6 +669,7 @@ function drawBuildGhost(c, p, s, time) {
   if (!p.loadout) return;
   const { tx, ty } = tileOf(p);
   const f = s.grid.get(ty * W + tx);
+  if (!f && !p.building) return; // the placeholder only shows in build mode
   const type = p.loadout[p.sel];
   const valid = f ? true : canBuildAt(s, tx, ty);
   const col = !valid ? '255,90,90' : f && p.mode === 'heal' && f.lvl > 0 ? '140,255,160' : '255,255,255';
@@ -844,9 +845,10 @@ function contextText(s, p, ui) {
   const { tx, ty } = tileOf(p);
   const f = s.grid.get(ty * W + tx);
   if (!f) {
+    if (!p.building) return `[${key}] or [${cyc}] build mode`;
     if (PATH_TILES.has(ty * W + tx)) return "Can't plant on the path";
     const F = FLOWERS[p.loadout[p.sel]];
-    return `[${key}] plant ${F.name} (${F.cost}) · ${F.desc}`;
+    return `[${key}] plant ${F.name} (${F.cost}) · [${cyc}] next · ${F.desc}`;
   }
   const name = FLOWERS[f.type].name;
   if (f.lvl === 0) return `Hold [${key}] to grow ${name} · ${Math.floor(f.grow.paid)}/${f.grow.cost}`;
@@ -897,7 +899,7 @@ function drawHud(c, s, time, ui) {
     c.strokeStyle = '#c9a26b'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(bx + 3, by - 4); c.lineTo(bx + 6, by - 8); c.stroke();
     (p.loadout || p.pick.chosen).forEach((t, j) => {
       const sx = x0 + 50 + j * 79, sy = y0 + 42, sw = 75, sh = 38;
-      const sel = p.loadout && j === p.sel;
+      const sel = p.loadout && p.building && j === p.sel;
       const afford = p.coins >= FLOWERS[t].cost;
       rrect(c, sx, sy, sw, sh, 8, sel ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.25)', sel ? pc : 'rgba(255,255,255,0.1)', sel ? 3 : 1);
       c.save(); c.translate(sx + 19, sy + 19); c.scale(0.8, 0.8); if (!afford) c.globalAlpha = 0.45; drawHead(c, t); c.restore();
@@ -998,7 +1000,7 @@ function drawMenu(c, time, ui) {
   const cols = [cx - 270, cx - 190, cx - 105, cx - 35, cx + 75, cx + 215];
   rows.forEach((r, ri) => r.forEach((t, ci) => label(c, t, cols[ci], 358 + ri * 28, ri ? 16 : 13, ri ? '#fff' : '#8fa5b3', 'center', ri ? 600 : 500, null)));
   const tips = [
-    'Tap the plant key for a seedling, then HOLD it to pour your coins in. Out of coins? Progress waits.',
+    'Plant key: build mode, again to plant a seedling, then HOLD to pour coins in. Next-flower key cycles.',
     'Flowers wear out as they fight: stand on one and switch to heal mode. Level 5 flowers never wilt.',
     'Each cat brings 4 of the 7 flowers and keeps the coins it picks up. Bombs knock cats down too!',
   ];

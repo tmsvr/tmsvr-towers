@@ -33,7 +33,7 @@ export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, l
   for (let i = 0; i < nPlayers; i++) {
     s.players.push({
       id: i, x: (5 + i) * T, y: 6 * T, dir: 0, atkCd: 0, swingT: 0, coins, stun: 0,
-      bombs: PLAYER.bombMax, sel: 0, moving: false, mode: 'grow', onFlowerId: null, working: null, msgCd: 0,
+      bombs: PLAYER.bombMax, sel: 0, building: false, moving: false, mode: 'grow', onFlowerId: null, working: null, msgCd: 0,
       loadout: null, pick: { cursor: 0, chosen: (loadouts[i] || []).filter((t) => FLOWERS[t]).slice(0, LOADOUT_SIZE), ready: false },
       prevMx: 0, prevAtk: false,
     });
@@ -420,8 +420,9 @@ function updatePlayers(s, dt, inputs) {
         p.y = clamp(p.y, o.y - (MAP_H - 90), o.y + (MAP_H - 90));
       }
     }
-    if (inp.atk && p.atkCd <= 0) swing(s, p);
-    if (inp.bomb && p.bombs >= 1) throwBomb(s, p);
+    // Fighting cancels build mode.
+    if (inp.atk && p.atkCd <= 0) { swing(s, p); p.building = false; }
+    if (inp.bomb && p.bombs >= 1) { throwBomb(s, p); p.building = false; }
 
     const { tx, ty } = tileOf(p);
     let f = s.grid.get(ty * W + tx);
@@ -429,10 +430,18 @@ function updatePlayers(s, dt, inputs) {
     p.onFlowerId = f ? f.id : null;
     if (inp.cycle) {
       if (f && f.lvl > 0 && f.lvl < MAX_LEVEL) p.mode = p.mode === 'heal' ? 'grow' : 'heal';
-      else if (!f) p.sel = (p.sel + 1) % p.loadout.length;
+      else if (!f) {
+        // off → flower 1 → … → flower 4 → off
+        if (!p.building) { p.building = true; p.sel = 0; }
+        else if (++p.sel >= p.loadout.length) { p.building = false; p.sel = 0; }
+      }
       ev(s, 'cycle');
     }
-    if (inp.buildTap && !f) { plant(s, p); f = s.grid.get(ty * W + tx); }
+    if (inp.buildTap && !f) {
+      // The first press only shows the placeholder flower; the next one plants it.
+      if (!p.building) { p.building = true; ev(s, 'cycle'); }
+      else { plant(s, p); f = s.grid.get(ty * W + tx); if (f) p.building = false; }
+    }
     if (!inp.build) p.waitRelease = false;
     if (inp.build && f && !p.waitRelease) work(s, p, f, dt);
   }
