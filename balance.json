@@ -4,6 +4,7 @@
     "reload": "Save this file and reload the page to apply changes.",
     "flowers.rate": "Seconds between attacks (lower = faster).",
     "flowers.kind": "single = homing seed, beam = instant hit, bolt = piercing fireball in a line, cloud = poison cloud (damage is per stack per second), pulse = hits everything in range, chomp = bite (small critters are swallowed whole).",
+    "flowers.slow": "slow = speed multiplier while slowed (lower = slower), slowSeconds = how long it lasts after each pulse; perLevel.slowDuration adds that share of slowSeconds per level.",
     "flowers.target": "first = enemy furthest along the path (default), strong = the toughest enemy (highest max health), kept until it dies.",
     "flowerLevels.prices": "A flower's cost is its base price. Planting it (seedling to level 1) costs cost x plantPrice; going from level L to L+1 costs cost x upgradeCostMultipliers[L-1] x upgradePrice. Healing is priced off the base cost (fullHealCostFraction).",
     "flowerLevels.perLevel": "Bonus added per level above 1, e.g. damage 0.5 means +50% damage per level.",
@@ -11,7 +12,7 @@
     "enemies.bite": "Damage per second an enemy does to the cottage while chomping on it (it keeps chomping until killed).",
     "enemies.size": "Radius in tiles. 'light' enemies can be knocked back by the baton and swallowed by Snapdragons.",
     "difficulty.spawn": "spawnGap = seconds between single monsters (random between the two), shrinking by spawnSpeedupPerWave each wave down to spawnGapMinScale of it. packGrowthPerWave makes packs (swarms, wasps) that much bigger every wave after they appear. openingRush = the share of each wave that pours out right at the start. newEnemyBoost multiplies how often a monster type appears in its first two waves; after that older types fade by oldEnemyFade per wave down to oldEnemyMin, so every wave feels different.",
-    "difficulty": "Enemy health = base * (1 + hpPerWave*(wave-1) + hpPerWaveSquared*(wave-1)^2). Wave size budget = waveBudgetBase + waveBudgetPerWave*wave + waveBudgetPerWaveSquared*wave^2. Both grow slowly at first and steeply towards the last waves. Every bossEvery-th wave has a boss; the one on the last wave has finalBossHp times more health.",
+    "difficulty": "Enemy health = base * enemyHp * (1 + hpPerWave*(wave-1) + hpPerWaveSquared*(wave-1)^2). Wave size budget = waveBudgetBase + waveBudgetPerWave*wave + waveBudgetPerWaveSquared*wave^2. Both grow slowly at first and steeply towards the last waves. Every bossEvery-th wave has a boss; the one on the last wave has finalBossHp times more health.",
     "economy.coopCoinShare": "In co-op, the share of every coin picked up that is split evenly between all cats (1 = fully shared, 0 = whoever picks it up keeps it).",
     "economy.uprootRefund": "Share of the coins poured into a flower (planting + upgrades, not healing) you get back when you dig it up. uprootSeconds = how long you hold the key to dig.",
     "juice": "Extra effects that don't change the game: damage numbers, hit squash, death pops, confetti, coin counter bounce, short freeze (hit-stop) on bombs and boss kills. J toggles them all in game; set any to false to drop just that one.",
@@ -53,7 +54,7 @@
     "waveBonusBase": 0,
     "waveBonusPerWave": 0,
     "coopBonusShare": 0.6,
-    "coopCoinShare": 1,
+    "coopCoinShare": 0,
     "uprootRefund": 0.6,
     "uprootSeconds": 1.2
   },
@@ -78,11 +79,12 @@
     "oldEnemyMin": 0.6,
     "packGrowthPerWave": 0.2,
     "openingRush": 0.35,
-    "finalBossHp": 1.8,
+    "finalBossHp": 2.4,
     "soloWaveSize": 0.6,
     "soloBossHp": 0.6,
     "coopWaveSize": 1.3,
-    "coopEnemyHp": 1.1
+    "coopEnemyHp": 1.1,
+    "enemyHp": 1.15
   },
 
   "juice": {
@@ -107,6 +109,7 @@
       "range": 0.06,
       "fasterFiring": 0.07,
       "slowStrength": 0.07,
+      "slowDuration": 0.25,
       "poisonStacks": 1,
       "cloudSize": 0.08
     },
@@ -120,10 +123,10 @@
 
   "flowers": {
     "daisy":     { "name": "Daisy",      "desc": "Rapid little seeds", "cost": 20, "range": 2.2, "damage": 5, "rate": 0.4, "kind": "single", "color": "#ffffff" },
-    "sunflower": { "name": "Sunflower",  "desc": "Superweapon. Blasts the strongest monster on the map.", "cost": 120, "range": 99, "damage": 450, "rate": 12, "kind": "beam", "target": "strong", "color": "#ffd23f" },
+    "sunflower": { "name": "Sunflower",  "desc": "Superweapon. Blasts the strongest monster on the map.", "cost": 120, "range": 99, "damage": 315, "rate": 12, "kind": "beam", "target": "strong", "color": "#ffd23f" },
     "firelily":  { "name": "Fire Lily",  "desc": "Fireball pierces everything in a line", "cost": 45, "range": 3, "damage": 14, "rate": 1.6, "kind": "bolt", "color": "#ff7a2f" },
     "stink":     { "name": "Stinkbloom", "desc": "Poison clouds stack, ignore armor (ground)", "cost": 45, "range": 2.6, "damage": 2.2, "rate": 2.4, "kind": "cloud", "cloudRadius": 0.95, "cloudSeconds": 3.5, "maxStacks": 5, "groundOnly": true, "color": "#9ad14b" },
-    "frost":     { "name": "Frostbloom", "desc": "Slows everything nearby", "cost": 35, "range": 1.8, "damage": 2, "rate": 0.8, "kind": "pulse", "slow": 0.55, "color": "#8fe3ff" },
+    "frost":     { "name": "Frostbloom", "desc": "Cheap. Slows everything nearby for a while", "cost": 16, "range": 1.8, "damage": 2, "rate": 2.2, "kind": "pulse", "slow": 0.55, "slowSeconds": 2.5, "color": "#8fe3ff" },
     "thorn":     { "name": "Thornrose",  "desc": "Spiky pulse hits all close enemies (ground)", "cost": 35, "range": 1.3, "damage": 11, "rate": 0.6, "kind": "pulse", "groundOnly": true, "color": "#ff4d5e" },
     "snap":      { "name": "Snapdragon", "desc": "Swallows small critters whole, big bite on the rest (ground)", "cost": 40, "range": 1.3, "damage": 45, "rate": 2.4, "kind": "chomp", "groundOnly": true, "color": "#e0569b" }
   },
@@ -143,7 +146,7 @@
     "mole":     { "hp": 48,   "speed": 1.8,  "coins": 3,  "bite": 2, "size": 0.28, "armor": 0, "burrow": { "aboveSeconds": 2.6, "belowSeconds": 1.8, "speedMultiplier": 1.5 } },
     "aphid":    { "hp": 28,   "speed": 1.95, "coins": 2,  "bite": 2, "size": 0.23, "armor": 0, "light": true, "eats": { "damagePerSecond": 6, "chewSeconds": 3.5, "cooldown": 4, "reach": 1.25 } },
     "hive":     { "hp": 150,  "speed": 1.05, "coins": 7,  "bite": 4, "size": 0.43, "armor": 1, "spawns": { "type": "swarm", "every": 4.5, "count": 2 } },
-    "boss":     { "hp": 500,  "speed": 0.98, "coins": 40, "bite": 8,  "size": 0.6,  "armor": 1, "boss": true, "spawns": { "type": "grunt", "every": 6, "count": 2 } }
+    "boss":     { "hp": 600,  "speed": 0.98, "coins": 40, "bite": 8,  "size": 0.6,  "armor": 1, "boss": true, "spawns": { "type": "grunt", "every": 6, "count": 2 } }
   },
 
   "waves": [

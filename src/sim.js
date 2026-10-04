@@ -137,7 +137,7 @@ function spawnEnemy(s, type, from, path = 0) {
   // The last boss is the big one. Bosses also shrink on maps with split-up
   // defences (smaller waveSize), since only some flowers will ever see them.
   const finale = d.boss ? (s.wave >= TOTAL_WAVES ? TUNE.finalBossHp || 1 : 1) * Math.sqrt(s.m.waveSize) : 1;
-  const hpScale = (1 + w * TUNE.hpPerWave + w * w * TUNE.hpPerWaveSquared) * (solo ? (d.boss ? TUNE.soloBossHp : 1) : TUNE.coopEnemyHp) * finale;
+  const hpScale = (TUNE.enemyHp ?? 1) * (1 + w * TUNE.hpPerWave + w * w * TUNE.hpPerWaveSquared) * (solo ? (d.boss ? TUNE.soloBossHp : 1) : TUNE.coopEnemyHp) * finale;
   const j = () => (rnd(s) - 0.5) * 18 * U;
   const id = s.nextId++;
   const road = s.m.paths[from ? from.path : path];
@@ -679,7 +679,7 @@ function updateFlowers(s, dt) {
       s.fx.push({ kind: 'ring', x: f.x, y: f.y, r: st.range, col: st.color, life: 0.35 });
       for (const e of inRange) {
         damage(s, e, st.dmg);
-        if (st.slow) { e.slow = Math.min(e.slow, st.slow); e.slowT = 1.3; }
+        if (st.slow) { e.slow = Math.min(e.slow, st.slow); e.slowT = Math.max(e.slowT, st.slowSeconds); }
       }
     }
     ev(s, 'shoot_' + f.type);
