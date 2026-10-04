@@ -301,16 +301,22 @@ function buildQueue(s, n) {
   const avail = WAVES.filter((u) => u.fromWave <= n);
   const bossWave = n % TUNE.bossEvery === 0;
   if (bossWave) budget *= TUNE.bossWaveBudget;
+  // Monsters that just arrived get the spotlight; older ones slowly make room.
+  const weightOf = (u) => {
+    const age = n - u.fromWave;
+    return u.weight * (age <= 1 ? TUNE.newEnemyBoost ?? 1 : Math.max(TUNE.oldEnemyMin ?? 1, 1 - (TUNE.oldEnemyFade ?? 0) * (age - 1)));
+  };
+  const total = avail.reduce((a, u) => a + weightOf(u), 0);
   while (budget > 0) {
-    const total = avail.reduce((a, u) => a + u.weight, 0);
     let r = rnd(s) * total, pick = avail[0];
-    for (const u of avail) { r -= u.weight; if (r <= 0) { pick = u; break; } }
+    for (const u of avail) { r -= weightOf(u); if (r <= 0) { pick = u; break; } }
     const path = Math.floor(rnd(s) * s.m.paths.length); // a group sticks together on one road
-    for (let i = 0; i < pick.group; i++) q.push({ type: pick.enemy, path, wait: pick.group > 1 ? 0.22 : 0.4 + rnd(s) * 0.8 });
+    const [lo, hi] = TUNE.spawnGap || [0.4, 1.2];
+    for (let i = 0; i < pick.group; i++) q.push({ type: pick.enemy, path, wait: pick.group > 1 ? 0.22 : lo + rnd(s) * (hi - lo) });
     budget -= pick.cost;
   }
   if (bossWave) q.push({ type: 'boss', path: Math.floor(rnd(s) * s.m.paths.length), wait: 3 });
-  const k = Math.max(0.5, 1 - n * 0.03);
+  const k = Math.max(TUNE.spawnGapMinScale ?? 0.5, 1 - n * (TUNE.spawnSpeedupPerWave ?? 0.03));
   for (const e of q) e.wait *= k;
   return q;
 }
@@ -346,7 +352,7 @@ function updateWaves(s, dt, ready) {
     // Everyone gets a share; in co-op each cat gets a bit more than half.
     const bonus = Math.round((ECONOMY.waveBonusBase + s.wave * ECONOMY.waveBonusPerWave) * (s.players.length > 1 ? ECONOMY.coopBonusShare : 1));
     for (const p of s.players) p.coins += bonus;
-    banner(s, `Wave cleared!  +${bonus} each`);
+    banner(s, bonus > 0 ? `Wave cleared!  +${bonus} each` : 'Wave cleared!');
     ev(s, 'clear');
   }
 }
@@ -769,7 +775,6 @@ function updateDrops(s, dt) {
         ev(s, d.big ? 'bigCoin' : 'coin');
       }
     }
-    if (d.age > 25) d.done = true;
   }
   prune(s.drops, isDone);
 }

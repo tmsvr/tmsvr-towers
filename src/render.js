@@ -1235,7 +1235,6 @@ function drawBuildGhost(c, p, s, time) {
 
 // ---- misc sprites -----------------------------------------------------------
 function drawDrop(c, d, time) {
-  if (d.age > 20 && Math.floor(time * 8) % 2) return;
   const bob = Math.sin(time * 5 + d.x) * 2;
   ellipse(c, d.x, d.y + 7, 6, 2.5, 'rgba(0,0,0,0.2)');
   // worth 4 or more: a bigger coin with a sparkle
