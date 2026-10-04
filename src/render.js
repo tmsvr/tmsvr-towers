@@ -300,7 +300,7 @@ const HEADS = [
   [[-6, -23, 0.95], [6, -23, 0.95], [-13, -11, 0.8], [13, -11, 0.8]],
   [[0, -27, 1.05], [-11, -19, 0.85], [11, -19, 0.85], [-15, -7, 0.72], [15, -7, 0.72]],
 ];
-const LEVEL_SCALE = [0, 0.8, 0.9, 1, 1.08, 1.16];
+const LEVEL_SCALE = [0, 0.92, 0.95, 0.98, 1.01, 1.04]; // levels show in looks and attitude, not size
 const WITHER = '#9a7b55';
 
 // ---- flower heads, painted once and reused ---------------------------------
@@ -333,13 +333,14 @@ function setSpriteScale(dpr) {
 }
 
 // A flower face: petals around a disc with eyes and a mouth.
-// o: { wither 0..1, spin (radians, petals only), look (radians), mouth, crown }
+// o: { wither 0..1, spin (radians, petals only), look (radians), mouth, crown,
+//      mood 0..4: how mean the face looks, rising with the flower's level }
 function drawHead(c, type, o = {}) {
   const w = Math.round((o.wither || 0) * 8) / 8;
-  const mouth = o.mouth || 'smile';
+  const mouth = o.mouth || 'smile', mood = o.mood || 0;
   const petals = sprite(`p${type}${w}`, (g) => paintPetals(g, type, w));
   if (o.spin) { c.save(); c.rotate(o.spin); stamp(c, petals); c.restore(); } else stamp(c, petals);
-  stamp(c, sprite(`f${type}${w}${mouth}${o.crown ? 1 : 0}`, (g) => paintFace(g, type, w, mouth, o.crown)));
+  stamp(c, sprite(`f${type}${w}${mouth}${o.crown ? 1 : 0}${mood}`, (g) => paintFace(g, type, w, mouth, o.crown, mood)));
   if (mouth !== 'sleep') {
     const lx = o.look != null ? Math.cos(o.look) * 1.1 : 0, ly = o.look != null ? Math.sin(o.look) * 0.8 : 0;
     for (const ex of [-2.4, 2.4]) circle(c, ex + lx, -1.1 + ly, 1, '#1a1a1a');
@@ -365,8 +366,10 @@ function paintPetals(c, type, w) {
   if (type === 'thorn') for (let i = 0; i < 5; i++) { c.save(); c.rotate((i / 5) * Math.PI * 2 + 0.3); ellipse(c, 4.5, 0, 4.5, 3.6, w ? mix('#e0283d', WITHER, w) : '#e0283d', OUT, 1.1); c.restore(); }
 }
 
-// Everything on the face except the pupils.
-function paintFace(c, type, w, mouth, crown) {
+// Everything on the face except the pupils. mood 0 is a sweet smile; each
+// step up adds attitude: a flat mouth, frowning brows, a squint and a toothy
+// grin, then fangs.
+function paintFace(c, type, w, mouth, crown, mood = 0) {
   const sp = SPEC[type];
   const fr = (type === 'sunflower' ? 7.5 : 6.2) * (sp.big || 1);
   circle(c, 0, 0, fr, w ? mix(sp.face, WITHER, w * 0.6) : sp.face, OUT, 1.5);
@@ -377,26 +380,37 @@ function paintFace(c, type, w, mouth, crown) {
     c.strokeStyle = OUT; c.lineWidth = 1.1;
     for (const ex of [-2.4, 2.4]) { c.beginPath(); c.arc(ex, -1, 1.4, 0.2, Math.PI - 0.2); c.stroke(); }
   } else {
-    for (const ex of [-2.4, 2.4]) ellipse(c, ex, -1.2, 1.7, 2.1, eyeWhite, OUT, 0.9);
+    for (const ex of [-2.4, 2.4]) ellipse(c, ex, -1.2, 1.7, mood >= 3 ? 1.6 : 2.1, eyeWhite, OUT, 0.9);
     if (type === 'sunflower') { // squinting sniper
       c.strokeStyle = OUT; c.lineWidth = 1.2; c.beginPath(); c.moveTo(-4.5, -3.3); c.lineTo(4.5, -3.3); c.stroke();
     }
   }
-  if (type === 'thorn' || type === 'firelily' || type === 'snap' || mouth === 'open') {
-    c.strokeStyle = OUT; c.lineWidth = 1.1; c.lineCap = 'round';
-    c.beginPath(); c.moveTo(-3.8, -4); c.lineTo(-1.2, -3); c.moveTo(3.8, -4); c.lineTo(1.2, -3); c.stroke();
+  // brows: none when sweet, then steeper and thicker as the mood darkens
+  const brow = Math.max(mood - 1, type === 'thorn' || type === 'firelily' || type === 'snap' || mouth === 'open' ? 1 : 0);
+  if (brow > 0) {
+    c.strokeStyle = OUT; c.lineWidth = 0.9 + brow * 0.35; c.lineCap = 'round';
+    const tilt = 0.6 + brow * 0.45;
+    c.beginPath(); c.moveTo(-3.9, -3.4 - tilt); c.lineTo(-1.1, -3.1); c.moveTo(3.9, -3.4 - tilt); c.lineTo(1.1, -3.1); c.stroke();
   }
-  if (type === 'daisy' || type === 'frost') { circle(c, -4, 1.6, 1.1, 'rgba(255,120,150,0.45)'); circle(c, 4, 1.6, 1.1, 'rgba(255,120,150,0.45)'); }
+  if ((type === 'daisy' || type === 'frost') && mood < 2) { circle(c, -4, 1.6, 1.1, 'rgba(255,120,150,0.45)'); circle(c, 4, 1.6, 1.1, 'rgba(255,120,150,0.45)'); }
   c.strokeStyle = OUT; c.lineWidth = 1.1; c.lineCap = 'round';
   if (sp.teeth) {
     // a big toothy jaw that gapes when it bites
     const open = mouth === 'open' ? 3.4 : 1.7;
     ellipse(c, 0, 3, 4.6, open, '#5a1a2a', OUT, 0.9);
     c.fillStyle = '#ffffff';
-    for (const tx of [-2.8, -0.9, 1, 2.9]) { c.beginPath(); c.moveTo(tx - 0.8, 3 - open + 0.3); c.lineTo(tx + 0.8, 3 - open + 0.3); c.lineTo(tx, 3 - open + 1.8); c.fill(); }
+    const n = 4 + mood, tl = 1.5 + mood * 0.25; // more and longer teeth as it levels
+    for (let i = 0; i < n; i++) { const tx = -3.2 + (i / (n - 1)) * 6.4; c.beginPath(); c.moveTo(tx - 0.7, 3 - open + 0.3); c.lineTo(tx + 0.7, 3 - open + 0.3); c.lineTo(tx, 3 - open + 0.3 + tl); c.fill(); }
   } else if (mouth === 'open') ellipse(c, 0, 2.6, 1.8, 2, type === 'firelily' ? '#ff9a3c' : type === 'stink' ? '#9ad14b' : '#5a1a1a', OUT, 0.9);
   else if (mouth === 'sad') { c.beginPath(); c.arc(0, 4.2, 1.6, Math.PI + 0.4, -0.4); c.stroke(); }
-  else if (type === 'stink') { c.beginPath(); c.moveTo(-2, 2.5); c.quadraticCurveTo(0, 1.5, 2, 2.8); c.stroke(); }
+  else if (mouth !== 'sleep' && mood >= 3) {
+    // a toothy grin; fangs on top at full attitude
+    rrect(c, -3.2, 1.6, 6.4, 2.6, 1.2, '#ffffff', OUT, 0.9);
+    c.lineWidth = 0.6; c.beginPath(); for (const tx of [-1.6, 0, 1.6]) { c.moveTo(tx, 1.7); c.lineTo(tx, 4.1); } c.moveTo(-3, 2.9); c.lineTo(3, 2.9); c.stroke();
+    if (mood >= 4) { c.fillStyle = '#ffffff'; c.lineWidth = 0.8; for (const fx of [-2.2, 2.2]) { c.beginPath(); c.moveTo(fx - 0.9, 4.1); c.lineTo(fx + 0.9, 4.1); c.lineTo(fx, 6); c.closePath(); c.fill(); c.stroke(); } }
+  }
+  else if (type === 'stink' || (mouth !== 'sleep' && mood === 2)) { c.beginPath(); c.moveTo(-2, 2.6); c.quadraticCurveTo(0.5, 1.8, 2.2, 1.6); c.stroke(); } // smirk
+  else if (mouth !== 'sleep' && mood === 1) { c.beginPath(); c.moveTo(-1.8, 2.4); c.lineTo(1.8, 2.4); c.stroke(); }
   else if (mouth !== 'sleep') { c.beginPath(); c.arc(0, 1.6, 1.6, 0.3, Math.PI - 0.3); c.stroke(); }
   if (crown) {
     c.fillStyle = '#ffd23f'; c.strokeStyle = OUT; c.lineWidth = 1.2; c.lineJoin = 'round';
@@ -437,7 +451,7 @@ function flowerHead(c, o, x, y, scale, i, firing, extra) {
   c.rotate(Math.sin(time * 1.6 + i + f.id) * 0.08 + wither * (x < 0 ? -0.4 : 0.4));
   c.scale(scale, scale);
   drawHead(c, f.type, {
-    look: f.angle, wither, crown: lvl === MAX_LEVEL && i === 0,
+    look: f.angle, wither, crown: lvl === MAX_LEVEL && i === 0, mood: lvl - 1,
     mouth: firing ? 'open' : wither > 0.55 ? 'sad' : 'smile',
     spin: f.type === 'frost' ? time * 0.8 + i : 0,
   });
@@ -478,21 +492,30 @@ function bodyBouquet(c, o) {
   heads.forEach(([hx, hy, hs], i) => flowerHead(c, o, hx, hy + droop, hs, i, firingHead(f, i)));
 }
 
-// Sunflower: one tall stalk that grows with every level; a sniper's monocle from level 3.
+// Sunflower: a lone sniper on a stalk. Levels add gear rather than height:
+// more leaves, a monocle (Lv3), a seed bandolier (Lv4), golden petal tips (Lv5).
 function bodyStalk(c, o) {
   const { f, lvl, time, wither, body, dark } = o;
-  const h = 16 + lvl * 4.5, sway = Math.sin(time * 1.2 + f.id) * 1.5 + wither * 5;
+  const h = 22 + lvl, sway = Math.sin(time * 1.2 + f.id) * 1.5 + wither * 5;
   for (const sx of [-1, 1]) { c.strokeStyle = dark; c.lineWidth = 2; c.lineCap = 'round'; c.beginPath(); c.moveTo(0, 10); c.quadraticCurveTo(sx * 4, 12, sx * 7, 13); c.stroke(); }
-  stem(c, 0, 11, sway * 0.3, -h * 0.4, sway, -h, 2.6 + lvl * 0.45, dark);
-  for (let i = 0; i < lvl; i++) {
-    const t = 0.2 + (i / Math.max(1, lvl)) * 0.6, y = 11 - (11 + h) * t, sx = i % 2 ? 1 : -1;
-    leaf(c, sway * t, y, 9 + lvl, sx > 0 ? -0.5 + Math.sin(time * 2 + i) * 0.1 + wither : Math.PI + 0.5 - Math.sin(time * 2 + i) * 0.1 - wither, body);
+  stem(c, 0, 11, sway * 0.3, -h * 0.4, sway, -h, 3.2, dark);
+  for (let i = 0; i < Math.min(lvl + 1, 4); i++) {
+    const t = 0.15 + i * 0.2, y = 11 - (11 + h) * t, sx = i % 2 ? 1 : -1;
+    leaf(c, sway * t, y, 10, sx > 0 ? -0.5 + Math.sin(time * 2 + i) * 0.1 + wither : Math.PI + 0.5 - Math.sin(time * 2 + i) * 0.1 - wither, body);
   }
-  flowerHead(c, o, sway, -h - 3 + wither * 4, 1 + lvl * 0.06, 0, f.flash > 0, lvl >= 3 ? (g) => {
-    g.strokeStyle = '#3b3b45'; g.lineWidth = 0.9; g.beginPath(); g.arc(2.4, -1.2, 2.6, 0, Math.PI * 2); g.stroke();
-    g.beginPath(); g.moveTo(4.9, -0.6); g.quadraticCurveTo(6.5, 3, 5, 6); g.stroke();
-    g.fillStyle = 'rgba(200,235,255,0.35)'; g.beginPath(); g.arc(2.4, -1.2, 2.3, 0, Math.PI * 2); g.fill();
-  } : null);
+  if (lvl >= 4) {
+    // a bandolier of seeds slung across the stalk
+    c.strokeStyle = '#6b4220'; c.lineWidth = 2.2; c.beginPath(); c.moveTo(-6, -2); c.quadraticCurveTo(sway * 0.4, -6, 6, -12); c.stroke();
+    for (let i = 0; i < 4; i++) { const t = 0.15 + i * 0.23; ellipse(c, -6 + 12 * t + sway * 0.2, -2 - 10 * t - Math.sin(t * Math.PI) * 2, 1.3, 2, '#3d220c', OUT, 0.7, 0.6); }
+  }
+  flowerHead(c, o, sway, -h - 3 + wither * 4, 1.05, 0, f.flash > 0, (g) => {
+    if (lvl >= 3) {
+      g.strokeStyle = '#3b3b45'; g.lineWidth = 0.9; g.beginPath(); g.arc(2.4, -1.2, 2.6, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.moveTo(4.9, -0.6); g.quadraticCurveTo(6.5, 3, 5, 6); g.stroke();
+      g.fillStyle = 'rgba(200,235,255,0.35)'; g.beginPath(); g.arc(2.4, -1.2, 2.3, 0, Math.PI * 2); g.fill();
+    }
+    if (lvl >= MAX_LEVEL) for (let i = 0; i < 14; i++) { const a = (i / 14) * Math.PI * 2; circle(g, Math.cos(a) * 13.5, Math.sin(a) * 13.5, 1.2, '#fff6c0'); }
+  });
 }
 
 // Fire lily: an onion bulb with writhing vines, each ending in a fiery snake head.
@@ -519,30 +542,44 @@ function bodyVines(c, o) {
   }
 }
 
-// Stinkbloom: a squat, warty gas sac on the ground that swells with every
-// level, with a small face set into its front and smoking vents on top.
-function bodyBlob(c, o) {
-  const { f, lvl, time, body, dark } = o;
-  const pulse = 1 + Math.sin(time * 2.2 + f.id) * 0.04 + (f.flash > 0 ? 0.1 : 0);
-  const rx = (12 + lvl * 1.5) * pulse, ry = (9.5 + lvl * 1.2) * pulse, cy = 12 - ry * 0.62;
-  const skin = mix(body, '#7b3fa0', 0.3);
-  // gas vents first, so the blob overlaps their bases
-  for (let i = 0; i < lvl; i++) {
-    const t = lvl === 1 ? 0 : i / (lvl - 1) - 0.5, vx = t * rx * 1.2, vy = cy - ry * (0.85 - Math.abs(t) * 0.4);
-    rrect(c, vx - 2.2, vy - 6, 4.4, 8, 1.6, dark, OUT, 1);
-    ellipse(c, vx, vy - 6, 2.6, 1.2, '#3a2a40', OUT, 0.8);
-    const k = (time * 0.8 + i * 0.37 + f.id * 0.1) % 1;
-    circle(c, vx + Math.sin(k * 6) * 2, vy - 8 - k * 14, 1.4 + k * 3, `rgba(154,209,75,${0.65 * (1 - k)})`);
+// Stinkbloom: a corpse flower. Five huge spotted petals lie on the ground
+// around a pit, and the face peeks out of it. Levels add more spots, buzzing
+// flies, dripping goo and thicker stink rather than size.
+function bodyRafflesia(c, o) {
+  const { f, lvl, time, wither } = o;
+  const petal = wither ? mix('#9b3b5c', '#8c7a4a', wither * 0.8) : '#9b3b5c';
+  const spot = wither ? mix('#e9d8a6', '#b9ab88', wither) : '#e9d8a6';
+  const cy = 6, breathe = 1 + Math.sin(time * 2 + f.id) * 0.03 + (f.flash > 0 ? 0.08 : 0);
+  // five fat petals, seen from the side so they sit flat on the ground
+  for (let i = 0; i < 5; i++) {
+    const a = -Math.PI / 2 + (i / 5) * Math.PI * 2 + 0.3;
+    c.save(); c.translate(0, cy); c.scale(breathe, 0.55 * breathe); c.rotate(a);
+    ellipse(c, 10, 0, 9, 7, petal, OUT, 1.8);
+    for (let k = 0; k < 1 + lvl; k++) circle(c, 6 + (k % 3) * 3.2, -3 + Math.floor(k / 3) * 4 + (k % 2) * 1.5, 1.1 + (k % 2) * 0.5, spot);
+    c.restore();
   }
-  ellipse(c, 0, cy, rx, ry, skin, OUT, 1.8);
-  ellipse(c, -rx * 0.35, cy - ry * 0.45, rx * 0.28, ry * 0.2, 'rgba(255,255,255,0.18)');
-  // warts on the upper half
-  const warts = lvl * 2 + 2;
-  for (let i = 0; i < warts; i++) {
-    const a = Math.PI + 0.35 + (i / (warts - 1)) * (Math.PI - 0.7);
-    circle(c, Math.cos(a) * rx * 0.8, cy + Math.sin(a) * ry * 0.72, 1.5 + (i % 3) * 0.6, i % 2 ? '#b3e26a' : '#5b2e70', OUT, 0.7);
+  // the pit in the middle
+  ellipse(c, 0, cy - 0.5, 7.5, 4, '#4a1630', OUT, 1.5);
+  ellipse(c, 0, cy - 1.3, 6, 2.4, '#2a0a1a');
+  // dripping goo from Lv3
+  if (lvl >= 3) for (let i = 0; i < lvl - 2; i++) {
+    const x = -9 + i * 8, k = (time * 0.6 + i * 0.4 + f.id * 0.2) % 1;
+    ellipse(c, x, cy + 4 + k * 4, 1, 1.2 + k * 1.5, `rgba(154,209,75,${0.9 - k * 0.6})`);
   }
-  flowerHead(c, o, 0, cy + 2, 0.6 + lvl * 0.03, 0, f.flash > 0);
+  // stink rising, thicker each level
+  for (let i = 0; i < 1 + lvl; i++) {
+    const k = (time * 0.7 + i / (1 + lvl) + f.id * 0.1) % 1;
+    circle(c, Math.sin(k * 7 + i) * 9, cy - 6 - k * 20, 1.3 + k * 2.6, `rgba(154,209,75,${0.55 * (1 - k)})`);
+  }
+  flowerHead(c, o, 0, cy - 6, 0.68, 0, f.flash > 0);
+  // flies buzzing around it from Lv2
+  for (let i = 0; i < lvl - 1; i++) {
+    const a = time * (3 + i * 0.7) + i * 2.1 + f.id;
+    const x = Math.cos(a) * (13 + i * 2), y = cy - 10 + Math.sin(a * 1.3) * 6;
+    ellipse(c, x - 1, y - 1.2, 1.3, 0.8, 'rgba(220,240,255,0.8)', null, 1, -0.5 + Math.sin(time * 40 + i) * 0.4);
+    ellipse(c, x + 1, y - 1.2, 1.3, 0.8, 'rgba(220,240,255,0.8)', null, 1, 0.5 - Math.sin(time * 40 + i) * 0.4);
+    circle(c, x, y, 1.1, '#1a1a1a');
+  }
 }
 
 // Frostbloom: a cluster of ice crystals; more and bigger shards each level,
@@ -553,16 +590,16 @@ function bodyCrystal(c, o) {
   const n = 2 + lvl;
   for (let i = 0; i < n; i++) {
     const t = n === 1 ? 0 : i / (n - 1) - 0.5, a = -Math.PI / 2 + t * 1.6;
-    const len = (10 + lvl * 1.5) * (1 - Math.abs(t) * 0.5), w = 3 + lvl * 0.25;
+    const len = 12 * (1 - Math.abs(t) * 0.5), w = 3.2;
     c.save(); c.translate(t * 10, 11); c.rotate(a + Math.PI / 2);
     c.beginPath(); c.moveTo(-w, 0); c.lineTo(-w * 0.8, -len * 0.8); c.lineTo(0, -len); c.lineTo(w * 0.8, -len * 0.8); c.lineTo(w, 0); c.closePath();
     c.fillStyle = i % 2 ? ice : deep; c.fill(); c.strokeStyle = OUT; c.lineWidth = 1.2; c.stroke();
     c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = 0.8; c.beginPath(); c.moveTo(-w * 0.3, -2); c.lineTo(-w * 0.2, -len * 0.75); c.stroke();
     c.restore();
   }
-  const hy = -6 - lvl * 2.2;
+  const hy = -12;
   stem(c, 0, 4, 0, hy * 0.5, 0, hy + 4, 2.4, deep);
-  flowerHead(c, o, 0, hy, 0.95 + lvl * 0.05, 0, f.flash > 0);
+  flowerHead(c, o, 0, hy, 1, 0, f.flash > 0);
   for (let i = 0; i < lvl - 2; i++) {
     const a = time * 1.4 + (i / (lvl - 2)) * Math.PI * 2;
     const ox = Math.cos(a) * 15, oy = hy + Math.sin(a) * 6;
@@ -573,35 +610,44 @@ function bodyCrystal(c, o) {
   }
 }
 
-// Thornrose: a muscly brute; bigger biceps and more thorns every level.
+// Thornrose: a muscly brute. Levels add thorns rather than size: more on the
+// chest, then on the arms (Lv3), spiked shoulders (Lv4), a thorn crown (Lv5).
 function bodyBrute(c, o) {
   const { f, lvl, time, wither, body, dark } = o;
   const thornCol = wither ? mix('#e8e2d0', '#9a8a6a', wither) : '#e8e2d0';
   const flex = f.flash > 0 ? 1 : 0.35 + Math.sin(time * 2 + f.id) * 0.15;
-  const tw = 7 + lvl * 1.1;
+  const tw = 9;
+  const thorn = (x, y, a, len = 3.5) => {
+    c.save(); c.translate(x, y); c.rotate(a);
+    c.beginPath(); c.moveTo(-1.2, 0); c.lineTo(0, -len); c.lineTo(1.2, 0); c.closePath();
+    c.fillStyle = thornCol; c.fill(); c.strokeStyle = OUT; c.lineWidth = 0.8; c.stroke();
+    c.restore();
+  };
   for (const sx of [-1, 1]) rrect(c, sx * 4 - 2.5, 7, 5, 6, 2, dark, OUT, 1.1); // stubby root legs
-  // arms: shoulder, bicep bulge, leafy fist raised when flexing
   for (const sx of [-1, 1]) {
-    const shx = sx * (tw - 1), shy = -3, bic = 3 + lvl * 0.7;
-    const ex = shx + sx * (5 + lvl * 0.5), ey = shy + 2;
-    const hx = ex + sx * 1.5, hy = ey - 6 - flex * 5;
-    stem(c, shx, shy, ex, ey + 2, hx, hy, 3 + lvl * 0.3, body);
-    circle(c, (shx + ex) / 2 + sx * 0.5, shy + 0.5 - flex * 1.5, bic * (0.8 + flex * 0.3), body, OUT, 1.2);
-    circle(c, hx, hy, 2.6 + lvl * 0.15, dark, OUT, 1.1);
+    const shx = sx * (tw - 1), shy = -3, ex = shx + sx * 6, ey = shy + 2, hx = ex + sx * 1.5, hy = ey - 6 - flex * 5;
+    stem(c, shx, shy, ex, ey + 2, hx, hy, 3.6, body);
+    const bx = (shx + ex) / 2 + sx * 0.5, by = shy + 0.5 - flex * 1.5;
+    circle(c, bx, by, 4.5 * (0.8 + flex * 0.3), body, OUT, 1.2);
+    if (lvl >= 3) for (let k = 0; k < lvl - 1; k++) thorn(bx + sx * (k - 1) * 2, by - 3.6, sx * (0.4 + k * 0.25), 3);
+    circle(c, hx, hy, 3, dark, OUT, 1.1);
+    if (lvl >= 4) for (let k = 0; k < 3; k++) thorn(shx + sx * k * 1.8 - sx * 1, shy - 2.5 - (k === 1 ? 0.8 : 0), sx * (0.2 + k * 0.4), 4.5);
   }
-  // torso: a broad chest
   c.beginPath(); c.moveTo(-tw, -5); c.quadraticCurveTo(0, -9, tw, -5); c.quadraticCurveTo(tw * 0.7, 6, 3.5, 9); c.lineTo(-3.5, 9); c.quadraticCurveTo(-tw * 0.7, 6, -tw, -5);
   c.fillStyle = body; c.fill(); c.strokeStyle = OUT; c.lineWidth = 1.6; c.stroke();
   c.strokeStyle = dark; c.lineWidth = 1; c.beginPath(); c.moveTo(0, -6); c.lineTo(0, 6); c.moveTo(-4, -1); c.quadraticCurveTo(-2, 1, 0, -1); c.moveTo(4, -1); c.quadraticCurveTo(2, 1, 0, -1); c.stroke();
-  // thorns all over the chest and shoulders
-  const nThorns = 3 + lvl * 2;
-  c.fillStyle = thornCol; c.strokeStyle = OUT; c.lineWidth = 0.8;
+  const nThorns = 2 + lvl * 2;
   for (let i = 0; i < nThorns; i++) {
-    const t = i / (nThorns - 1), sx = t < 0.5 ? -1 : 1;
-    const x = (t - 0.5) * tw * 2 * 0.95, y = -6 + Math.abs(t - 0.5) * 2 + (i % 2) * 6;
-    c.beginPath(); c.moveTo(x - 1.2, y); c.lineTo(x + sx * 1.8, y - 3.5); c.lineTo(x + 1.2, y); c.closePath(); c.fill(); c.stroke();
+    const t = nThorns === 1 ? 0.5 : i / (nThorns - 1), sx = t < 0.5 ? -1 : 1;
+    thorn((t - 0.5) * tw * 1.7, -4 + Math.abs(t - 0.5) * 3 + (i % 2) * 7, sx * (0.9 + (i % 3) * 0.3), 3 + (i % 2));
   }
-  flowerHead(c, o, 0, -14 - lvl * 0.6 + wither * 3, 0.95 + lvl * 0.04, 0, f.flash > 0);
+  flowerHead(c, o, 0, -15 + wither * 3, 1, 0, f.flash > 0, lvl >= MAX_LEVEL ? (g) => {
+    // a ring of thorns around the rose
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2 + 0.3; g.save(); g.rotate(a); g.translate(0, -11.5);
+      g.beginPath(); g.moveTo(-1.2, 0); g.lineTo(0, -4); g.lineTo(1.2, 0); g.closePath(); g.fillStyle = thornCol; g.fill(); g.strokeStyle = OUT; g.lineWidth = 0.8; g.stroke(); g.restore();
+    }
+  } : null);
 }
 
 // Snapdragon: a flytrap on a thick, segmented neck that lunges at whatever it
@@ -619,11 +665,11 @@ function bodyTrap(c, o) {
     }
   }
   ellipse(c, 0, 6, 7.5, 5.5, body, OUT, 1.5);
-  const reach = 13 + lvl * 3, lunge = f.flash > 0 ? 6 : 0;
+  const reach = 16 + lvl, lunge = f.flash > 0 ? 6 : 0;
   const ax = Math.cos(f.angle || -Math.PI / 2), ay = Math.sin(f.angle || -Math.PI / 2);
   const hx = ax * (4 + lunge) * 0.8, hy = -reach + Math.min(0, ay) * lunge + wither * 6;
   const coil = Math.sin(time * 1.8 + f.id) * 5;
-  const nw = 3.4 + lvl * 0.5;
+  const nw = 4.2;
   stem(c, 0, 3, -9 + coil, -reach * 0.45, hx, hy + 4, nw, dark);
   // neck segments
   for (let i = 1; i < 4; i++) {
@@ -634,17 +680,17 @@ function bodyTrap(c, o) {
   const spikes = 5 + lvl;
   c.save(); c.translate(hx, hy); c.rotate(Math.sin(time * 1.3 + f.id) * 0.1);
   for (let i = 0; i < spikes; i++) {
-    const a = (i / spikes) * Math.PI * 2, len = 13 + lvl * 1.2;
+    const a = (i / spikes) * Math.PI * 2, len = 14 + (i % 2) * 2;
     c.save(); c.rotate(a);
     c.beginPath(); c.moveTo(4, -2.6); c.lineTo(len, 0); c.lineTo(4, 2.6); c.closePath();
     c.fillStyle = i % 2 ? dark : body; c.fill(); c.strokeStyle = OUT; c.lineWidth = 1; c.stroke();
     c.restore();
   }
   c.restore();
-  flowerHead(c, o, hx, hy, 0.95 + lvl * 0.07, 0, f.flash > 0);
+  flowerHead(c, o, hx, hy, 1.05, 0, f.flash > 0);
 }
 
-const BODIES = { daisy: bodyBouquet, sunflower: bodyStalk, firelily: bodyVines, stink: bodyBlob, frost: bodyCrystal, thorn: bodyBrute, snap: bodyTrap };
+const BODIES = { daisy: bodyBouquet, sunflower: bodyStalk, firelily: bodyVines, stink: bodyRafflesia, frost: bodyCrystal, thorn: bodyBrute, snap: bodyTrap };
 
 function drawFlower(c, f, time) {
   const sp = SPEC[f.type];
