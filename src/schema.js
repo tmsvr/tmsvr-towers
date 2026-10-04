@@ -9,7 +9,7 @@ import { ENEMIES, FLOWER_ORDER, CAT_ORDER } from './data.js';
 // so small numbers take one byte and a position in tenths of a pixel three.
 // Bump whenever a message changes shape, so mismatched copies refuse to play
 // together instead of misreading each other (checked when a guest joins).
-export const PROTOCOL = 3;
+export const PROTOCOL = 4;
 
 const utf8 = new TextEncoder(), fromUtf8 = new TextDecoder();
 
@@ -105,7 +105,7 @@ const struct = (fields) => {
 
 const r1 = num(1), r2 = num(2), r3 = num(3);
 export const PHASES = ['wave', 'prep', 'pick'];
-export const MODES = ['grow', 'heal', 'dig'];
+export const MODES = ['grow', 'dig'];
 const flowerType = oneOf(FLOWER_ORDER);
 
 // ---- the snapshot -------------------------------------------------------------
@@ -119,7 +119,7 @@ const PICK = struct([['cursor', int], ['chosen', listOf(flowerType)], ['ready', 
 const PLAYER = struct([
   ['id', int], ['x', r1], ['y', r1], ['dir', r2], ['moving', bool], ['swingT', r2], ['swingDir', r2], ['bombs', r2],
   ['sel', int], ['mode', oneOf(MODES)], ['working', ref], ['coins', r1], ['stun', r2], ['loadout', maybe(listOf(flowerType))],
-  ['pick', maybe(PICK), (s) => s.phase === 'pick'], ['building', bool], ['dig', r2], ['cat', oneOf(CAT_ORDER)], ['stam', r3], ['tired', bool], ['sprinting', bool],
+  ['pick', maybe(PICK), (s) => s.phase === 'pick'], ['building', bool], ['healing', bool], ['dig', r2], ['cat', oneOf(CAT_ORDER)], ['stam', r3], ['tired', bool], ['sprinting', bool],
   // only the guest's prediction needs these two (see predict.js)
   ['restT', r3], ['atkCd', r3],
 ]);
@@ -171,7 +171,7 @@ export function encodeSnapshot(s, { seq, at, paused, ack }) {
 
 // Guest ticks' keys. Holding a direction gives long runs of identical
 // ticks, so each run is sent once: first seq, how many, direction, buttons.
-const INPUT_FLAGS = ['atk', 'build', 'sprint', 'bomb', 'cycle', 'buildTap', 'ready'];
+const INPUT_FLAGS = ['atk', 'build', 'sprint', 'bomb', 'cycle', 'buildTap', 'ready', 'heal'];
 const unit = (v) => Math.max(-1, Math.min(1, Math.round(+v || 0)));
 const inputFlags = (i) => INPUT_FLAGS.reduce((f, k, b) => f | (i[k] ? 1 << b : 0), 0);
 

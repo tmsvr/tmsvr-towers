@@ -528,7 +528,7 @@ function drawWorkStream(c, p, time) {
     }
     return;
   }
-  const heal = p.mode === 'heal' && !f.grow;
+  const heal = p.healing;
   for (let i = 0; i < 3; i++) {
     const k = (time * 2.5 + i / 3) % 1;
     const x = p.x + (f.x - p.x) * k, y = p.y + (f.y - T * 0.2 - p.y) * k - Math.sin(k * Math.PI) * T * 0.5;
@@ -890,7 +890,7 @@ function drawBuildGhost(c, p, s, time) {
   if (!f && !p.building) return; // the placeholder only shows in build mode
   const type = p.loadout[p.sel];
   const valid = f ? true : canBuildAt(s, tx, ty);
-  const col = !valid ? '255,90,90' : f && p.mode === 'dig' ? '230,160,90' : f && p.mode === 'heal' && f.lvl > 0 ? '140,255,160' : '255,255,255';
+  const col = !valid ? '255,90,90' : f && p.mode === 'dig' ? '230,160,90' : f && p.healing ? '140,255,160' : '255,255,255';
   const pulse = 0.6 + Math.sin(time * 6) * 0.25;
   c.setLineDash([7, 5]); c.lineDashOffset = -time * 20;
   rrect(c, tx * T + 3, ty * T + 3, T - 6, T - 6, 8, `rgba(${col},0.12)`, `rgba(${col},${pulse})`, 2.5);
@@ -1087,7 +1087,7 @@ function coinIcon(c, x, y, r) {
 function contextText(s, p, ui) {
   if (!p.loadout) return p.pick.ready ? 'Ready! Waiting for the other cat…' : 'Choosing flowers…';
   if (p.stun > 0) return 'Knocked down!';
-  const key = ui.keyLabel(ui.keysFor(p.id).build), cyc = ui.keyLabel(ui.keysFor(p.id).cycle);
+  const key = ui.keyLabel(ui.keysFor(p.id).build), cyc = ui.keyLabel(ui.keysFor(p.id).cycle), hk = ui.keyLabel(ui.keysFor(p.id).heal);
   const m = s.m;
   const { tx, ty } = tileOf(m, p);
   const k = ty * m.W + tx;
@@ -1105,13 +1105,11 @@ function contextText(s, p, ui) {
   if (p.mode === 'dig') return `Hold [${key}] dig up ${name} · get back ${uprootRefund(f)} · [${cyc}] ${midLevel ? 'upgrade' : 'back'}`;
   if (f.lvl === 0) return `Hold [${key}] to grow ${name} · ${Math.floor(f.grow.paid)}/${f.grow.cost} · [${cyc}] dig up`;
   if (f.lvl >= MAX_LEVEL) return `${name} · max level, never wilts · [${cyc}] dig up`;
-  if (p.mode === 'heal') {
-    if (f.hp >= FLOWER_HP) return `${name} is healthy · [${cyc}] dig up mode`;
-    const cost = Math.ceil((FLOWER_HP - f.hp) * healCostPerHp(f));
-    return `Hold [${key}] heal ${Math.floor(f.hp)}% → 100% (${cost}) · [${cyc}] dig up`;
-  }
   const paid = f.grow ? Math.floor(f.grow.paid) : 0, cost = f.grow ? f.grow.cost : upgradeCost(f.type, f.lvl);
-  return `Hold [${key}] upgrade → Lv${f.lvl + 1} (${paid}/${cost}) · [${cyc}] heal`;
+  const up = `[${key}] upgrade Lv${f.lvl + 1} ${paid}/${cost}`;
+  if (f.hp >= FLOWER_HP - 0.5) return `${up} · healthy · [${cyc}] dig up`;
+  const healCost = Math.ceil((FLOWER_HP - f.hp) * healCostPerHp(f));
+  return `${up} · [${hk}] heal ${Math.floor(f.hp)}%→100 (${healCost}) · [${cyc}] dig`;
 }
 
 function drawHud(c, s, time, ui) {
@@ -1318,16 +1316,16 @@ function drawMenu(c, time, ui) {
   label(c, '1  Solo     2  Local co-op     3  Host online     4  Join online', cx, 318, 22, '#ffffff', 'center', 600, null);
   c.globalAlpha = 1;
   const rows = [
-    ['', 'Move', 'Sprint', 'Baton', 'Bomb', 'Plant / grow (hold)', 'Next flower / mode'],
+    ['', 'Move', 'Sprint', 'Baton', 'Bomb', 'Plant / upgrade', 'Heal', 'Next / mode'],
     ...ui.keys.map((k, i) => [`P${i + 1}`, i === 0 ? [k.up, k.left, k.down, k.right].map(ui.keyLabel).join('') : 'Arrows',
-      ui.keyLabel(k.sprint), ui.keyLabel(k.atk), ui.keyLabel(k.bomb), ui.keyLabel(k.build), ui.keyLabel(k.cycle)]),
+      ui.keyLabel(k.sprint), ui.keyLabel(k.atk), ui.keyLabel(k.bomb), ui.keyLabel(k.build), ui.keyLabel(k.heal), ui.keyLabel(k.cycle)]),
   ];
-  const cols = [cx - 300, cx - 225, cx - 150, cx - 85, cx - 25, cx + 90, cx + 235];
+  const cols = [cx - 300, cx - 228, cx - 158, cx - 98, cx - 42, cx + 48, cx + 140, cx + 230];
   rows.forEach((r, ri) => r.forEach((t, ci) => label(c, t, cols[ci], 358 + ri * 28, ri ? 16 : 13, ri ? '#fff' : '#8fa5b3', 'center', ri ? 600 : 500, null)));
   const tips = [
     'Plant key: build mode, again to plant a seedling, then HOLD to pour coins in. Next-flower key cycles.',
-    'Flowers wear out as they fight: stand on one and switch to heal mode (or dig it up for 60% back).',
-    'Each player picks a different cat and 4 of the 7 flowers, and keeps the coins they pick up.',
+    'Flowers wear out as they fight: stand on one and HOLD the heal key. Mode key on a flower: dig it up for 60% back.',
+    'Each player picks a different cat and 4 of the 7 flowers. In co-op, coins picked up are shared.',
   ];
   tips.forEach((t, i) => label(c, t, cx, 455 + i * 24, 13.5, '#cfe0ea', 'center', 500, null));
   label(c, 'Enter: start wave early  ·  P: pause  ·  N: sound  ·  J: effects  ·  Esc: menu', cx, 545, 14, '#8fa5b3', 'center', 500, null);

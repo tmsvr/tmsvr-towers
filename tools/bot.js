@@ -100,13 +100,13 @@ export function runBot({ players = 2, seed = 1, loadouts, cats, map = 0, maxMinu
     const inputs = s.players.map(() => ({}));
     s.players.forEach((p, i) => {
       const b = bots[i], inp = inputs[i];
-      if (b.target && (b.target.dead || (!b.target.grow && !(p.mode === 'heal' && b.target.hp < 100)) || p.coins < 1)) b.target = null;
+      if (b.target && (b.target.dead || (!b.target.grow && !(b.heal && b.target.hp < 100)) || p.coins < 1)) b.target = null;
       if (!b.target && tick % 10 === i * 5) {
         const hurt = s.flowers.find((f) => f.lvl > 0 && f.lvl < MAX_LEVEL && f.hp < 45);
         const seedling = s.flowers.find((f) => f.grow && f.lvl === 0);
         const up = s.flowers.filter((f) => f.lvl > 0 && f.lvl < MAX_LEVEL).sort((a, c) => a.lvl - c.lvl)[0];
-        if (hurt && p.coins >= 5) { b.target = hurt; p.mode = 'heal'; p.onFlowerId = hurt.id; }
-        else if (seedling && p.coins >= 5) { b.target = seedling; p.mode = 'grow'; p.onFlowerId = seedling.id; }
+        if (hurt && p.coins >= 5) { b.target = hurt; b.heal = true; p.onFlowerId = hurt.id; }
+        else if (seedling && p.coins >= 5) { b.target = seedling; b.heal = false; p.mode = 'grow'; p.onFlowerId = seedling.id; }
         else if (s.flowers.length < Math.min(16, 2 + s.wave + m.paths.length) || !up) {
           // keep planting until there's a decent garden, saving up if needed
           const spot = p.coins >= 25 && nextSpot();
@@ -118,10 +118,10 @@ export function runBot({ players = 2, seed = 1, loadouts, cats, map = 0, maxMinu
             p.x = (spot[0] + 0.5) * T; p.y = (spot[1] + 0.5) * T;
             inp.buildTap = true; inp.build = true;
           }
-        } else if (up && p.coins >= 15) { b.target = up; p.mode = 'grow'; p.onFlowerId = up.id; }
+        } else if (up && p.coins >= 15) { b.target = up; b.heal = false; p.mode = 'grow'; p.onFlowerId = up.id; }
         if (b.target) { p.x = b.target.x; p.y = b.target.y - 10; }
       }
-      if (b.target) { inp.build = !p.waitRelease; return; } // let go once a level finishes, like a player has to
+      if (b.target) { if (b.heal) inp.heal = true; else inp.build = !p.waitRelease; return; } // let go once a level finishes, like a player has to
       if (inp.buildTap) return;
       let foe = null, fd = 400;
       for (const e of s.enemies) { if (e.under) continue; const d = Math.hypot(e.x - p.x, e.y - p.y); if (d < fd) { fd = d; foe = e; } }

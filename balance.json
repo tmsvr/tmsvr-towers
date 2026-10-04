@@ -9,6 +9,7 @@
     "enemies.bite": "Damage per second an enemy does to the cottage while chomping on it (it keeps chomping until killed).",
     "enemies.size": "Radius in tiles. 'light' enemies can be knocked back by the baton and swallowed by Snapdragons.",
     "difficulty": "Enemy health = base * (1 + hpPerWave*(wave-1) + hpPerWaveSquared*(wave-1)^2). Wave size budget = waveBudgetBase + waveBudgetPerWave*wave + waveBudgetPerWaveSquared*wave^2. Both grow slowly at first and steeply towards the last waves. Every bossEvery-th wave has a boss; the one on the last wave has finalBossHp times more health.",
+    "economy.coopCoinShare": "In co-op, the share of every coin picked up that is split evenly between all cats (1 = fully shared, 0 = whoever picks it up keeps it).",
     "economy.uprootRefund": "Share of the coins poured into a flower (planting + upgrades, not healing) you get back when you dig it up. uprootSeconds = how long you hold the key to dig.",
     "juice": "Extra effects that don't change the game: damage numbers, hit squash, death pops, confetti, coin counter bounce, short freeze (hit-stop) on bombs and boss kills. J toggles them all in game; set any to false to drop just that one.",
     "player.sprint": "Holding sprint multiplies speed by sprintSpeed for up to sprintSeconds; stamina refills fully in sprintRecoverSeconds after a sprintRecoverDelay pause. Running dry means waiting until it is a third full.",
@@ -49,6 +50,7 @@
     "waveBonusBase": 15,
     "waveBonusPerWave": 4,
     "coopBonusShare": 0.6,
+    "coopCoinShare": 1,
     "uprootRefund": 0.6,
     "uprootSeconds": 1.2
   },

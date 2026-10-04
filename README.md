@@ -35,10 +35,12 @@ them.
 - Before each game, pick a map, a cat and 4 of the 7 flowers. Two players can't
   pick the same cat: Brick (slow, big hits), Zip (fast, light hits), Fern
   (grows and heals faster) or Boom (faster, bigger bombs).
-- Standing on a flower, Q cycles upgrade → heal → dig up. Holding E in dig-up
-  mode removes the flower and refunds part of what was spent on it.
-- P1: WASD move · Shift sprint · F baton · G bomb · E plant/grow (hold) · Q next flower / heal / dig-up mode
-- P2 (local): arrows · Right Shift sprint · `,` baton · `.` bomb · `/` plant/grow · M next flower
+- Standing on a flower, hold E to upgrade it and R to heal it. Q switches E to
+  dig-up mode, which removes the flower and refunds part of what was spent on it.
+- In co-op, coins picked up are shared between both cats (see
+  `economy.coopCoinShare`), so the gardener can afford to garden.
+- P1: WASD move · Shift sprint · F baton · G bomb · E plant/upgrade (hold) · R heal (hold) · Q next flower / dig-up mode
+- P2 (local): arrows · Right Shift sprint · `,` baton · `.` bomb · `/` plant/upgrade · `'` heal · M next flower
 - J turns the extra effects (damage numbers, confetti, hit-stop…) on and off.
 - Online, both players use the P1 keys on their own keyboard. Your friend needs
   the game too: easiest is hosting it on GitHub Pages (see above) and sending

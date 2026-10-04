@@ -1,5 +1,5 @@
 // Game simulation. No DOM/canvas/audio access: state in, inputs in, state out.
-// Inputs per player per tick: { mx, my, atk, bomb, build (held), buildTap, cycle, ready }
+// Inputs per player per tick: { mx, my, atk, bomb, build (held), heal (held), buildTap, cycle, ready }
 // Side effects for presentation are queued for whoever draws the game:
 // sounds and shake in s.events, visual effects (described, not simulated) in
 // s.fx. Both are drained by the caller.
@@ -123,10 +123,9 @@ export function catStats(p) {
 export const healCostPerHp = (f) => (FLOWERS[f.type].cost * HEAL_COST) / FLOWER_HP;
 export const uprootRefund = (f) => Math.floor((f.spent || 0) * ECONOMY.uprootRefund);
 
-// What the mode key cycles through while standing on a flower.
-function modesFor(f) {
-  return f.lvl > 0 && f.lvl < MAX_LEVEL ? ['grow', 'heal', 'dig'] : ['grow', 'dig'];
-}
+// What the mode key cycles through while standing on a flower. Healing has
+// its own key, so the plant key only ever upgrades (or digs up).
+const FLOWER_MODES = ['grow', 'dig'];
 
 // ---- Enemies --------------------------------------------------------------
 function spawnEnemy(s, type, from, path = 0) {
@@ -445,29 +444,32 @@ function plant(s, p) {
   ev(s, 'plant');
 }
 
-// A cat holding the plant key pours its own coins into the flower it stands on.
+// A cat holding the heal key pours its own coins into the flower's health.
+function heal(s, p, f, dt) {
+  if (f.lvl === 0 || f.lvl >= MAX_LEVEL) return deny(s, p, f.x, f.y - T * 0.6, f.lvl ? 'Max level flowers never wilt' : 'Seedlings are fine');
+  if (f.hp >= FLOWER_HP) return; // the HUD already says it's healthy
+  const cph = healCostPerHp(f);
+  const pay = Math.min((FLOWER_HP - f.hp) * cph, HEAL_RATE * catStats(p).grow * dt * cph, p.coins);
+  if (pay <= 1e-6) return deny(s, p, f.x, f.y - T * 0.6, 'Out of coins!');
+  p.coins -= pay;
+  f.hp += pay / cph;
+  p.working = f;
+  ev(s, 'pour');
+  if (f.hp >= FLOWER_HP - 1e-6) {
+    f.hp = FLOWER_HP;
+    text(s, f.x, f.y - T * 0.6, 'Healthy!', '#8dff9a');
+    ev(s, 'healed');
+  }
+}
+
+// A cat holding the plant key pours its own coins into upgrading the flower
+// it stands on (or digs it up in dig mode).
 function work(s, p, f, dt) {
   if (p.mode === 'dig') {
     p.dig = (p.dig || 0) + dt / ECONOMY.uprootSeconds;
     p.working = f;
     ev(s, 'dig');
     if (p.dig >= 1) uproot(s, p, f);
-    return;
-  }
-  if (f.lvl > 0 && p.mode === 'heal') {
-    if (f.hp >= FLOWER_HP) return;
-    const cph = healCostPerHp(f);
-    const pay = Math.min((FLOWER_HP - f.hp) * cph, HEAL_RATE * catStats(p).grow * dt * cph, p.coins);
-    if (pay <= 1e-6) return deny(s, p, f.x, f.y - T * 0.6, 'Out of coins!');
-    p.coins -= pay;
-    f.hp += pay / cph;
-    p.working = f;
-    ev(s, 'pour');
-    if (f.hp >= FLOWER_HP - 1e-6) {
-      f.hp = FLOWER_HP;
-      text(s, f.x, f.y - T * 0.6, 'Healthy!', '#8dff9a');
-      ev(s, 'healed');
-    }
     return;
   }
   if (!f.grow) {
@@ -556,6 +558,7 @@ function updatePlayers(s, dt, inputs) {
     const inp = inputs[p.id] || {};
     p.msgCd -= dt;
     p.working = null;
+    p.healing = false;
     const had = p.bombs;
     p.bombs = Math.min(PLAYER.bombMax, p.bombs + dt / catStats(p).bombRecharge);
     if (had < 1 && p.bombs >= 1) ev(s, 'bombReady');
@@ -567,10 +570,10 @@ function updatePlayers(s, dt, inputs) {
 
     const { tx, ty } = tileOf(s.m, p);
     let f = s.grid.get(ty * s.m.W + tx);
-    if (f && f.id !== p.onFlowerId) p.mode = f.lvl > 0 && f.hp < FLOWER_HP * 0.6 ? 'heal' : 'grow';
+    if (f && f.id !== p.onFlowerId) p.mode = 'grow'; // stepping onto a flower always starts in upgrade mode
     p.onFlowerId = f ? f.id : null;
     if (inp.cycle) {
-      if (f) { const ms = modesFor(f); p.mode = ms[(ms.indexOf(p.mode) + 1) % ms.length]; }
+      if (f) p.mode = FLOWER_MODES[(FLOWER_MODES.indexOf(p.mode) + 1) % FLOWER_MODES.length];
       // off → flower 1 → … → flower 4 → off
       else if (!p.building) { p.building = true; p.sel = 0; }
       else if (++p.sel >= p.loadout.length) { p.building = false; p.sel = 0; }
@@ -582,7 +585,8 @@ function updatePlayers(s, dt, inputs) {
       else { plant(s, p); f = s.grid.get(ty * s.m.W + tx); if (f) p.building = false; }
     }
     if (!inp.build) p.waitRelease = false;
-    if (inp.build && f && !p.waitRelease) work(s, p, f, dt);
+    if (inp.heal && f) { p.healing = true; heal(s, p, f, dt); }
+    else if (inp.build && f && !p.waitRelease) work(s, p, f, dt);
     if (p.working?.id !== f?.id || p.mode !== 'dig') p.dig = 0; // digging only counts while held
   }
   return ready;
@@ -747,7 +751,11 @@ function updateDrops(s, dt) {
       d.y += ((near.y - d.y) / nd) * Math.min(sp, nd);
       if (nd < 20 * U) {
         d.done = true;
-        near.coins += d.value;
+        // In co-op part of every pickup is shared, so the gardener isn't
+        // starved by whoever runs around fighting.
+        const share = s.players.length > 1 ? ECONOMY.coopCoinShare ?? 0 : 0;
+        near.coins += d.value * (1 - share);
+        for (const p of s.players) p.coins += (d.value * share) / s.players.length;
         text(s, d.x, d.y - 10, `+${d.value}`, d.meat ? '#ff9d8a' : '#ffd23f');
         ev(s, d.meat ? 'meat' : 'coin');
       }
