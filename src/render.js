@@ -117,6 +117,24 @@ function drawPond(c, o, r) {
   }
 }
 
+// A wooden bridge deck over one water tile: planks across the way it is
+// crossed, with a rail and posts on both sides.
+function drawDeck(c, d) {
+  c.save(); c.translate((d.x + 0.5) * T, (d.y + 0.5) * T);
+  if (d.dir === 'v') c.rotate(Math.PI / 2);
+  const hw = T / 2 + 1, hh = T * 0.4;
+  c.fillStyle = 'rgba(0,0,0,0.18)'; c.fillRect(-hw, -hh + 4, hw * 2, hh * 2);
+  c.fillStyle = '#b8834c'; c.fillRect(-hw, -hh, hw * 2, hh * 2);
+  c.strokeStyle = '#7d5530'; c.lineWidth = 1.5;
+  for (let x = -hw + T / 7; x < hw; x += T / 7) { c.beginPath(); c.moveTo(x, -hh); c.lineTo(x, hh); c.stroke(); }
+  for (const sy of [-1, 1]) {
+    c.fillStyle = '#6b4526'; c.fillRect(-hw, sy * hh - 3, hw * 2, 6);
+    c.fillStyle = '#8a5c33'; c.fillRect(-hw, sy * hh - 3, hw * 2, 2.5);
+    for (const px of [-T / 4, T / 4]) { c.fillStyle = '#5a3a1e'; c.fillRect(px - 2.5, sy * hh - 5, 5, 10); }
+  }
+  c.restore();
+}
+
 function drawRock(c, o) {
   const cx = (o.x + 0.5) * T, cy = (o.y + 0.5) * T;
   ellipse(c, cx, cy + T * 0.22, T * 0.36, T * 0.12, 'rgba(0,0,0,0.18)');
@@ -241,6 +259,7 @@ function paintBg(c, m) {
       }
     }
   }
+  for (const d of m.decks) drawDeck(c, d);
   for (const o of m.obstacles) if (o.type === 'rock') drawRock(c, o);
   // a monster cave where each road enters the map
   for (const path of m.paths) {

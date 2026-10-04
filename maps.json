@@ -4,7 +4,7 @@
     "paths": "Each path is a list of corner points, from where enemies enter (on the map edge) to the base. Segments must be straight horizontal or vertical lines. Enemies are spread across all paths.",
     "base": "The cottage enemies are trying to reach; every path must end here.",
     "start": "Where the cats start.",
-    "obstacles": "Hand-placed things you can't plant on: pond (x, y, w, h), tree (x, y), rock (x, y).",
+    "obstacles": "Hand-placed things you can't plant on: pond (x, y, w, h), tree (x, y), rock (x, y), bridge (x, y, w, h: a footbridge over a pond that cats can cross). Roads may cross ponds; they get a bridge automatically.",
     "waveSize": "Multiplies how many enemies come per wave on this map (maps with short roads or several entrances can use less than 1). Boss health is multiplied by its square root.",
     "startCoins": "Multiplies the starting coins on this map (maps with several entrances need more flowers early).",
     "scatter": "Extra trees and rocks placed randomly (but the same every game) on free tiles; change seed for a different layout."
@@ -13,7 +13,7 @@
     {
       "id": "meadow",
       "name": "Meadow Trail",
-      "desc": "One long road. Good for learning",
+      "desc": "One long road, to learn",
       "width": 36,
       "height": 22,
       "base": [33, 8],
@@ -32,7 +32,7 @@
     {
       "id": "lakeside",
       "name": "Lakeside",
-      "desc": "Opposite corners, winding roads",
+      "desc": "Opposite corners",
       "width": 29,
       "height": 23,
       "base": [14, 11],
@@ -54,7 +54,7 @@
     {
       "id": "crossroads",
       "name": "Crossroads",
-      "desc": "Three roads, two of them cross",
+      "desc": "Three roads",
       "width": 32,
       "height": 22,
       "base": [16, 11],
@@ -79,7 +79,7 @@
     {
       "id": "twin",
       "name": "Twin Gates",
-      "desc": "Left and right. Split up!",
+      "desc": "Left and right",
       "width": 33,
       "height": 21,
       "base": [16, 10],
@@ -99,7 +99,7 @@
     {
       "id": "four",
       "name": "Four Winds",
-      "desc": "A road from every side",
+      "desc": "From every side",
       "width": 29,
       "height": 29,
       "base": [14, 14],
@@ -119,6 +119,53 @@
         { "type": "pond", "x": 7, "y": 17, "w": 2, "h": 3 }
       ],
       "scatter": { "trees": 26, "rocks": 10, "seed": 17 }
+    },
+    {
+      "id": "island",
+      "name": "Island Keep",
+      "desc": "Island, two bridges",
+      "width": 31,
+      "height": 27,
+      "base": [15, 13],
+      "start": [13, 11],
+      "waveSize": 0.85,
+      "startCoins": 2.5,
+      "paths": [
+        [[0, 12], [7, 12], [7, 2], [3, 2], [3, 6], [15, 6], [15, 13]],
+        [[30, 12], [23, 12], [23, 2], [27, 2], [27, 6], [15, 6], [15, 13]],
+        [[30, 14], [23, 14], [23, 24], [27, 24], [27, 20], [15, 20], [15, 13]],
+        [[0, 14], [7, 14], [7, 24], [3, 24], [3, 20], [15, 20], [15, 13]]
+      ],
+      "obstacles": [
+        { "type": "pond", "x": 9, "y": 7, "w": 13, "h": 3 },
+        { "type": "pond", "x": 9, "y": 17, "w": 13, "h": 3 },
+        { "type": "pond", "x": 9, "y": 10, "w": 3, "h": 7 },
+        { "type": "pond", "x": 19, "y": 10, "w": 3, "h": 7 }
+      ],
+      "scatter": { "trees": 30, "rocks": 12, "seed": 41 }
+    },
+    {
+      "id": "river",
+      "name": "River Crossing",
+      "desc": "Split by a river",
+      "width": 33,
+      "height": 25,
+      "base": [16, 7],
+      "start": [16, 9],
+      "waveSize": 0.95,
+      "startCoins": 2.5,
+      "paths": [
+        [[3, 24], [3, 16], [9, 16], [9, 21], [6, 21], [6, 19], [11, 19], [11, 9], [13, 9], [13, 7], [16, 7]],
+        [[29, 24], [29, 16], [23, 16], [23, 21], [26, 21], [26, 19], [21, 19], [21, 9], [19, 9], [19, 7], [16, 7]],
+        [[0, 1], [10, 1], [10, 5], [6, 5], [6, 3], [16, 3], [16, 7]],
+        [[32, 1], [22, 1], [22, 5], [26, 5], [26, 3], [16, 3], [16, 7]]
+      ],
+      "obstacles": [
+        { "type": "pond", "x": 0, "y": 11, "w": 33, "h": 3 },
+        { "type": "bridge", "x": 4, "y": 11, "w": 1, "h": 3 },
+        { "type": "bridge", "x": 28, "y": 11, "w": 1, "h": 3 }
+      ],
+      "scatter": { "trees": 26, "rocks": 10, "seed": 53 }
     }
   ]
 }

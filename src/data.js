@@ -42,8 +42,11 @@ function prepareMap(def, index) {
   });
   const blocked = new Set();
   const obstacles = [];
+  const footbridges = new Set(); // cat-only bridges over water
   for (const o of def.obstacles || []) {
-    if (o.type === 'pond') {
+    if (o.type === 'bridge') {
+      for (let y = o.y; y < o.y + o.h; y++) for (let x = o.x; x < o.x + o.w; x++) { footbridges.add(y * w + x); blocked.add(y * w + x); }
+    } else if (o.type === 'pond') {
       for (let y = o.y; y < o.y + o.h; y++) for (let x = o.x; x < o.x + o.w; x++) blocked.add(y * w + x);
       obstacles.push({ ...o });
     } else {
@@ -71,12 +74,34 @@ function prepareMap(def, index) {
       placed++;
     }
   }
+  // Bridges: water tiles a road or a footbridge crosses. Everyone can walk
+  // over them, nobody can plant on them. Each deck runs along the way it is
+  // crossed (dir 'h' or 'v'), so its planks can be drawn the right way.
+  const water = new Set();
+  for (const o of obstacles) if (o.type === 'pond') for (let y = o.y; y < o.y + o.h; y++) for (let x = o.x; x < o.x + o.w; x++) water.add(y * w + x);
+  const crossing = (k) => pathTiles.has(k) || footbridges.has(k);
+  const decks = [];
+  for (const k of water) {
+    if (!crossing(k)) continue;
+    const x = k % w, y = (k - x) / w;
+    const h = (x > 0 && crossing(k - 1)) || (x < w - 1 && crossing(k + 1));
+    decks.push({ x, y, dir: h ? 'h' : 'v' });
+  }
+  const deckTiles = new Set(decks.map((d) => d.y * w + d.x));
   // What cats bump into: rounded boxes (ponds) and circles (tree trunks, rocks),
   // matched to the drawings. Each is listed under every tile it touches.
+  // A pond with a bridge across it is made of square tiles instead, leaving
+  // the deck free.
   const solids = new Map();
+  const addSolid = (k, s) => { if (!solids.has(k)) solids.set(k, []); solids.get(k).push(s); };
   for (const o of obstacles) {
     let s;
-    if (o.type === 'pond') {
+    if (o.type === 'pond' && [...Array(o.w * o.h).keys()].some((i) => deckTiles.has((o.y + Math.floor(i / o.w)) * w + o.x + (i % o.w)))) {
+      for (let y = o.y; y < o.y + o.h; y++) for (let x = o.x; x < o.x + o.w; x++) {
+        if (!deckTiles.has(y * w + x)) addSolid(y * w + x, { x0: x * T, y0: y * T, x1: (x + 1) * T, y1: (y + 1) * T, rad: 0 });
+      }
+      continue;
+    } else if (o.type === 'pond') {
       const rad = T * 0.4;
       s = { x0: o.x * T + 4 + rad, y0: o.y * T + 4 + rad, x1: (o.x + o.w) * T - 4 - rad, y1: (o.y + o.h) * T - 4 - rad, rad };
     } else {
@@ -84,15 +109,11 @@ function prepareMap(def, index) {
       const rad = o.type === 'tree' ? T * 0.28 : T * 0.3 * (0.7 + (o.v || 0.5) * 0.4);
       s = { x0: cx, y0: cy, x1: cx, y1: cy, rad };
     }
-    for (let y = o.y; y < o.y + o.h; y++) for (let x = o.x; x < o.x + o.w; x++) {
-      const k = y * w + x;
-      if (!solids.has(k)) solids.set(k, []);
-      solids.get(k).push(s);
-    }
+    for (let y = o.y; y < o.y + o.h; y++) for (let x = o.x; x < o.x + o.w; x++) addSolid(y * w + x, s);
   }
   return {
     index, id: def.id, name: def.name, desc: def.desc, W: w, H: h, waveSize: def.waveSize ?? 1, startCoins: def.startCoins ?? 1, worldW: w * T, worldH: h * T,
-    paths, base: center(def.base), baseTile: def.base, start: center(def.start), pathTiles, blocked, yard, obstacles, solids,
+    paths, base: center(def.base), baseTile: def.base, start: center(def.start), pathTiles, blocked, yard, obstacles, solids, decks,
   };
 }
 
