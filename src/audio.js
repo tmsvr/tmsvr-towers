@@ -1,5 +1,6 @@
 // Procedural sound effects and background music via WebAudio. No asset files.
 let ctx = null, master, sfxBus, musicBus, noiseBuf;
+let drumBus, dangerBus; // music layers that fade in with the action
 let muted = false;
 const lastPlayed = {};
 
@@ -10,6 +11,8 @@ export function initAudio() {
   const comp = ctx.createDynamicsCompressor(); comp.connect(master);
   sfxBus = ctx.createGain(); sfxBus.gain.value = 0.9; sfxBus.connect(comp);
   musicBus = ctx.createGain(); musicBus.gain.value = 0.22; musicBus.connect(comp);
+  drumBus = ctx.createGain(); drumBus.gain.value = 0; drumBus.connect(musicBus);
+  dangerBus = ctx.createGain(); dangerBus.gain.value = 0; dangerBus.connect(musicBus);
   noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
   const d = noiseBuf.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -37,7 +40,7 @@ function tone({ type = 'sine', f = 440, f2, dur = 0.1, vol = 0.2, attack = 0.005
   o.start(t); o.stop(t + dur + 0.05);
 }
 
-function noise({ dur = 0.2, vol = 0.2, type = 'lowpass', f = 1000, f2, q = 1, delay = 0 }) {
+function noise({ dur = 0.2, vol = 0.2, type = 'lowpass', f = 1000, f2, q = 1, delay = 0, dest = sfxBus }) {
   const t = ctx.currentTime + delay;
   const src = ctx.createBufferSource();
   src.buffer = noiseBuf;
@@ -48,7 +51,7 @@ function noise({ dur = 0.2, vol = 0.2, type = 'lowpass', f = 1000, f2, q = 1, de
   const g = ctx.createGain();
   g.gain.setValueAtTime(vol, t);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  src.connect(flt).connect(g).connect(sfxBus);
+  src.connect(flt).connect(g).connect(dest);
   src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.05);
 }
 
@@ -108,6 +111,9 @@ export function play(name) {
 }
 
 // ---- Music: a gentle looping I–vi–IV–V tune --------------------------------
+// Three layers share one clock: the tune always plays, drums fade in while a
+// wave is running, and a tense bass + counter-melody fades in when the cottage
+// is being chomped or a boss is on the field.
 const BPM = 104;
 const STEP = 60 / BPM / 2; // eighth notes
 const CHORDS = [[60, 64, 67], [57, 60, 64], [53, 57, 60], [55, 59, 62]]; // C Am F G
@@ -119,6 +125,14 @@ const MELODY = [
 ];
 const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
 let musicStep = 0, nextTime = 0;
+
+let mood = { drums: 0, danger: 0 };
+export function setMusicMood(drums, danger) {
+  if (!ctx || (drums === mood.drums && danger === mood.danger)) return;
+  mood = { drums, danger };
+  drumBus.gain.setTargetAtTime(drums, ctx.currentTime, 0.8);
+  dangerBus.gain.setTargetAtTime(danger, ctx.currentTime, danger > 0 ? 0.3 : 1.5);
+}
 
 function startMusic() {
   nextTime = ctx.currentTime + 0.2;
@@ -136,6 +150,17 @@ function scheduleMusic() {
     if (beat % 2 === 1) chord.forEach((n) => tone({ type: 'sine', f: midi(n), dur: STEP * 0.8, vol: 0.06, delay: at, dest: musicBus }));
     const m = MELODY[bar][beat];
     if (m) tone({ type: 'triangle', f: midi(m), dur: STEP * 1.6, vol: 0.13, attack: 0.01, delay: at, dest: musicBus });
+    // drums (silent unless the layer is faded in)
+    if (mood.drums > 0.01) {
+      if (beat === 0 || beat === 4 || (bar % 2 && beat === 7)) tone({ f: 120, f2: 45, dur: 0.18, vol: 0.5, attack: 0.002, delay: at, dest: drumBus });
+      if (beat === 2 || beat === 6) noise({ type: 'bandpass', f: 1800, q: 0.8, dur: 0.12, vol: 0.22, delay: at, dest: drumBus });
+      noise({ type: 'highpass', f: 7000, dur: beat % 2 ? 0.03 : 0.05, vol: beat % 2 ? 0.05 : 0.09, delay: at, dest: drumBus });
+    }
+    // danger: driving eighth-note bass and a high counter-line on the minor third
+    if (mood.danger > 0.01) {
+      tone({ type: 'sawtooth', f: midi(chord[0] - 24), dur: STEP * 0.7, vol: 0.12, attack: 0.004, delay: at, dest: dangerBus });
+      if (beat % 4 === 0) tone({ type: 'square', f: midi(chord[0] + 15 + (beat === 4 ? 2 : 0)), dur: STEP * 1.8, vol: 0.05, attack: 0.01, delay: at, dest: dangerBus });
+    }
     nextTime += STEP;
     musicStep++;
   }

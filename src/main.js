@@ -6,7 +6,7 @@
 //   guest     – this browser only sends inputs and draws snapshots from the host
 import { createState, step, updateFx } from './sim.js';
 import { render, VIEW_W, VIEW_H } from './render.js';
-import { initAudio, play, toggleMute } from './audio.js';
+import { initAudio, play, toggleMute, setMusicMood } from './audio.js';
 import { hostGame, joinGame } from './net.js';
 import { makeSnapshot, applySnapshot, interpolate, newGuestState } from './snapshot.js';
 import { PLAYER, T, W, H, WORLD_W, WORLD_H, MAP_H } from './data.js';
@@ -304,6 +304,14 @@ function updateCamera(now) {
   ui.cam.y += (cy - ui.cam.y) * k;
 }
 
+// Music gets busier during waves and tense while the cottage is under attack.
+function updateMusic(s) {
+  const live = s && !s.over && !s.won && !s.paused && !ui.paused;
+  const fighting = live && s.phase === 'wave';
+  const danger = live && (s.baseHitT > 0 || s.enemies.some((e) => e.def?.boss));
+  setMusicMood(fighting ? 1 : 0, danger ? 1 : 0);
+}
+
 function frame(now) {
   pump();
   if (mode === 'guest') {
@@ -312,7 +320,9 @@ function frame(now) {
     if (me && pred) { me.x = pred.x; me.y = pred.y; me.moving = predMoving; if (predMoving) me.dir = predDir; }
   }
   updateCamera(now);
-  render(ctx, mode === 'guest' || mode === 'local' || mode === 'host' ? state : null, ui);
+  const inGame = mode === 'guest' || mode === 'local' || mode === 'host';
+  updateMusic(inGame ? state : null);
+  render(ctx, inGame ? state : null, ui);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
