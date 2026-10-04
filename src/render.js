@@ -340,7 +340,7 @@ const PERSONA = {
   sunflower: (l) => ({ eyes: 'round', squint: true, brows: l >= 4 ? 'flat' : null, mouth: 'smirk' }),
   firelily: (l) => ({ eyes: 'round', brows: 'cheeky', mouth: l >= 3 ? 'teethgrin' : 'grin' }),
   stink: (l) => ({ eyes: 'lazy', mouth: l >= 3 ? 'tongue' : 'smirk' }),
-  frost: (l) => ({ eyes: 'calm', lashes: true, cheeks: '#8fd6ff', mouth: 'soft', tiara: l >= 3 ? 'ice' : null, sparkle: l >= 2 }),
+  frost: (l) => ({ eyes: 'round', iris: '#5ab8e8', lashes: true, sparkle: true, cheeks: '#8fd6ff', mouth: 'soft', tiara: l >= 3 ? 'ice' : null }),
   thorn: (l) => ({ eyes: 'round', narrow: l >= 4, brows: 'angry', anger: l, mouth: l >= 4 ? 'teethgrin' : l >= 2 ? 'scowl' : 'flat', fangs: l >= MAX_LEVEL }),
   snap: (l) => ({ eyes: 'round', lashes: true, cheeks: '#ff7896', mouth: 'jaw', teeth: 3 + l, tiara: l >= 2 && l < MAX_LEVEL ? 'pink' : null }),
 };
@@ -358,14 +358,15 @@ function drawHead(c, type, o = {}) {
   if (mouth === 'sleep') return;
   const lx = o.look != null ? Math.cos(o.look) * 1.1 : 0, ly = o.look != null ? Math.sin(o.look) * 0.8 : 0;
   for (const ex of [-2.4, 2.4]) {
-    circle(c, ex + lx, -1.1 + ly, 1, '#1a1a1a');
-    if (face.sparkle) circle(c, ex + lx + 0.45, -1.55 + ly, 0.38, '#ffffff');
+    if (face.iris) { circle(c, ex + lx * 0.7, -1.1 + ly * 0.7, 1.35, face.iris); circle(c, ex + lx * 0.7, -1.1 + ly * 0.7, 0.65, '#1a1a1a'); }
+    else circle(c, ex + lx, -1.1 + ly, 1, '#1a1a1a');
+    if (face.sparkle) circle(c, ex + lx * 0.7 + 0.5, -1.6 + ly * 0.7, 0.4, '#ffffff');
   }
-  // heavy lids sit over the pupils: half-closed and dreamy, or lazy and droopy
-  if (face.eyes === 'calm' || face.eyes === 'lazy') {
+  // the stinkbloom's lazy, droopy lids sit over its pupils
+  if (face.eyes === 'lazy') {
     const lid = w ? mix(SPEC[type].face, WITHER, w * 0.6) : SPEC[type].face;
     for (const ex of [-2.4, 2.4]) {
-      const low = face.eyes === 'calm' ? -0.9 : -0.5;
+      const low = -0.5;
       c.beginPath(); c.ellipse(ex, -1.2, 1.9, 2.3, 0, Math.PI, 0); c.lineTo(ex + 1.9, low); c.lineTo(ex - 1.9, low); c.closePath();
       c.fillStyle = lid; c.fill();
       c.strokeStyle = OUT; c.lineWidth = 0.9; c.beginPath(); c.moveTo(ex - 1.8, low); c.lineTo(ex + 1.8, low); c.stroke();
@@ -448,9 +449,11 @@ function paintFace(c, type, w, mouth, crown, face) {
   else if (m === 'smile') { c.beginPath(); c.arc(0, 1.6, 1.6, 0.3, Math.PI - 0.3); c.stroke(); }
   else if (m === 'soft') { c.beginPath(); c.arc(0, 1.9, 1.1, 0.4, Math.PI - 0.4); c.stroke(); }
   else if (m === 'bigsmile') {
-    c.beginPath(); c.moveTo(-2.6, 1.6); c.quadraticCurveTo(0, 5.6, 2.6, 1.6); c.closePath();
-    c.fillStyle = '#7a2030'; c.fill(); c.stroke();
-    circle(c, 0, 3.4, 0.9, '#ff8fa3');
+    // a wide open smile with a pink tongue filling the bottom of the mouth
+    c.beginPath(); c.moveTo(-3.9, 0.8); c.quadraticCurveTo(0, 2.6, 3.9, 0.8); c.quadraticCurveTo(0, 7.2, -3.9, 0.8); c.closePath(); // a crescent: corners up
+    c.fillStyle = '#7a2030'; c.fill();
+    c.save(); c.clip(); ellipse(c, 0, 5.2, 2.6, 1.6, '#ff7d96'); c.restore();
+    c.stroke();
   } else if (m === 'grin') { c.beginPath(); c.arc(0, 0.9, 2.8, 0.35, Math.PI - 0.35); c.stroke(); }
   else if (m === 'smirk' || m === 'tongue') {
     c.beginPath(); c.moveTo(-2, 2.6); c.quadraticCurveTo(0.5, 1.8, 2.2, 1.6); c.stroke();
@@ -543,7 +546,7 @@ function bodyBouquet(c, o) {
   }
   ellipse(c, 0, 3, 8 + Math.min(lvl, 4), 10, body, OUT, 1.8);
   ellipse(c, -2.5, 1, 2.8, 5, 'rgba(255,255,255,0.18)');
-  c.strokeStyle = dark; c.lineWidth = 1; c.beginPath(); c.moveTo(-3, 9); c.quadraticCurveTo(0, 5, 3, 9); c.stroke();
+  c.strokeStyle = dark; c.lineWidth = 1; c.beginPath(); c.moveTo(0, 10); c.lineTo(0, 4); c.moveTo(0, 7); c.lineTo(-2.5, 5); c.moveTo(0, 7); c.lineTo(2.5, 5); c.stroke(); // a leaf vein
   const heads = HEADS[lvl], droop = wither * 4;
   for (const [hx, hy] of heads) stem(c, hx * 0.3, -5, hx * 0.2, (hy + droop) * 0.6, hx, hy + droop + 4, 2, dark);
   heads.forEach(([hx, hy, hs], i) => flowerHead(c, o, hx, hy + droop, hs, i, firingHead(f, i)));

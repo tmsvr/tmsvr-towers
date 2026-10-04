@@ -18,7 +18,7 @@
 <body>
 <main>
   <h1>Flower gallery</h1>
-  <p>Every flower at every level, drawn with the game's own code. Edit <code>src/render.js</code> and reload.</p>
+  <p>Every flower at every level, drawn with the game's own code. Edit <code>src/render.js</code> and reload. Add <code>?zoom=5</code> to the address for a closer look.</p>
   <p><label><input id="fire" type="checkbox"> firing</label><label><input id="hurt" type="checkbox"> hurt (40% health)</label></p>
   <canvas id="c"></canvas>
 </main>
@@ -26,10 +26,11 @@
 import { drawFlower } from '../src/render.js';
 import { FLOWER_ORDER, FLOWERS, MAX_LEVEL, T } from '../src/data.js';
 
-const ZOOM = 2.2, COL = T * 1.5, ROW = T * 1.9, LEFT = 110, TOP = 40;
+const ZOOM = +new URLSearchParams(location.search).get('zoom') || 2.2, COL = T * 1.5, ROW = T * 1.9, LEFT = 110, TOP = 40;
 const cv = document.getElementById('c'), dpr = Math.min(2, devicePixelRatio || 1);
 const W = LEFT + (MAX_LEVEL + 1) * COL, H = TOP + FLOWER_ORDER.length * ROW;
 cv.width = W * ZOOM * dpr; cv.height = H * ZOOM * dpr;
+if (ZOOM !== 2.2) { cv.style.width = W * ZOOM + 'px'; document.querySelector('main').style.maxWidth = 'none'; }
 const c = cv.getContext('2d');
 
 function frame() {
