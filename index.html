@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Petal Patrol</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; background: #141b22; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  canvas { max-width: 100vw; max-height: 100vh; aspect-ratio: 1008 / 656; width: auto; height: auto; border-radius: 6px; box-shadow: 0 0 50px rgba(0,0,0,0.6); outline: none; }
+  #lobby {
+    position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    min-width: 340px; max-width: min(520px, calc(100vw - 32px)); box-sizing: border-box;
+    padding: 28px 32px; border-radius: 20px; text-align: center;
+    background: rgba(30, 38, 48, 0.97); border: 2px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    color: #e8f1f7; font-family: "Fredoka", system-ui, sans-serif; font-weight: 500;
+  }
+  #lobby[hidden] { display: none; }
+  #lobby h2 { margin: 0 0 12px; color: #ffe27a; font-size: 28px; font-weight: 700; }
+  #lobby p { margin: 8px 0; font-size: 16px; }
+  #lobby .hint { color: #8fa5b3; font-size: 14px; }
+  #lobby .code { font-size: 64px; font-weight: 700; letter-spacing: 12px; color: #fff; margin: 4px 0 12px; padding-left: 12px; }
+  #lobby form { display: flex; gap: 10px; justify-content: center; margin: 16px 0; }
+  #lobby input {
+    width: 150px; font: 700 36px "Fredoka", system-ui, sans-serif; letter-spacing: 8px; text-align: center; text-transform: uppercase;
+    padding: 6px 8px; border-radius: 12px; border: 2px solid #4c6070; background: #1b242c; color: #fff; outline: none;
+  }
+  #lobby input:focus { border-color: #ffe27a; }
+  #lobby button {
+    font: 600 18px "Fredoka", system-ui, sans-serif; padding: 10px 20px; border-radius: 12px; border: none; cursor: pointer;
+    background: #ffd23f; color: #2b2118;
+  }
+  #lobby button:hover { background: #ffe27a; }
+</style>
+</head>
+<body>
+<canvas id="game" tabindex="0"></canvas>
+<div id="lobby" hidden></div>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
