@@ -56,15 +56,41 @@ export function runBot({ players = 2, seed = 1, loadouts, cats, map = 0, maxMinu
   });
   sim.step(s, s.players.map(() => ({})), 1 / 60);
 
+  // Each road's tiles, so flowers can be spread over every road.
+  const roadTiles = m.paths.map((path) => {
+    const set = new Set();
+    const pts = path.points;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [x0, y0] = pts[i], [x1, y1] = pts[i + 1];
+      for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) set.add(y * m.W + x);
+    }
+    return set;
+  });
+  const roadsNear = (x, y) => roadTiles.map((set, i) => {
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (set.has((y + dy) * m.W + x + dx)) return i;
+    return -1;
+  }).filter((i) => i >= 0);
+
   // tiles next to lots of path, best first
   const spots = [];
   for (let y = 0; y < m.H; y++) for (let x = 0; x < m.W; x++) {
     if (!sim.canBuildAt(s, x, y)) continue;
     let n = 0;
     for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (m.pathTiles.has((y + dy) * m.W + x + dx)) n++;
-    if (n >= 3) spots.push([x, y, n]);
+    if (n >= 3) spots.push([x, y, n, roadsNear(x, y)]);
   }
   spots.sort((a, b) => b[2] - a[2]);
+  // the best free spot next to whichever road has the fewest flowers
+  const nextSpot = () => {
+    const cover = roadTiles.map(() => 0);
+    for (const f of s.flowers) for (const i of roadsNear(f.tx, f.ty)) cover[i]++;
+    const order = cover.map((c, i) => i).sort((a, b) => cover[a] - cover[b]);
+    for (const road of order) {
+      const spot = spots.find(([x, y, , near]) => near.includes(road) && sim.canBuildAt(s, x, y));
+      if (spot) return spot;
+    }
+    return null;
+  };
 
   let built = 0;
   const bots = s.players.map(() => ({ target: null }));
@@ -81,9 +107,9 @@ export function runBot({ players = 2, seed = 1, loadouts, cats, map = 0, maxMinu
         const up = s.flowers.filter((f) => f.lvl > 0 && f.lvl < MAX_LEVEL).sort((a, c) => a.lvl - c.lvl)[0];
         if (hurt && p.coins >= 5) { b.target = hurt; p.mode = 'heal'; p.onFlowerId = hurt.id; }
         else if (seedling && p.coins >= 5) { b.target = seedling; p.mode = 'grow'; p.onFlowerId = seedling.id; }
-        else if (s.flowers.length < Math.min(14, 3 + s.wave) || !up) {
+        else if (s.flowers.length < Math.min(16, 2 + s.wave + m.paths.length) || !up) {
           // keep planting until there's a decent garden, saving up if needed
-          const spot = p.coins >= 25 && spots.find(([x, y]) => sim.canBuildAt(s, x, y));
+          const spot = p.coins >= 25 && nextSpot();
           if (spot) {
             p.sel = built++ % p.loadout.length;
             // save expensive superweapons (Sunflower) until the first boss is near
@@ -95,12 +121,12 @@ export function runBot({ players = 2, seed = 1, loadouts, cats, map = 0, maxMinu
         } else if (up && p.coins >= 15) { b.target = up; p.mode = 'grow'; p.onFlowerId = up.id; }
         if (b.target) { p.x = b.target.x; p.y = b.target.y - 10; }
       }
-      if (b.target) { inp.build = true; return; }
+      if (b.target) { inp.build = !p.waitRelease; return; } // let go once a level finishes, like a player has to
       if (inp.buildTap) return;
       let foe = null, fd = 400;
-      for (const e of s.enemies) { if (e.under || e.def.flying) continue; const d = Math.hypot(e.x - p.x, e.y - p.y); if (d < fd) { fd = d; foe = e; } }
+      for (const e of s.enemies) { if (e.under) continue; const d = Math.hypot(e.x - p.x, e.y - p.y); if (d < fd) { fd = d; foe = e; } }
       // anything chewing on the cottage takes priority, wherever it is
-      const chomper = s.enemies.find((e) => e.atBase && !e.def.flying);
+      const chomper = s.enemies.find((e) => e.atBase);
       if (chomper) { foe = chomper; fd = Math.hypot(chomper.x - p.x, chomper.y - p.y); }
       let coin = null, cd = 1e9;
       for (const d of s.drops) { const dd = Math.hypot(d.x - p.x, d.y - p.y); if (dd < cd) { cd = dd; coin = d; } }

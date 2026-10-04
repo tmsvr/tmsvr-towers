@@ -1222,7 +1222,7 @@ function drawPick(c, s, ui, time) {
   c.fillStyle = 'rgba(12,18,26,0.85)'; c.fillRect(0, 0, VIEW_W, MAP_H);
   label(c, `Choose a map, a cat and ${LOADOUT_SIZE} flowers`, VIEW_W / 2, 20, 22, '#ffe27a', 'center', 700, OUT);
   // maps
-  const mw = 200, mh = 96, mgap = 16, mx0 = (VIEW_W - (MAPS.length * mw + (MAPS.length - 1) * mgap)) / 2, my0 = 40;
+  const mgap = 12, mw = Math.min(200, (VIEW_W - 40 - (MAPS.length - 1) * mgap) / MAPS.length), mh = 96, mx0 = (VIEW_W - (MAPS.length * mw + (MAPS.length - 1) * mgap)) / 2, my0 = 40;
   MAPS.forEach((m, i) => {
     const x = mx0 + i * (mw + mgap);
     const sel = s.map === i;

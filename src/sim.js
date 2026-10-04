@@ -133,7 +133,10 @@ function spawnEnemy(s, type, from, path = 0) {
   const d = ENEMIES[type];
   const w = Math.max(0, s.wave - 1);
   const solo = s.players.length === 1;
-  const hpScale = (1 + w * TUNE.hpPerWave + w * w * TUNE.hpPerWaveSquared) * (solo ? (d.boss ? TUNE.soloBossHp : 1) : TUNE.coopEnemyHp);
+  // The last boss is the big one. Bosses also shrink on maps with split-up
+  // defences (smaller waveSize), since only some flowers will ever see them.
+  const finale = d.boss ? (s.wave >= TOTAL_WAVES ? TUNE.finalBossHp || 1 : 1) * Math.sqrt(s.m.waveSize) : 1;
+  const hpScale = (1 + w * TUNE.hpPerWave + w * w * TUNE.hpPerWaveSquared) * (solo ? (d.boss ? TUNE.soloBossHp : 1) : TUNE.coopEnemyHp) * finale;
   const j = () => (rnd(s) - 0.5) * 18 * U;
   const id = s.nextId++;
   const road = s.m.paths[from ? from.path : path];
@@ -292,7 +295,7 @@ function chompCottage(s, e, dt) {
 // ---- Waves ----------------------------------------------------------------
 function buildQueue(s, n) {
   const q = [];
-  let budget = (TUNE.waveBudgetBase + n * TUNE.waveBudgetPerWave) * (s.players.length > 1 ? TUNE.coopWaveSize : TUNE.soloWaveSize) * s.m.waveSize;
+  let budget = (TUNE.waveBudgetBase + n * TUNE.waveBudgetPerWave + n * n * (TUNE.waveBudgetPerWaveSquared || 0)) * (s.players.length > 1 ? TUNE.coopWaveSize : TUNE.soloWaveSize) * s.m.waveSize;
   const avail = WAVES.filter((u) => u.fromWave <= n);
   const bossWave = n % TUNE.bossEvery === 0;
   if (bossWave) budget *= TUNE.bossWaveBudget;

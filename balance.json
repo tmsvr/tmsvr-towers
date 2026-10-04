@@ -8,7 +8,7 @@
     "flowerLevels.perLevel": "Bonus added per level above 1, e.g. damage 0.5 means +50% damage per level.",
     "enemies.bite": "Damage per second an enemy does to the cottage while chomping on it (it keeps chomping until killed).",
     "enemies.size": "Radius in tiles. 'light' enemies can be knocked back by the baton and swallowed by Snapdragons.",
-    "difficulty": "Enemy health = base * (1 + hpPerWave*(wave-1) + hpPerWaveSquared*(wave-1)^2). Wave size budget = waveBudgetBase + waveBudgetPerWave*wave.",
+    "difficulty": "Enemy health = base * (1 + hpPerWave*(wave-1) + hpPerWaveSquared*(wave-1)^2). Wave size budget = waveBudgetBase + waveBudgetPerWave*wave + waveBudgetPerWaveSquared*wave^2. Both grow slowly at first and steeply towards the last waves. Every bossEvery-th wave has a boss; the one on the last wave has finalBossHp times more health.",
     "economy.uprootRefund": "Share of the coins poured into a flower (planting + upgrades, not healing) you get back when you dig it up. uprootSeconds = how long you hold the key to dig.",
     "juice": "Extra effects that don't change the game: damage numbers, hit squash, death pops, confetti, coin counter bounce, short freeze (hit-stop) on bombs and boss kills. J toggles them all in game; set any to false to drop just that one.",
     "player.sprint": "Holding sprint multiplies speed by sprintSpeed for up to sprintSeconds; stamina refills fully in sprintRecoverSeconds after a sprintRecoverDelay pause. Running dry means waiting until it is a third full.",
@@ -18,7 +18,7 @@
 
   "player": {
     "speed": 4.1,
-    "batonDamage": 10,
+    "batonDamage": 7,
     "batonCooldown": 0.38,
     "batonRange": 1.45,
     "batonArcDegrees": 126,
@@ -43,27 +43,29 @@
   },
 
   "economy": {
-    "startCoinsSolo": 60,
-    "startCoinsCoop": 40,
-    "coinDropMultiplier": 1,
-    "waveBonusBase": 10,
-    "waveBonusPerWave": 2,
+    "startCoinsSolo": 70,
+    "startCoinsCoop": 50,
+    "coinDropMultiplier": 1.4,
+    "waveBonusBase": 15,
+    "waveBonusPerWave": 4,
     "coopBonusShare": 0.6,
     "uprootRefund": 0.6,
     "uprootSeconds": 1.2
   },
 
   "difficulty": {
-    "totalWaves": 15,
-    "cottageHealth": 250,
+    "totalWaves": 10,
+    "cottageHealth": 200,
     "firstWaveDelay": 30,
     "timeBetweenWaves": 15,
     "hpPerWave": 0.3,
-    "hpPerWaveSquared": 0.015,
-    "waveBudgetBase": 8,
-    "waveBudgetPerWave": 11,
+    "hpPerWaveSquared": 0.025,
+    "waveBudgetBase": 6,
+    "waveBudgetPerWave": 7,
+    "waveBudgetPerWaveSquared": 0.6,
     "bossEvery": 5,
     "bossWaveBudget": 0.6,
+    "finalBossHp": 1.8,
     "soloWaveSize": 0.6,
     "soloBossHp": 0.6,
     "coopWaveSize": 1.3,
@@ -94,7 +96,7 @@
       "cloudSize": 0.08
     },
     "health": 100,
-    "wearPerSecond": 0.55,
+    "wearPerSecond": 1.3,
     "wearMultiplierByLevel": [1, 0.8, 0.65, 0.5, 0],
     "healPerSecond": 40,
     "fullHealCostFraction": 0.3,
@@ -126,22 +128,22 @@
     "mole":     { "hp": 48,   "speed": 1.8,  "coins": 3,  "bite": 2, "size": 0.28, "armor": 0, "burrow": { "aboveSeconds": 2.6, "belowSeconds": 1.8, "speedMultiplier": 1.5 } },
     "aphid":    { "hp": 28,   "speed": 1.95, "coins": 2,  "bite": 2, "size": 0.23, "armor": 0, "light": true, "eats": { "damagePerSecond": 8, "chewSeconds": 3.5, "cooldown": 4, "reach": 1.25 } },
     "hive":     { "hp": 150,  "speed": 1.05, "coins": 7,  "bite": 4, "size": 0.43, "armor": 1, "spawns": { "type": "swarm", "every": 4.5, "count": 2 } },
-    "boss":     { "hp": 1000, "speed": 0.98, "coins": 40, "bite": 10, "size": 0.6,  "armor": 2, "boss": true, "spawns": { "type": "grunt", "every": 6, "count": 2 } }
+    "boss":     { "hp": 500,  "speed": 0.98, "coins": 40, "bite": 8,  "size": 0.6,  "armor": 1, "boss": true, "spawns": { "type": "grunt", "every": 6, "count": 2 } }
   },
 
   "waves": [
     { "enemy": "grunt",    "fromWave": 1, "weight": 5, "cost": 1,   "group": 1 },
     { "enemy": "swarm",    "fromWave": 2, "weight": 3, "cost": 2,   "group": 5 },
-    { "enemy": "runner",   "fromWave": 3, "weight": 2, "cost": 1.3, "group": 1 },
+    { "enemy": "runner",   "fromWave": 2, "weight": 2, "cost": 1.3, "group": 1 },
     { "enemy": "dasher",   "fromWave": 3, "weight": 3, "cost": 1.5, "group": 1 },
-    { "enemy": "flyer",    "fromWave": 4, "weight": 2, "cost": 1.6, "group": 1 },
-    { "enemy": "splitter", "fromWave": 4, "weight": 3, "cost": 3,   "group": 1 },
-    { "enemy": "aphid",    "fromWave": 5, "weight": 3, "cost": 1.6, "group": 1 },
-    { "enemy": "shield",   "fromWave": 5, "weight": 2, "cost": 2.5, "group": 1 },
-    { "enemy": "tank",     "fromWave": 6, "weight": 2, "cost": 4.5, "group": 1 },
-    { "enemy": "mole",     "fromWave": 6, "weight": 3, "cost": 2,   "group": 1 },
-    { "enemy": "healer",   "fromWave": 7, "weight": 2, "cost": 3,   "group": 1 },
-    { "enemy": "hive",     "fromWave": 8, "weight": 2, "cost": 5,   "group": 1 },
-    { "enemy": "wasp",     "fromWave": 9, "weight": 2, "cost": 3,   "group": 3 }
+    { "enemy": "flyer",    "fromWave": 3, "weight": 2, "cost": 1.6, "group": 1 },
+    { "enemy": "splitter", "fromWave": 3, "weight": 3, "cost": 3,   "group": 1 },
+    { "enemy": "aphid",    "fromWave": 4, "weight": 3, "cost": 1.6, "group": 1 },
+    { "enemy": "shield",   "fromWave": 4, "weight": 2, "cost": 2.5, "group": 1 },
+    { "enemy": "tank",     "fromWave": 5, "weight": 2, "cost": 4.5, "group": 1 },
+    { "enemy": "mole",     "fromWave": 4, "weight": 3, "cost": 2,   "group": 1 },
+    { "enemy": "healer",   "fromWave": 5, "weight": 2, "cost": 3,   "group": 1 },
+    { "enemy": "hive",     "fromWave": 6, "weight": 2, "cost": 5,   "group": 1 },
+    { "enemy": "wasp",     "fromWave": 7, "weight": 2, "cost": 3,   "group": 3 }
   ]
 }
