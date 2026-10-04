@@ -13,6 +13,22 @@ python3 serve.py
 Then open http://localhost:8765. (`serve.py` is Python's built-in file server
 with caching turned off, so edits show up on a normal reload.)
 
+## Hosting on GitHub Pages
+
+The game is just static files, so GitHub Pages can serve it as is:
+
+1. Push this folder to a GitHub repository (public, for free Pages).
+2. In the repository: **Settings → Pages → Build and deployment**, choose
+   **Deploy from a branch**, branch `main`, folder `/ (root)`.
+3. After a minute the game is at `https://<user>.github.io/<repo>/`.
+
+Every push to `main` redeploys. Online co-op works from there too: the host
+presses **3** and sends the **Copy invite link** link; players are connected
+through PeerJS's free public server, so no server of your own is needed.
+GitHub caches files for up to 10 minutes, so after an update both players
+should reload. `.nojekyll` tells Pages to serve the files without processing
+them.
+
 ## Playing
 
 - **1** solo · **2** local co-op (one keyboard) · **3** host online · **4** join online
@@ -25,7 +41,8 @@ with caching turned off, so edits show up on a normal reload.)
 - P2 (local): arrows · Right Shift sprint · `,` baton · `.` bomb · `/` plant/grow · M next flower
 - J turns the extra effects (damage numbers, confetti, hit-stop…) on and off.
 - Online, both players use the P1 keys on their own keyboard. Your friend needs
-  the game files too (or host the folder somewhere like GitHub Pages).
+  the game too: easiest is hosting it on GitHub Pages (see above) and sending
+  them the invite link.
 
 ## Tuning
 
