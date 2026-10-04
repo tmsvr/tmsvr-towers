@@ -168,6 +168,13 @@ export function upgradeCost(type, lvl) {
   return Math.round(FLOWERS[type].cost * LV.upgradeCostMultipliers[lvl - 1]);
 }
 
+// Ranges at least this big mean "the whole map" (no range circle is drawn).
+export const GLOBAL_RANGE = 40 * T;
+
+// ---- cat classes ----
+export const CAT_ORDER = Object.keys(BAL.cats);
+export const CATS = BAL.cats;
+
 export const ECONOMY = BAL.economy;
 export const DIFFICULTY = BAL.difficulty;
 export const START_COINS = { solo: ECONOMY.startCoinsSolo, coop: ECONOMY.startCoinsCoop };
@@ -187,7 +194,9 @@ export const PLAYER = {
   catStun: P.bombStunCats,
   bombMax: 1,
   bombRecharge: P.bombRecharge,
-  colors: ['#ff9a3c', '#a7b1c4'],
-  darks: ['#c4600f', '#6c778c'],
+  sprintSpeed: P.sprintSpeed,
+  sprintSeconds: P.sprintSeconds,
+  sprintRecover: P.sprintRecoverSeconds,
+  sprintDelay: P.sprintRecoverDelay,
   scarves: ['#3a7bd5', '#e04f7a'],
 };

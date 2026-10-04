@@ -4,7 +4,7 @@
 import {
   T, U, W, H, WORLD_W, WORLD_H, VIEW_W, MAP_H, TOTAL_WAVES, PATHS, BASE, PATH_TILES, BLOCKED, MAP, MAPS, loadMap, ENEMIES,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, GROW_TIME, FLOWER_HP, WEAR_PER_SEC, WEAR_MULT, HEAL_RATE, HEAL_COST,
-  POISON_TIME, START_COINS, LOADOUT_SIZE, WAVES, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, PLAYER,
+  POISON_TIME, START_COINS, LOADOUT_SIZE, WAVES, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, PLAYER, CATS, CAT_ORDER,
 } from './data.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -22,8 +22,8 @@ function rnd(s) {
 export const TUNE = DIFFICULTY;
 
 // sharedScreen: both cats share one camera, so they can't wander further apart than the view.
-// loadouts: last game's flower picks per player, pre-selected on the pick screen.
-export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, loadouts = [], map = 0 } = {}) {
+// loadouts / cats: last game's flower picks and characters, pre-selected on the pick screen.
+export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, loadouts = [], cats = [], map = 0 } = {}) {
   loadMap(map);
   const s = {
     t: 0, nextId: 1, rng: seed, wave: 0, phase: 'pick', timer: DIFFICULTY.firstWaveDelay, queue: [], spawnWait: 0,
@@ -31,9 +31,12 @@ export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, l
     fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, sharedScreen, map: MAP.index,
   };
   const coins = startCoins(nPlayers);
+  const taken = new Set();
   for (let i = 0; i < nPlayers; i++) {
+    let cat = CATS[cats[i]] && !taken.has(cats[i]) ? cats[i] : CAT_ORDER.find((c, k) => k >= i && !taken.has(c)) || CAT_ORDER.find((c) => !taken.has(c));
+    taken.add(cat);
     s.players.push({
-      id: i, x: MAP.start.x + i * T, y: MAP.start.y, dir: 0, atkCd: 0, swingT: 0, coins, stun: 0,
+      id: i, x: MAP.start.x + i * T, y: MAP.start.y, dir: 0, atkCd: 0, swingT: 0, coins, stun: 0, cat, stam: 1, tired: false, sprinting: false, restT: 0,
       bombs: PLAYER.bombMax, sel: 0, building: false, moving: false, mode: 'grow', onFlowerId: null, working: null, msgCd: 0,
       loadout: null, pick: { row: 1, cursor: 0, chosen: (loadouts[i] || []).filter((t) => FLOWERS[t]).slice(0, LOADOUT_SIZE), ready: false },
       prevMx: 0, prevMy: 0, prevAtk: false,
@@ -92,6 +95,21 @@ export function collideCat(p) {
   }
   p.x = clamp(p.x, 14, WORLD_W - 14);
   p.y = clamp(p.y, 14, WORLD_H - 14);
+}
+
+// A cat's stats with its class applied.
+export function catStats(p) {
+  const k = CATS[p.cat] || CATS[CAT_ORDER[0]];
+  return {
+    speed: PLAYER.speed * k.speed,
+    atkDmg: PLAYER.atkDmg * k.batonDamage,
+    atkCd: PLAYER.atkCd * k.batonCooldown,
+    atkRange: PLAYER.atkRange * k.batonRange,
+    bombRecharge: PLAYER.bombRecharge * k.bombRecharge,
+    bombRadius: PLAYER.bombRadius * k.bombRadius,
+    sprintSeconds: PLAYER.sprintSeconds * k.sprintSeconds,
+    grow: k.growSpeed,
+  };
 }
 
 export const healCostPerHp = (f) => (FLOWERS[f.type].cost * HEAL_COST) / FLOWER_HP;
@@ -321,7 +339,8 @@ function updateWaves(s, dt, ready) {
 
 // ---- Players --------------------------------------------------------------
 function swing(s, p) {
-  p.atkCd = PLAYER.atkCd;
+  const cs = catStats(p);
+  p.atkCd = cs.atkCd;
   p.swingT = 0.18;
   p.swingDir = p.dir;
   let hit = false;
@@ -329,11 +348,11 @@ function swing(s, p) {
     if (!hittable(e)) continue;
     const dx = e.x - p.x, dy = e.y - p.y;
     const d = Math.hypot(dx, dy);
-    if (d > PLAYER.atkRange + e.def.r) continue;
+    if (d > cs.atkRange + e.def.r) continue;
     let da = Math.atan2(dy, dx) - p.dir;
     da = Math.atan2(Math.sin(da), Math.cos(da));
     if (Math.abs(da) > PLAYER.atkArc / 2 && d > e.def.r + 10 * U) continue;
-    damage(s, e, PLAYER.atkDmg);
+    damage(s, e, cs.atkDmg);
     hit = true;
     if (e.chew) { e.chew = null; e.chewCd = 2; }
     // Only small critters get knocked back, so the baton can't juggle big ones in a kill zone.
@@ -347,20 +366,21 @@ function throwBomb(s, p) {
   p.bombs -= 1;
   const tx = clamp(p.x + Math.cos(p.dir) * PLAYER.bombRange, 10, WORLD_W - 10);
   const ty = clamp(p.y + Math.sin(p.dir) * PLAYER.bombRange, 10, WORLD_H - 10);
-  s.bombs.push({ id: s.nextId++, sx: p.x, sy: p.y, tx, ty, x: p.x, y: p.y, h: 0, t: 0, dur: 0.6 });
+  s.bombs.push({ id: s.nextId++, sx: p.x, sy: p.y, tx, ty, x: p.x, y: p.y, h: 0, t: 0, dur: 0.6, r: catStats(p).bombRadius });
   ev(s, 'throw');
 }
 
 function explode(s, b) {
-  s.fx.push({ kind: 'ring', x: b.tx, y: b.ty, r: PLAYER.bombRadius, col: '#ffb347', life: 0.4, max: 0.4 });
-  s.fx.push({ kind: 'flash', x: b.tx, y: b.ty, r: PLAYER.bombRadius * 0.8, life: 0.15, max: 0.15 });
+  const R = b.r || PLAYER.bombRadius;
+  s.fx.push({ kind: 'ring', x: b.tx, y: b.ty, r: R, col: '#ffb347', life: 0.4, max: 0.4 });
+  s.fx.push({ kind: 'flash', x: b.tx, y: b.ty, r: R * 0.8, life: 0.15, max: 0.15 });
   puff(s, b.tx, b.ty, '#ffb347', 16, 160);
   puff(s, b.tx, b.ty, '#6b6b6b', 8, 60);
   ev(s, 'explode');
   ev(s, 'shake', { amt: 7 });
   for (const e of s.enemies) {
     if (!hittable(e)) continue;
-    if (Math.hypot(e.x - b.tx, e.y - b.ty) <= PLAYER.bombRadius + e.def.r) {
+    if (Math.hypot(e.x - b.tx, e.y - b.ty) <= R + e.def.r) {
       damage(s, e, PLAYER.bombDmg, true);
       applyStun(e, PLAYER.bombStun);
     }
@@ -368,7 +388,7 @@ function explode(s, b) {
   // Cats caught in the blast get knocked down too — watch where you throw!
   for (const p of s.players) {
     const dx = p.x - b.tx, dy = p.y - b.ty, d = Math.hypot(dx, dy);
-    if (d > PLAYER.bombRadius + 10 * U) continue;
+    if (d > R + 10 * U) continue;
     p.stun = PLAYER.catStun;
     p.working = null;
     const push = 30 * U / Math.max(1, d) ;
@@ -419,7 +439,7 @@ function work(s, p, f, dt) {
   if (f.lvl > 0 && p.mode === 'heal') {
     if (f.hp >= FLOWER_HP) return;
     const cph = healCostPerHp(f);
-    const pay = Math.min((FLOWER_HP - f.hp) * cph, HEAL_RATE * dt * cph, p.coins);
+    const pay = Math.min((FLOWER_HP - f.hp) * cph, HEAL_RATE * catStats(p).grow * dt * cph, p.coins);
     if (pay <= 1e-6) return deny(s, p, f.x, f.y - T * 0.6, 'Out of coins!');
     p.coins -= pay;
     f.hp += pay / cph;
@@ -437,7 +457,7 @@ function work(s, p, f, dt) {
     f.grow = { to: f.lvl + 1, cost: upgradeCost(f.type, f.lvl), paid: 0 };
   }
   const g = f.grow;
-  const pay = Math.min(g.cost - g.paid, (g.cost / GROW_TIME[g.to]) * dt, p.coins);
+  const pay = Math.min(g.cost - g.paid, (g.cost / GROW_TIME[g.to]) * catStats(p).grow * dt, p.coins);
   if (pay <= 1e-6) return deny(s, p, f.x, f.y - T * 0.6, 'Out of coins!');
   p.coins -= pay;
   g.paid += pay;
@@ -470,6 +490,20 @@ function uproot(s, p, f) {
   ev(s, 'uproot');
 }
 
+// Sprinting drains stamina; it refills after a short rest. Running dry
+// leaves the cat tired until a third of the bar is back.
+function sprint(p, cs, inp, dt) {
+  p.sprinting = !!inp.sprint && p.moving && !p.tired && p.stam > 0;
+  if (p.sprinting) {
+    p.stam = Math.max(0, p.stam - dt / cs.sprintSeconds);
+    p.restT = PLAYER.sprintDelay;
+    if (p.stam <= 0) p.tired = true;
+  } else if ((p.restT -= dt) <= 0) {
+    p.stam = Math.min(1, p.stam + dt / PLAYER.sprintRecover);
+    if (p.tired && p.stam >= 0.34) p.tired = false;
+  }
+}
+
 function updatePlayers(s, dt, inputs) {
   let ready = false;
   for (const p of s.players) {
@@ -479,17 +513,20 @@ function updatePlayers(s, dt, inputs) {
     p.swingT = Math.max(0, p.swingT - dt);
     p.working = null;
     const had = p.bombs;
-    p.bombs = Math.min(PLAYER.bombMax, p.bombs + dt / PLAYER.bombRecharge);
+    const cs = catStats(p);
+    p.bombs = Math.min(PLAYER.bombMax, p.bombs + dt / cs.bombRecharge);
     if (had < 1 && p.bombs >= 1) ev(s, 'bombReady');
     if (inp.ready) ready = true;
-    if (p.stun > 0) { p.stun -= dt; p.moving = false; continue; }
+    if (p.stun > 0) { p.stun -= dt; p.moving = false; p.sprinting = false; continue; }
 
     let mx = inp.mx || 0, my = inp.my || 0;
     const l = Math.hypot(mx, my);
     p.moving = l > 0;
     if (l > 0) { mx /= l; my /= l; p.dir = Math.atan2(my, mx); }
-    p.x = clamp(p.x + mx * PLAYER.speed * dt, 14, WORLD_W - 14);
-    p.y = clamp(p.y + my * PLAYER.speed * dt, 14, WORLD_H - 14);
+    sprint(p, cs, inp, dt);
+    const speed = cs.speed * (p.sprinting ? PLAYER.sprintSpeed : 1);
+    p.x = clamp(p.x + mx * speed * dt, 14, WORLD_W - 14);
+    p.y = clamp(p.y + my * speed * dt, 14, WORLD_H - 14);
     if (s.sharedScreen) {
       for (const o of s.players) {
         if (o === p) continue;
@@ -712,7 +749,18 @@ function selectMap(s, i) {
   s.players.forEach((p, k) => { p.x = MAP.start.x + k * T; p.y = MAP.start.y; p.pick.ready = false; p.coins = startCoins(s.players.length); });
 }
 
-// Pick screen: up/down switches between the map row and the flower row,
+// Next cat in direction `dir` that no other player has.
+function nextCat(s, p, dir) {
+  const n = CAT_ORDER.length;
+  let i = CAT_ORDER.indexOf(p.cat);
+  for (let k = 0; k < n; k++) {
+    i = (i + dir + n) % n;
+    if (!s.players.some((o) => o !== p && o.cat === CAT_ORDER[i])) return CAT_ORDER[i];
+  }
+  return p.cat;
+}
+
+// Pick screen rows: 0 = map, 1 = cat, 2 = flowers. Up/down switches rows,
 // left/right moves, the plant key picks a flower, the baton key locks in.
 function updatePick(s, inputs) {
   const N = FLOWER_ORDER.length;
@@ -720,17 +768,18 @@ function updatePick(s, inputs) {
     const inp = inputs[p.id] || {};
     const pk = p.pick;
     const mx = Math.sign(inp.mx || 0), my = Math.sign(inp.my || 0);
-    if (my && my !== p.prevMy && !pk.ready) { pk.row = my < 0 ? 0 : 1; ev(s, 'cycle'); }
+    if (my && my !== p.prevMy && !pk.ready) { pk.row = clamp(pk.row + my, 0, 2); ev(s, 'cycle'); }
     p.prevMy = my;
     if (mx && mx !== p.prevMx && !pk.ready) {
       if (pk.row === 0) selectMap(s, (s.map + mx + MAPS.length) % MAPS.length); // changing the map un-readies everyone
+      else if (pk.row === 1) p.cat = nextCat(s, p, mx); // taken cats are skipped
       else pk.cursor = (pk.cursor + mx + N) % N;
       ev(s, 'cycle');
     }
     p.prevMx = mx;
     if (inp.buildTap) {
       if (pk.ready) { pk.ready = false; ev(s, 'cycle'); }
-      else if (pk.row === 0) pk.row = 1;
+      else if (pk.row < 2) { pk.row++; ev(s, 'cycle'); }
       else {
         const t = FLOWER_ORDER[pk.cursor];
         const i = pk.chosen.indexOf(t);

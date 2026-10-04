@@ -4,7 +4,7 @@
 //   local     – this browser runs the game for 1 or 2 players on one keyboard
 //   host      – this browser runs the game; player 2's inputs arrive over the network
 //   guest     – this browser only sends inputs and draws snapshots from the host
-import { createState, step, updateFx, collideCat } from './sim.js';
+import { createState, step, updateFx, collideCat, catStats } from './sim.js';
 import { render, VIEW_W, VIEW_H } from './render.js';
 import { initAudio, play, toggleMute, setMusicMood } from './audio.js';
 import { juiceEvent, hitStopping, toggleJuice } from './juice.js';
@@ -21,10 +21,10 @@ const ctx = canvas.getContext('2d');
 ctx.scale(dpr, dpr);
 
 const KEYS = [
-  { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', atk: 'KeyF', bomb: 'KeyG', build: 'KeyE', cycle: 'KeyQ' },
-  { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', atk: 'Comma', bomb: 'Period', build: 'Slash', cycle: 'KeyM' },
+  { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', atk: 'KeyF', bomb: 'KeyG', build: 'KeyE', cycle: 'KeyQ', sprint: 'ShiftLeft' },
+  { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', atk: 'Comma', bomb: 'Period', build: 'Slash', cycle: 'KeyM', sprint: 'ShiftRight' },
 ];
-const DEFAULT_LABELS = { Comma: ',', Period: '.', Slash: '/', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' };
+const DEFAULT_LABELS = { ShiftLeft: 'Shift', ShiftRight: 'R-Shift', Comma: ',', Period: '.', Slash: '/', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' };
 const KEY_TO_CODE = { '/': 'Slash', ',': 'Comma', '.': 'Period' };
 
 const held = new Set();
@@ -45,7 +45,7 @@ const ui = {
 
 // Keys are bound by physical position; show what is printed on this keyboard layout.
 navigator.keyboard?.getLayoutMap?.().then((map) => {
-  ui.keyLabel = (code) => (map.get(code) || DEFAULT_LABELS[code] || code.replace(/^Key|^Digit/, '')).toUpperCase();
+  ui.keyLabel = (code) => (map.has(code) ? map.get(code).toUpperCase() : DEFAULT_LABELS[code] || code.replace(/^Key|^Digit/, ''));
 }).catch(() => {});
 
 // ---- input ------------------------------------------------------------------
@@ -57,6 +57,7 @@ function readKeys(k, withArrows) {
     mx: (right ? 1 : 0) - (left ? 1 : 0),
     my: (down ? 1 : 0) - (up ? 1 : 0),
     atk: h(k.atk),
+    sprint: h(k.sprint) || (withArrows && h('ShiftRight')),
     build: h(k.build),
     buildTap: pressed.has(k.build),
     bomb: pressed.has(k.bomb),
@@ -110,11 +111,11 @@ addEventListener('blur', () => held.clear());
 addEventListener('pointerdown', initAudio);
 
 // ---- modes ------------------------------------------------------------------
-let lastLoadouts = [];
+let lastLoadouts = [], lastCats = [];
 let lastMap = 0;
 function newGame() {
-  if (state && state.players) { lastLoadouts = state.players.map((p) => p.loadout || p.pick.chosen); lastMap = state.map; }
-  state = createState(nPlayers, (Math.random() * 1e9) | 0, { sharedScreen: mode === 'local' && nPlayers > 1, loadouts: lastLoadouts, map: lastMap });
+  if (state && state.players) { lastLoadouts = state.players.map((p) => p.loadout || p.pick.chosen); lastCats = state.players.map((p) => p.cat); lastMap = state.map; }
+  state = createState(nPlayers, (Math.random() * 1e9) | 0, { sharedScreen: mode === 'local' && nPlayers > 1, loadouts: lastLoadouts, cats: lastCats, map: lastMap });
   ui.cam.snap = true;
   ui.paused = false;
   play('wave');
@@ -282,8 +283,9 @@ function predictOwnCat(k, dt) {
   const l = me.stun > 0 || state.phase === 'pick' ? 0 : Math.hypot(k.mx, k.my);
   predMoving = l > 0;
   if (l > 0 && !state.paused && !state.over && !state.won) {
-    pred.x = Math.max(14, Math.min(W * T - 14, pred.x + (k.mx / l) * PLAYER.speed * dt));
-    pred.y = Math.max(14, Math.min(H * T - 14, pred.y + (k.my / l) * PLAYER.speed * dt));
+    const speed = catStats(me).speed * (k.sprint && !me.tired && me.stam > 0 ? PLAYER.sprintSpeed : 1);
+    pred.x = Math.max(14, Math.min(W * T - 14, pred.x + (k.mx / l) * speed * dt));
+    pred.y = Math.max(14, Math.min(H * T - 14, pred.y + (k.my / l) * speed * dt));
     collideCat(pred);
     predDir = Math.atan2(k.my, k.mx);
   }

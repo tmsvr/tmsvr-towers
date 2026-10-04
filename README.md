@@ -16,11 +16,13 @@ with caching turned off, so edits show up on a normal reload.)
 ## Playing
 
 - **1** solo · **2** local co-op (one keyboard) · **3** host online · **4** join online
-- Before each game, pick a map and 4 of the 7 flowers.
+- Before each game, pick a map, a cat and 4 of the 7 flowers. Two players can't
+  pick the same cat: Brick (slow, big hits), Zip (fast, light hits), Fern
+  (grows and heals faster) or Boom (faster, bigger bombs).
 - Standing on a flower, Q cycles upgrade → heal → dig up. Holding E in dig-up
   mode removes the flower and refunds part of what was spent on it.
-- P1: WASD move · F baton · G bomb · E plant/grow (hold) · Q next flower / heal / dig-up mode
-- P2 (local): arrows · `,` baton · `.` bomb · `/` plant/grow · M next flower
+- P1: WASD move · Shift sprint · F baton · G bomb · E plant/grow (hold) · Q next flower / heal / dig-up mode
+- P2 (local): arrows · Right Shift sprint · `,` baton · `.` bomb · `/` plant/grow · M next flower
 - J turns the extra effects (damage numbers, confetti, hit-stop…) on and off.
 - Online, both players use the P1 keys on their own keyboard. Your friend needs
   the game files too (or host the folder somewhere like GitHub Pages).

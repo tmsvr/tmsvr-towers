@@ -2,9 +2,9 @@
 // The world is bigger than the screen: everything on the map is drawn relative to ui.cam.
 import {
   T, U, W, H, WORLD_W, WORLD_H, VIEW_W, MAP_H, HUD_H, TOTAL_WAVES, PATHS, BASE, PATH_TILES, BLOCKED, MAP, MAPS,
-  FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, flowerStats, upgradeCost, PLAYER,
+  FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, flowerStats, upgradeCost, PLAYER, CATS, CAT_ORDER, GLOBAL_RANGE,
 } from './data.js';
-import { tileOf, canBuildAt, healCostPerHp, uprootRefund } from './sim.js';
+import { tileOf, canBuildAt, healCostPerHp, uprootRefund, catStats } from './sim.js';
 import { isMuted } from './audio.js';
 import { observeJuice, drawJuiceWorld, drawJuiceScreen, hitSquash, swingSquash, coinScale } from './juice.js';
 
@@ -716,10 +716,48 @@ function drawEnemy(c, e, time) {
 }
 
 // ---- cats ------------------------------------------------------------------
+// Each class wears something on its head: Brick a sweatband, Zip goggles,
+// Fern a straw hat, Boom a bandana and eyepatch.
+function drawCatGear(c, cat, time) {
+  if (cat === 'brawler') {
+    rrect(c, -10, -6, 20, 4.5, 2, '#e04a3a', OUT, 1.4);
+    rrect(c, -14, -6, 5, 3, 1.5, '#e04a3a', OUT, 1.2);
+  } else if (cat === 'scout') {
+    rrect(c, -9, -8.5, 18, 3, 1.5, '#4a4a55', null);
+    for (const gx of [-3, 4]) circle(c, gx, -7.5, 3.6, '#8fd8ff', OUT, 1.5);
+    circle(c, -4, -8.5, 1, '#ffffff');
+  } else if (cat === 'gardener') {
+    ellipse(c, 0, -8, 15, 4, '#e8c56a', OUT, 1.6);
+    c.beginPath(); c.moveTo(-8, -8.5); c.quadraticCurveTo(-7, -17, 0, -17); c.quadraticCurveTo(7, -17, 8, -8.5); c.closePath();
+    c.fillStyle = '#f0d27a'; c.fill(); c.strokeStyle = OUT; c.lineWidth = 1.6; c.stroke();
+    rrect(c, -8, -11, 16, 2.6, 1, '#6bbf4a');
+    circle(c, 5, -11, 2.2, '#ff8fb8', OUT, 1);
+  } else if (cat === 'bomber') {
+    c.beginPath(); c.moveTo(-10, -4); c.quadraticCurveTo(0, -15, 10, -4); c.closePath();
+    c.fillStyle = '#d6453a'; c.fill(); c.strokeStyle = OUT; c.lineWidth = 1.5; c.stroke();
+    for (const [dx, dy] of [[-3, -7], [3, -8], [0, -10]]) circle(c, dx, dy, 0.9, '#ffffff');
+    ellipse(c, -11, -4, 3, 2, '#d6453a', OUT, 1.2);
+    ellipse(c, 5, -1, 3, 3.4, '#1a1a1a');
+    c.strokeStyle = '#1a1a1a'; c.lineWidth = 1; c.beginPath(); c.moveTo(2, -3); c.lineTo(-9, -6); c.stroke();
+  }
+}
+
 function drawCat(c, p, time) {
-  const col = PLAYER.colors[p.id], dark = PLAYER.darks[p.id], scarf = PLAYER.scarves[p.id];
+  const K = CATS[p.cat] || {};
+  const col = K.fur || '#ff9a3c', dark = K.dark || '#c4600f', scarf = PLAYER.scarves[p.id];
   const face = Math.cos(p.dir) >= -0.01 ? 1 : -1;
   const down = p.stun > 0;
+  if (p.sprinting && p.moving && !down) {
+    // speed lines and kicked-up dust behind a sprinting cat
+    c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = 2; c.lineCap = 'round';
+    for (let i = 0; i < 3; i++) {
+      const k = (time * 4 + i / 3) % 1, off = (i - 1) * 7 * U;
+      const bx = p.x - Math.cos(p.dir) * (16 + k * 14) * U - Math.sin(p.dir) * off, by = p.y - Math.sin(p.dir) * (16 + k * 14) * U + Math.cos(p.dir) * off;
+      c.globalAlpha = 1 - k;
+      c.beginPath(); c.moveTo(bx, by); c.lineTo(bx - Math.cos(p.dir) * 10 * U, by - Math.sin(p.dir) * 10 * U); c.stroke();
+    }
+    c.globalAlpha = 1;
+  }
   const bob = down ? 0 : p.moving ? -Math.abs(Math.sin(time * 14)) * 3 : p.working ? -Math.abs(Math.sin(time * 10)) * 2 : Math.sin(time * 2) * 0.6;
   ellipse(c, p.x, p.y + 14 * U, (down ? 18 : 14) * U, 5 * U, 'rgba(0,0,0,0.25)');
   c.save();
@@ -744,7 +782,7 @@ function drawCat(c, p, time) {
     c.beginPath(); c.moveTo(ex - 1, -7); c.lineTo(ex + 1, -12); c.lineTo(ex + 3, -6.5); c.closePath(); c.fillStyle = '#f7a6b5'; c.fill();
   }
   circle(c, 0, 0, 10, col, OUT, 2);
-  if (p.id === 0) { c.strokeStyle = dark; c.lineWidth = 1.6; c.beginPath(); c.moveTo(-3, -9.5); c.lineTo(-3, -6); c.moveTo(0, -10); c.lineTo(0, -6); c.moveTo(3, -9.5); c.lineTo(3, -6); c.stroke(); }
+  if (p.cat === 'scout') { c.strokeStyle = dark; c.lineWidth = 1.6; c.beginPath(); c.moveTo(-3, -9.5); c.lineTo(-3, -6); c.moveTo(0, -10); c.lineTo(0, -6); c.moveTo(3, -9.5); c.lineTo(3, -6); c.stroke(); }
   const blink = Math.sin(time * 1.3 + p.id * 2) > 0.985;
   for (const ex of [-1, 5]) {
     if (down) { c.strokeStyle = OUT; c.lineWidth = 1.4; c.beginPath(); c.moveTo(ex - 2, -3); c.lineTo(ex + 2, 1); c.moveTo(ex + 2, -3); c.lineTo(ex - 2, 1); c.stroke(); }
@@ -754,6 +792,8 @@ function drawCat(c, p, time) {
   circle(c, 2.5, 3, 1.4, '#f2778b');
   c.strokeStyle = 'rgba(40,30,20,0.6)'; c.lineWidth = 0.9;
   c.beginPath(); c.moveTo(6, 3); c.lineTo(13, 2); c.moveTo(6, 4.5); c.lineTo(13, 5.5); c.moveTo(-1, 3); c.lineTo(-8, 2); c.stroke();
+  drawCatGear(c, p.cat, time);
+  if (p.tired && !down) { const k = (time * 1.5) % 1; ellipse(c, -11, -6 + k * 8, 1.8, 2.6, `rgba(120,200,255,${1 - k})`, OUT, 0.8); }
   c.restore();
   rrect(c, -3, -1, 14, 4.5, 2, scarf, OUT, 1.4);
   rrect(c, -4, 1, 4, 8, 2, scarf, OUT, 1.4);
@@ -768,12 +808,12 @@ function drawCat(c, p, time) {
     let a, inner = 10 * U, outer = 34 * U;
     if (p.swingT > 0) {
       const k = 1 - p.swingT / 0.18;
-      const a0 = p.swingDir - PLAYER.atkArc / 2;
+      const a0 = p.swingDir - PLAYER.atkArc / 2, reach = catStats(p).atkRange;
       a = a0 + PLAYER.atkArc * k;
       c.globalAlpha = 0.6;
-      c.beginPath(); c.arc(bx, by, PLAYER.atkRange * 0.85, a0, a); c.strokeStyle = '#ffffff'; c.lineWidth = 10 * U; c.lineCap = 'round'; c.stroke();
+      c.beginPath(); c.arc(bx, by, reach * 0.85, a0, a); c.strokeStyle = '#ffffff'; c.lineWidth = (p.cat === 'brawler' ? 15 : 10) * U; c.lineCap = 'round'; c.stroke();
       c.globalAlpha = 1;
-      outer = PLAYER.atkRange * 0.85;
+      outer = reach * 0.85;
     } else {
       a = -Math.PI / 2 + face * 0.6;
       inner = 6 * U; outer = 22 * U;
@@ -781,10 +821,12 @@ function drawCat(c, p, time) {
     const hx = bx + face * (p.swingT > 0 ? 0 : 9 * U), hy = by + (p.swingT > 0 ? 0 : 4 * U);
     const x1 = hx + Math.cos(a) * inner, y1 = hy + Math.sin(a) * inner, x2 = hx + Math.cos(a) * outer, y2 = hy + Math.sin(a) * outer;
     c.lineCap = 'round';
-    c.strokeStyle = OUT; c.lineWidth = 7 * U; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
-    c.strokeStyle = '#8a5a2b'; c.lineWidth = 4 * U; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
-    circle(c, x2, y2, 3.8 * U, '#ffd23f', OUT, 1.5);
+    const thick = p.cat === 'brawler' ? 1.6 : p.cat === 'scout' ? 0.8 : 1; // Brick swings a club, Zip a twig
+    c.strokeStyle = OUT; c.lineWidth = 7 * U * thick; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+    c.strokeStyle = '#8a5a2b'; c.lineWidth = 4 * U * thick; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+    circle(c, x2, y2, 3.8 * U * thick, '#ffd23f', OUT, 1.5);
   }
+  if (p.noTag) return;
   rrect(c, p.x - 14, p.y - 34 * U, 28, 16, 8, scarf, OUT, 1.5);
   label(c, `P${p.id + 1}`, p.x, p.y - 34 * U + 8.5, 11, '#fff', 'center', 700, null);
 }
@@ -803,11 +845,11 @@ function drawBuildGhost(c, p, s, time) {
   c.setLineDash([]);
   if (f && f.lvl > 0) {
     const st = flowerStats(f.type, f.lvl);
-    circle(c, f.x, f.y, st.range, 'rgba(255,255,255,0.07)', 'rgba(255,255,255,0.45)', 2);
+    if (st.range < GLOBAL_RANGE) circle(c, f.x, f.y, st.range, 'rgba(255,255,255,0.07)', 'rgba(255,255,255,0.45)', 2);
   } else if (!f && valid) {
     const st = flowerStats(type, 1);
     const cx = (tx + 0.5) * T, cy = (ty + 0.5) * T;
-    circle(c, cx, cy, st.range, 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.3)', 1.5);
+    if (st.range < GLOBAL_RANGE) circle(c, cx, cy, st.range, 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.3)', 1.5);
     c.globalAlpha = 0.5;
     drawFlower(c, { id: 0, type, lvl: 1, x: cx, y: cy, angle: 0, flash: 0, hurtT: 0, hp: FLOWER_HP, headIdx: 0 }, time);
     c.globalAlpha = 1;
@@ -1035,6 +1077,9 @@ function drawHud(c, s, time, ui) {
     }
     circle(c, bx, by + 1, 7, '#2b2b33', OUT, 1.5);
     c.strokeStyle = '#c9a26b'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(bx + 3, by - 4); c.lineTo(bx + 6, by - 8); c.stroke();
+    // stamina bar under the bomb
+    rrect(c, bx - 16, by + 18, 32, 6, 3, 'rgba(0,0,0,0.45)');
+    if (p.stam > 0.01) rrect(c, bx - 15, by + 19, 30 * p.stam, 4, 2, p.tired ? '#ff8a5a' : p.sprinting ? '#ffffff' : '#7fd4ff');
     (p.loadout || p.pick.chosen).forEach((t, j) => {
       const sx = x0 + 50 + j * 79, sy = y0 + 42, sw = 75, sh = 38;
       const sel = p.loadout && p.building && j === p.sel;
@@ -1077,68 +1122,95 @@ function drawMapThumb(c, m, x, y, w, h) {
 }
 
 // Before the game: choose a map (top row) and LOADOUT_SIZE flowers (bottom row).
+// Pulsing outline for each player whose cursor is on this card.
+function pickCursor(c, s, x, y, w, h, r, row, on, time) {
+  s.players.forEach((p) => {
+    if (p.pick.row !== row || p.pick.ready || !on(p)) return;
+    const inset = p.id * 5;
+    c.globalAlpha = 0.7 + Math.sin(time * 6) * 0.3;
+    rrect(c, x - 4 + inset, y - 4 + inset, w + 8 - inset * 2, h + 8 - inset * 2, r - inset, null, PLAYER.scarves[p.id], 4);
+    c.globalAlpha = 1;
+  });
+}
+
+function pips(c, x, y, name, v) {
+  label(c, name, x, y, 10.5, '#a9bccb', 'left', 600, null);
+  const n = clamp(Math.round(3 * v), 1, 5);
+  for (let i = 0; i < 5; i++) rrect(c, x + 40 + i * 11, y - 3.5, 9, 7, 2, i < n ? '#ffe27a' : 'rgba(255,255,255,0.12)');
+}
+
 function drawPick(c, s, ui, time) {
   c.fillStyle = 'rgba(12,18,26,0.85)'; c.fillRect(0, 0, VIEW_W, MAP_H);
-  label(c, `Choose a map and ${LOADOUT_SIZE} flowers`, VIEW_W / 2, 22, 24, '#ffe27a', 'center', 700, OUT);
+  label(c, `Choose a map, a cat and ${LOADOUT_SIZE} flowers`, VIEW_W / 2, 20, 22, '#ffe27a', 'center', 700, OUT);
   // maps
-  const mw = 210, mh = 112, mgap = 16, mx0 = (VIEW_W - (MAPS.length * mw + (MAPS.length - 1) * mgap)) / 2, my0 = 42;
+  const mw = 200, mh = 96, mgap = 16, mx0 = (VIEW_W - (MAPS.length * mw + (MAPS.length - 1) * mgap)) / 2, my0 = 40;
   MAPS.forEach((m, i) => {
     const x = mx0 + i * (mw + mgap);
     const sel = s.map === i;
     rrect(c, x, my0, mw, mh, 12, sel ? 'rgba(255,226,122,0.16)' : 'rgba(255,255,255,0.05)', sel ? '#ffe27a' : 'rgba(255,255,255,0.18)', sel ? 3 : 1.5);
-    drawMapThumb(c, m, x + 8, my0 + 6, mw - 16, mh - 44);
-    label(c, m.name, x + mw / 2, my0 + mh - 30, 14, '#ffffff', 'center', 700, null);
-    label(c, fitText(c, m.desc, mw - 12, 11), x + mw / 2, my0 + mh - 13, 11, '#a9bccb', 'center', 500, null);
-    if (sel) s.players.forEach((p) => {
-      if (p.pick.row !== 0 || p.pick.ready) return;
-      const inset = p.id * 5;
-      c.globalAlpha = 0.7 + Math.sin(time * 6) * 0.3;
-      rrect(c, x - 4 + inset, my0 - 4 + inset, mw + 8 - inset * 2, mh + 8 - inset * 2, 15 - inset, null, PLAYER.scarves[p.id], 4);
-      c.globalAlpha = 1;
-    });
+    drawMapThumb(c, m, x + 8, my0 + 6, mw - 16, mh - 42);
+    label(c, m.name, x + mw / 2, my0 + mh - 27, 13, '#ffffff', 'center', 700, null);
+    label(c, fitText(c, m.desc, mw - 12, 10.5), x + mw / 2, my0 + mh - 11, 10.5, '#a9bccb', 'center', 500, null);
+    if (sel) pickCursor(c, s, x, my0, mw, mh, 15, 0, () => true, time);
+  });
+  // cats: each one can only be taken by one player
+  const cw0 = 232, cgap = 12, ch0 = 98, cx0 = (VIEW_W - (CAT_ORDER.length * cw0 + (CAT_ORDER.length - 1) * cgap)) / 2, cy0 = 148;
+  CAT_ORDER.forEach((id, i) => {
+    const K = CATS[id], x = cx0 + i * (cw0 + cgap);
+    const owner = s.players.find((p) => p.cat === id);
+    rrect(c, x, cy0, cw0, ch0, 12, owner ? 'rgba(255,240,180,0.13)' : 'rgba(255,255,255,0.05)', owner ? PLAYER.scarves[owner.id] : 'rgba(255,255,255,0.18)', owner ? 2.5 : 1.5);
+    c.save(); c.translate(x + 36, cy0 + 75);
+    drawCat(c, { id: owner ? owner.id : 0, cat: id, noTag: true, x: 0, y: 0, dir: 0, moving: false, swingT: 0, stun: 0 }, time);
+    c.restore();
+    label(c, K.name, x + 12, cy0 + 13, 16, '#ffffff', 'left', 700, null);
+    label(c, fitText(c, K.desc, cw0 - 20, 11), x + 12, cy0 + 29, 11, '#cfe0ea', 'left', 500, null);
+    pips(c, x + 92, cy0 + 51, 'Speed', K.speed);
+    pips(c, x + 92, cy0 + 63, 'Baton', K.batonDamage / K.batonCooldown);
+    pips(c, x + 92, cy0 + 75, 'Garden', K.growSpeed);
+    pips(c, x + 92, cy0 + 87, 'Bomb', (K.bombRadius / K.bombRecharge) ** 0.6);
+    if (owner && s.players.length > 1) {
+      rrect(c, x + cw0 - 36, cy0 + 8, 28, 18, 9, PLAYER.scarves[owner.id]);
+      label(c, `P${owner.id + 1}`, x + cw0 - 22, cy0 + 17.5, 11, '#fff', 'center', 700, null);
+    }
+    pickCursor(c, s, x, cy0, cw0, ch0, 15, 1, (p) => p.cat === id, time);
   });
   // flowers
-  const N = FLOWER_ORDER.length, cw = 130, gap = 8, x0 = (VIEW_W - (N * cw + (N - 1) * gap)) / 2, y0 = 170, ch = 290;
+  const N = FLOWER_ORDER.length, cw = 130, gap = 8, x0 = (VIEW_W - (N * cw + (N - 1) * gap)) / 2, y0 = 260, ch = 222;
   FLOWER_ORDER.forEach((t, i) => {
     const F = FLOWERS[t];
     const x = x0 + i * (cw + gap), cx = x + cw / 2;
     const pickedBy = s.players.filter((p) => p.pick.chosen.includes(t));
     rrect(c, x, y0, cw, ch, 14, pickedBy.length ? 'rgba(255,240,180,0.13)' : 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.18)', 1.5);
-    drawFlower(c, { id: i, type: t, lvl: 3, x: cx, y: y0 + 88, angle: Math.PI / 2, flash: Math.sin(time * 2 + i) > 0.97 ? 0.1 : 0, hurtT: 0, hp: FLOWER_HP, headIdx: 0 }, time);
-    label(c, F.name, cx, y0 + 134, 16, '#ffffff', 'center', 700, null);
-    coinIcon(c, cx - 14, y0 + 156, 7);
-    label(c, `${F.cost}`, cx + 2, y0 + 157, 14, '#ffe27a', 'left', 700, null);
-    wrapText(c, F.desc, cw - 16, 12).forEach((l, j) => label(c, l, cx, y0 + 180 + j * 15, 12, '#cfe0ea', 'center', 500, null));
+    drawFlower(c, { id: i, type: t, lvl: 3, x: cx, y: y0 + 66, angle: Math.PI / 2, flash: Math.sin(time * 2 + i) > 0.97 ? 0.1 : 0, hurtT: 0, hp: FLOWER_HP, headIdx: 0 }, time);
+    label(c, F.name, cx, y0 + 106, 15, '#ffffff', 'center', 700, null);
+    coinIcon(c, cx - 14, y0 + 125, 7);
+    label(c, `${F.cost}`, cx + 2, y0 + 126, 13, '#ffe27a', 'left', 700, null);
+    wrapText(c, F.desc, cw - 14, 11.5).slice(0, 3).forEach((l, j) => label(c, l, cx, y0 + 146 + j * 14, 11.5, '#cfe0ea', 'center', 500, null));
     const st = flowerStats(t, 1);
-    label(c, `Range ${(st.range / T).toFixed(1)}`, cx, y0 + 252, 11, '#8fa5b3', 'center', 500, null);
-    label(c, F.kind === 'cloud' ? `${st.dmg}/s per stack` : F.kind === 'chomp' ? `Bite ${st.dmg}` : `Dmg ${st.dmg} · every ${st.rate}s`, cx, y0 + 268, 11, '#8fa5b3', 'center', 500, null);
+    label(c, st.range >= GLOBAL_RANGE ? 'Range: whole map' : `Range ${(st.range / T).toFixed(1)}`, cx, y0 + 194, 11, '#8fa5b3', 'center', 500, null);
+    label(c, F.kind === 'cloud' ? `${st.dmg}/s per stack` : F.kind === 'chomp' ? `Bite ${st.dmg}` : `Dmg ${st.dmg} · every ${st.rate}s`, cx, y0 + 209, 11, '#8fa5b3', 'center', 500, null);
     pickedBy.forEach((p) => {
       const n = p.pick.chosen.indexOf(t) + 1;
       const bx = p.id === 0 ? x + 18 : x + cw - 18;
       circle(c, bx, y0 + 18, 12, PLAYER.scarves[p.id], '#ffffff', 2);
       label(c, `${n}`, bx, y0 + 19, 13, '#fff', 'center', 700, null);
     });
-    s.players.forEach((p) => {
-      if (p.pick.cursor !== i || p.pick.ready || p.pick.row !== 1) return;
-      const inset = p.id * 5;
-      c.globalAlpha = 0.7 + Math.sin(time * 6) * 0.3;
-      rrect(c, x - 3 + inset, y0 - 3 + inset, cw + 6 - inset * 2, ch + 6 - inset * 2, 16 - inset, null, PLAYER.scarves[p.id], 4);
-      c.globalAlpha = 1;
-    });
+    pickCursor(c, s, x, y0, cw, ch, 17, 2, (p) => p.pick.cursor === i, time);
   });
   // per-player status and controls
   s.players.forEach((p, i) => {
     const k = ui.keysFor(p.id);
-    const y = y0 + ch + 22 + i * 24;
+    const y = y0 + ch + 20 + i * 24;
     const n = p.pick.chosen.length;
     const L = ui.keyLabel;
-    const keys = p.pick.row === 0
-      ? `[${L(k.left)}/${L(k.right)}] change map · [${L(k.down)}] flowers`
-      : `[${L(k.left)}/${L(k.right)}] move · [${L(k.build)}] pick · [${L(k.up)}] map · [${L(k.atk)}] ready`;
-    const msg = p.pick.ready ? 'Ready! ✓' : n < LOADOUT_SIZE ? `${n}/${LOADOUT_SIZE} chosen   ${keys}` : `4/4 chosen — [${L(k.atk)}] when ready   ${keys}`;
-    rrect(c, VIEW_W / 2 - 330, y - 11, 32, 22, 11, PLAYER.scarves[p.id]);
-    label(c, `P${p.id + 1}`, VIEW_W / 2 - 314, y + 0.5, 12, '#fff', 'center', 700, null);
-    label(c, msg, VIEW_W / 2 - 288, y + 1, 14, p.pick.ready ? '#8dff9a' : '#e8f1f7', 'left', 600, null);
+    const keys = p.pick.row === 0 ? `[${L(k.left)}/${L(k.right)}] change map · [${L(k.down)}] cats`
+      : p.pick.row === 1 ? `[${L(k.left)}/${L(k.right)}] change cat · [${L(k.up)}] map · [${L(k.down)}] flowers`
+      : `[${L(k.left)}/${L(k.right)}] move · [${L(k.build)}] pick · [${L(k.up)}] cats · [${L(k.atk)}] ready`;
+    const who = `${CATS[p.cat].name}, `;
+    const msg = p.pick.ready ? `Ready with ${CATS[p.cat].name}! ✓` : n < LOADOUT_SIZE ? `${who}${n}/${LOADOUT_SIZE} flowers   ${keys}` : `${who}4/4 — [${L(k.atk)}] when ready   ${keys}`;
+    rrect(c, VIEW_W / 2 - 360, y - 11, 32, 22, 11, PLAYER.scarves[p.id]);
+    label(c, `P${p.id + 1}`, VIEW_W / 2 - 344, y + 0.5, 12, '#fff', 'center', 700, null);
+    label(c, fitText(c, msg, 700, 14, 600), VIEW_W / 2 - 318, y + 1, 14, p.pick.ready ? '#8dff9a' : '#e8f1f7', 'left', 600, null);
   });
 }
 
@@ -1154,8 +1226,8 @@ function drawMenu(c, time, ui) {
   rrect(c, cx - 360, 40, 720, 570, 24, 'rgba(30,38,48,0.92)', 'rgba(255,255,255,0.25)', 2);
   label(c, 'Petal Patrol', cx, 100, 64, '#ffe27a', 'center', 700, OUT);
   label(c, 'Two cats. One garden. Many, many monsters.', cx, 146, 18, '#cfe0ea', 'center', 500, null);
-  drawCat(c, { id: 0, x: cx - 250, y: 100, dir: 0, moving: true, swingT: 0, stun: 0 }, time);
-  drawCat(c, { id: 1, x: cx + 250, y: 100, dir: Math.PI, moving: true, swingT: 0, stun: 0 }, time);
+  drawCat(c, { id: 0, cat: 'scout', x: cx - 250, y: 100, dir: 0, moving: true, swingT: 0, stun: 0 }, time);
+  drawCat(c, { id: 1, cat: 'gardener', x: cx + 250, y: 100, dir: Math.PI, moving: true, swingT: 0, stun: 0 }, time);
   FLOWER_ORDER.forEach((t, i) => {
     const lvl = [1, 3, 2, 2, 4, 3, 2][i];
     const x = cx - 285 + i * 95;
@@ -1167,16 +1239,16 @@ function drawMenu(c, time, ui) {
   label(c, '1  Solo     2  Local co-op     3  Host online     4  Join online', cx, 318, 22, '#ffffff', 'center', 600, null);
   c.globalAlpha = 1;
   const rows = [
-    ['', 'Move', 'Baton', 'Bomb', 'Plant / grow (hold)', 'Next flower / mode'],
+    ['', 'Move', 'Sprint', 'Baton', 'Bomb', 'Plant / grow (hold)', 'Next flower / mode'],
     ...ui.keys.map((k, i) => [`P${i + 1}`, i === 0 ? [k.up, k.left, k.down, k.right].map(ui.keyLabel).join('') : 'Arrows',
-      ui.keyLabel(k.atk), ui.keyLabel(k.bomb), ui.keyLabel(k.build), ui.keyLabel(k.cycle)]),
+      ui.keyLabel(k.sprint), ui.keyLabel(k.atk), ui.keyLabel(k.bomb), ui.keyLabel(k.build), ui.keyLabel(k.cycle)]),
   ];
-  const cols = [cx - 270, cx - 190, cx - 105, cx - 35, cx + 75, cx + 215];
+  const cols = [cx - 300, cx - 225, cx - 150, cx - 85, cx - 25, cx + 90, cx + 235];
   rows.forEach((r, ri) => r.forEach((t, ci) => label(c, t, cols[ci], 358 + ri * 28, ri ? 16 : 13, ri ? '#fff' : '#8fa5b3', 'center', ri ? 600 : 500, null)));
   const tips = [
     'Plant key: build mode, again to plant a seedling, then HOLD to pour coins in. Next-flower key cycles.',
     'Flowers wear out as they fight: stand on one and switch to heal mode (or dig it up for 60% back).',
-    'Each cat brings 4 of the 7 flowers and keeps the coins it picks up. Bombs knock cats down too!',
+    'Each player picks a different cat and 4 of the 7 flowers, and keeps the coins they pick up.',
   ];
   tips.forEach((t, i) => label(c, t, cx, 455 + i * 24, 13.5, '#cfe0ea', 'center', 500, null));
   label(c, 'Enter: start wave early  ·  P: pause  ·  N: sound  ·  J: effects  ·  Esc: menu', cx, 545, 14, '#8fa5b3', 'center', 500, null);

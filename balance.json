@@ -11,6 +11,8 @@
     "difficulty": "Enemy health = base * (1 + hpPerWave*(wave-1) + hpPerWaveSquared*(wave-1)^2). Wave size budget = waveBudgetBase + waveBudgetPerWave*wave.",
     "economy.uprootRefund": "Share of the coins poured into a flower (planting + upgrades, not healing) you get back when you dig it up. uprootSeconds = how long you hold the key to dig.",
     "juice": "Extra effects that don't change the game: damage numbers, hit squash, death pops, confetti, coin counter bounce, short freeze (hit-stop) on bombs and boss kills. J toggles them all in game; set any to false to drop just that one.",
+    "player.sprint": "Holding sprint multiplies speed by sprintSpeed for up to sprintSeconds; stamina refills fully in sprintRecoverSeconds after a sprintRecoverDelay pause. Running dry means waiting until it is a third full.",
+    "cats": "Character classes. Every number is a multiplier on the player section (1 = normal). growSpeed also speeds up healing. Two players can't pick the same cat.",
     "waves": "Which enemies can appear: fromWave = first wave it shows up, weight = how often it is picked, cost = how much of the wave budget one group uses, group = how many spawn together."
   },
 
@@ -26,7 +28,18 @@
     "bombDamage": 4,
     "bombStunEnemies": 2.5,
     "bombStunCats": 1.8,
-    "bombRecharge": 14
+    "bombRecharge": 14,
+    "sprintSpeed": 1.6,
+    "sprintSeconds": 2.5,
+    "sprintRecoverSeconds": 4,
+    "sprintRecoverDelay": 0.6
+  },
+
+  "cats": {
+    "brawler":  { "name": "Brick", "desc": "Slow, but hits like a truck", "speed": 0.8,  "batonDamage": 2.2,  "batonCooldown": 1.25, "batonRange": 1.15, "growSpeed": 1,   "bombRecharge": 1,    "bombRadius": 1,    "sprintSeconds": 1,   "fur": "#b07d52", "dark": "#7a5232" },
+    "scout":    { "name": "Zip",   "desc": "Fast paws, light taps, long sprints",   "speed": 1.3,  "batonDamage": 0.65, "batonCooldown": 0.75, "batonRange": 0.95, "growSpeed": 1,   "bombRecharge": 1,    "bombRadius": 1,    "sprintSeconds": 1.6, "fur": "#ff9a3c", "dark": "#c4600f" },
+    "gardener": { "name": "Fern",  "desc": "Grows and heals flowers 60% faster",   "speed": 1,    "batonDamage": 0.85, "batonCooldown": 1,    "batonRange": 1,    "growSpeed": 1.6, "bombRecharge": 1,    "bombRadius": 1,    "sprintSeconds": 1,   "fur": "#efe4cf", "dark": "#b3a284" },
+    "bomber":   { "name": "Boom",  "desc": "Bomb recharges 2x faster, bigger blast", "speed": 0.95, "batonDamage": 0.9, "batonCooldown": 1, "batonRange": 1,   "growSpeed": 1,   "bombRecharge": 0.5,  "bombRadius": 1.3,  "sprintSeconds": 1,   "fur": "#5d5f6e", "dark": "#383945" }
   },
 
   "economy": {
@@ -90,7 +103,7 @@
 
   "flowers": {
     "daisy":     { "name": "Daisy",      "desc": "Rapid little seeds", "cost": 20, "range": 2.2, "damage": 5, "rate": 0.4, "kind": "single", "color": "#ffffff" },
-    "sunflower": { "name": "Sunflower",  "desc": "Huge range, slow, massive damage to the strongest", "cost": 55, "range": 5.5, "damage": 75, "rate": 3.2, "kind": "beam", "target": "strong", "color": "#ffd23f" },
+    "sunflower": { "name": "Sunflower",  "desc": "Hits the strongest anywhere on the map. Very slow.", "cost": 55, "range": 99, "damage": 160, "rate": 5.5, "kind": "beam", "target": "strong", "color": "#ffd23f" },
     "firelily":  { "name": "Fire Lily",  "desc": "Fireball pierces everything in a line", "cost": 45, "range": 3, "damage": 14, "rate": 1.6, "kind": "bolt", "color": "#ff7a2f" },
     "stink":     { "name": "Stinkbloom", "desc": "Poison clouds stack, ignore armor (ground)", "cost": 45, "range": 2.6, "damage": 2.2, "rate": 2.4, "kind": "cloud", "cloudRadius": 0.95, "cloudSeconds": 3.5, "maxStacks": 5, "groundOnly": true, "color": "#9ad14b" },
     "frost":     { "name": "Frostbloom", "desc": "Slows everything nearby", "cost": 35, "range": 1.8, "damage": 2, "rate": 0.8, "kind": "pulse", "slow": 0.55, "color": "#8fe3ff" },

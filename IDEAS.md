@@ -13,6 +13,7 @@ or a rework of something core.
 |---|---|---|
 | B7 | Dig up flowers for a partial refund (Q cycles upgrade → heal → dig up) | `f9757f8` |
 | H2 | Music that reacts to the game (drums in waves, tense layer when the cottage is chomped or a boss is alive) | `9ffd679` |
+| A5 | Cat classes (Brick, Zip, Fern, Boom; no duplicates) plus a sprint key for everyone | see git log |
 | H1 | Juice: damage numbers, squash, death pops, confetti, coin bounce, hit-stop. J toggles it; `balance.json → juice` switches single effects | `4783b4c` |
 | n/a | Cats collide with trees, rocks and ponds | `4c985cf` |
 | n/a | Walkable cottage yard where nothing can be planted | `2c11ddb` |
@@ -56,9 +57,9 @@ mechanic** so the theme changes how the game plays, not only how it looks.
 
 - **A1. Revive a downed partner.** Hold a button next to a downed partner to revive them. **Needs A2 first**: right now cats can't take damage and are only knocked down by bombs for 1.8 s. 🎯🎉 · S (on top of A2)
 - **A2. Cat health and enemies that attack cats.** Some enemies leave the road to swipe at nearby cats. A downed cat either waits for a revive (A1) or gets back up after a few seconds. 🎯 · M
-- **A3. Dash or roll** on a cooldown. 🎉 · S
+- **A3. Dash or roll** on a cooldown. Sprint covers most of this now. 🎉 · S
 - **A4. Choose a tool** with the loadout: baton, slingshot (ranged and weak) or net (slows small enemies). 🎉🎯 · M
-- **A5. Cat classes:** gardener (grows and heals faster), brawler (stronger baton), bombardier (2 bombs). 🎉 · M
+- ~~A5. Cat classes~~ (done, with sprint)
 - **A6. Cat levels within a run:** gain experience from kills and pick a small perk at each level. 🎉 · M
 - **A7. Carry things:** move a seedling, or carry loot. 🎉 · M
 - **A8. Co-op combos:** a bomb followed by a baton swing launches enemies, and two cats hitting the same enemy within 0.5 s gives a crit. 🎉 · S–M
