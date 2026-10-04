@@ -2,7 +2,7 @@
 // Inputs per player per tick: { mx, my, atk, bomb, build (held), buildTap, cycle, ready }
 // Side effects for presentation (sounds, shake) are queued in s.events.
 import {
-  T, U, W, H, WORLD_W, WORLD_H, VIEW_W, MAP_H, TOTAL_WAVES, WAYPOINTS, SPAWN, BASE, PATH_TILES, ENEMIES,
+  T, U, W, H, WORLD_W, WORLD_H, VIEW_W, MAP_H, TOTAL_WAVES, PATHS, BASE, PATH_TILES, BLOCKED, MAP, MAPS, loadMap, ENEMIES,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, GROW_TIME, FLOWER_HP, WEAR_PER_SEC, WEAR_MULT, HEAL_RATE, HEAL_COST,
   POISON_TIME, START_COINS, LOADOUT_SIZE, WAVES, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, PLAYER,
 } from './data.js';
@@ -23,19 +23,20 @@ export const TUNE = DIFFICULTY;
 
 // sharedScreen: both cats share one camera, so they can't wander further apart than the view.
 // loadouts: last game's flower picks per player, pre-selected on the pick screen.
-export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, loadouts = [] } = {}) {
+export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, loadouts = [], map = 0 } = {}) {
+  loadMap(map);
   const s = {
     t: 0, nextId: 1, rng: seed, wave: 0, phase: 'pick', timer: DIFFICULTY.firstWaveDelay, queue: [], spawnWait: 0,
     lives: DIFFICULTY.lives, players: [], flowers: [], enemies: [], drops: [], bombs: [], projs: [], clouds: [],
-    fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, sharedScreen,
+    fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, sharedScreen, map: MAP.index,
   };
-  const coins = nPlayers > 1 ? START_COINS.coop : START_COINS.solo;
+  const coins = startCoins(nPlayers);
   for (let i = 0; i < nPlayers; i++) {
     s.players.push({
-      id: i, x: (5 + i) * T, y: 6 * T, dir: 0, atkCd: 0, swingT: 0, coins, stun: 0,
+      id: i, x: MAP.start.x + i * T, y: MAP.start.y, dir: 0, atkCd: 0, swingT: 0, coins, stun: 0,
       bombs: PLAYER.bombMax, sel: 0, building: false, moving: false, mode: 'grow', onFlowerId: null, working: null, msgCd: 0,
-      loadout: null, pick: { cursor: 0, chosen: (loadouts[i] || []).filter((t) => FLOWERS[t]).slice(0, LOADOUT_SIZE), ready: false },
-      prevMx: 0, prevAtk: false,
+      loadout: null, pick: { row: 1, cursor: 0, chosen: (loadouts[i] || []).filter((t) => FLOWERS[t]).slice(0, LOADOUT_SIZE), ready: false },
+      prevMx: 0, prevMy: 0, prevAtk: false,
     });
   }
   return s;
@@ -61,13 +62,13 @@ export function tileOf(p) {
 
 export function canBuildAt(s, tx, ty) {
   const k = ty * W + tx;
-  return !PATH_TILES.has(k) && !s.grid.has(k);
+  return !PATH_TILES.has(k) && !BLOCKED.has(k) && !s.grid.has(k);
 }
 
 export const healCostPerHp = (f) => (FLOWERS[f.type].cost * HEAL_COST) / FLOWER_HP;
 
 // ---- Enemies --------------------------------------------------------------
-function spawnEnemy(s, type, from) {
+function spawnEnemy(s, type, from, path = 0) {
   const d = ENEMIES[type];
   const w = Math.max(0, s.wave - 1);
   const solo = s.players.length === 1;
@@ -75,8 +76,9 @@ function spawnEnemy(s, type, from) {
   const j = () => (rnd(s) - 0.5) * 18 * U;
   s.enemies.push({
     id: s.nextId++, type, def: d,
-    x: from ? from.x + j() : SPAWN.x, y: from ? from.y + j() : SPAWN.y,
-    seg: from ? from.seg : 0, dist: from ? from.dist : 0,
+    path: from ? from.path : path,
+    x: from ? from.x + j() : PATHS[path].spawn.x, y: from ? from.y + j() : PATHS[path].spawn.y,
+    seg: from ? from.seg : 0, dist: from ? from.dist : 0, left: from ? from.left : PATHS[path].length,
     hp: d.hp * hpScale, maxhp: d.hp * hpScale,
     stun: 0, slow: 1, slowT: 0, kx: 0, ky: 0, flash: 0, dead: false, wob: rnd(s) * 6, ang: 0,
     phaseT: rnd(s) * 2, spawnT: 0, under: false, dashing: false, chew: null, chewT: 0, chewCd: 1,
@@ -186,15 +188,18 @@ function updateEnemies(s, dt) {
     }
     e.wob += dt * 8 * e.slow;
     const sp = e.def.speed * e.slow * (e.dashing ? e.def.dash.speedMultiplier : 1) * (e.under ? e.def.burrow.speedMultiplier : 1);
-    const tgt = e.def.flying ? BASE : WAYPOINTS[e.seg];
+    const wps = PATHS[e.path].waypoints;
+    const tgt = e.def.flying ? BASE : wps[e.seg];
     const dx = tgt.x - e.x, dy = tgt.y - e.y;
     const d = Math.hypot(dx, dy);
     const mv = Math.min(sp * dt, d);
     if (d > 0) { e.x += (dx / d) * mv; e.y += (dy / d) * mv; e.ang = Math.atan2(dy, dx); }
     e.dist += mv;
+    // how far is left to the cottage (flowers aim at whoever is closest to getting in)
+    e.left = e.def.flying ? Math.hypot(BASE.x - e.x, BASE.y - e.y) : PATHS[e.path].length - e.dist;
     if (e.dashing && rnd(s) < dt * 30) s.fx.push({ kind: 'puff', x: e.x, y: e.y, vx: 0, vy: 0, col: 'rgba(255,255,255,0.7)', size: 3, life: 0.25, max: 0.25 });
     if (d - mv < 1) {
-      if (e.def.flying || e.seg >= WAYPOINTS.length - 1) leak(s, e);
+      if (e.def.flying || e.seg >= wps.length - 1) leak(s, e);
       else e.seg++;
     }
   }
@@ -213,7 +218,7 @@ function leak(s, e) {
 // ---- Waves ----------------------------------------------------------------
 function buildQueue(s, n) {
   const q = [];
-  let budget = (TUNE.waveBudgetBase + n * TUNE.waveBudgetPerWave) * (s.players.length > 1 ? TUNE.coopWaveSize : TUNE.soloWaveSize);
+  let budget = (TUNE.waveBudgetBase + n * TUNE.waveBudgetPerWave) * (s.players.length > 1 ? TUNE.coopWaveSize : TUNE.soloWaveSize) * MAP.waveSize;
   const avail = WAVES.filter((u) => u.fromWave <= n);
   const bossWave = n % TUNE.bossEvery === 0;
   if (bossWave) budget *= TUNE.bossWaveBudget;
@@ -221,10 +226,11 @@ function buildQueue(s, n) {
     const total = avail.reduce((a, u) => a + u.weight, 0);
     let r = rnd(s) * total, pick = avail[0];
     for (const u of avail) { r -= u.weight; if (r <= 0) { pick = u; break; } }
-    for (let i = 0; i < pick.group; i++) q.push({ type: pick.enemy, wait: pick.group > 1 ? 0.22 : 0.4 + rnd(s) * 0.8 });
+    const path = Math.floor(rnd(s) * PATHS.length); // a group sticks together on one road
+    for (let i = 0; i < pick.group; i++) q.push({ type: pick.enemy, path, wait: pick.group > 1 ? 0.22 : 0.4 + rnd(s) * 0.8 });
     budget -= pick.cost;
   }
-  if (bossWave) q.push({ type: 'boss', wait: 3 });
+  if (bossWave) q.push({ type: 'boss', path: Math.floor(rnd(s) * PATHS.length), wait: 3 });
   const k = Math.max(0.5, 1 - n * 0.03);
   for (const e of q) e.wait *= k;
   return q;
@@ -251,7 +257,7 @@ function updateWaves(s, dt, ready) {
     s.spawnWait -= dt;
     if (s.spawnWait <= 0) {
       const e = s.queue.shift();
-      spawnEnemy(s, e.type);
+      spawnEnemy(s, e.type, null, e.path);
       s.spawnWait = e.wait;
     }
   } else if (!s.enemies.some((e) => !e.dead)) {
@@ -339,6 +345,7 @@ function plant(s, p) {
   const cx = (tx + 0.5) * T, cy = ty * T;
   if (s.grid.has(k)) return;
   if (PATH_TILES.has(k)) return deny(s, p, cx, cy, "Can't plant on the path");
+  if (BLOCKED.has(k)) return deny(s, p, cx, cy, "Something's in the way");
   if (p.coins < 1) return deny(s, p, cx, cy, 'Out of coins!');
   const type = p.loadout[p.sel];
   const nf = {
@@ -477,7 +484,7 @@ function updateFlowers(s, dt) {
       if (!hittable(e) || (st.groundOnly && e.def.flying)) continue;
       if (dist(e, f) <= st.range + e.def.r) {
         inRange.push(e);
-        const better = st.target === 'strong' ? !best || e.hp > best.hp : !best || e.dist > best.dist;
+        const better = st.target === 'strong' ? !best || e.hp > best.hp : !best || e.left < best.left;
         if (better) best = e;
       }
     }
@@ -625,17 +632,33 @@ export function updateFx(s, dt) {
   s.fx = s.fx.filter((f) => f.life > 0);
 }
 
-// Pick screen: move with left/right, toggle with the plant key, lock in with the baton key.
+const startCoins = (n) => Math.round((n > 1 ? START_COINS.coop : START_COINS.solo) * MAP.startCoins);
+
+function selectMap(s, i) {
+  loadMap(i);
+  s.map = MAP.index;
+  s.players.forEach((p, k) => { p.x = MAP.start.x + k * T; p.y = MAP.start.y; p.pick.ready = false; p.coins = startCoins(s.players.length); });
+}
+
+// Pick screen: up/down switches between the map row and the flower row,
+// left/right moves, the plant key picks a flower, the baton key locks in.
 function updatePick(s, inputs) {
   const N = FLOWER_ORDER.length;
   for (const p of s.players) {
     const inp = inputs[p.id] || {};
     const pk = p.pick;
-    const mx = Math.sign(inp.mx || 0);
-    if (mx && mx !== p.prevMx && !pk.ready) { pk.cursor = (pk.cursor + mx + N) % N; ev(s, 'cycle'); }
+    const mx = Math.sign(inp.mx || 0), my = Math.sign(inp.my || 0);
+    if (my && my !== p.prevMy && !pk.ready) { pk.row = my < 0 ? 0 : 1; ev(s, 'cycle'); }
+    p.prevMy = my;
+    if (mx && mx !== p.prevMx && !pk.ready) {
+      if (pk.row === 0) selectMap(s, (s.map + mx + MAPS.length) % MAPS.length); // changing the map un-readies everyone
+      else pk.cursor = (pk.cursor + mx + N) % N;
+      ev(s, 'cycle');
+    }
     p.prevMx = mx;
     if (inp.buildTap) {
       if (pk.ready) { pk.ready = false; ev(s, 'cycle'); }
+      else if (pk.row === 0) pk.row = 1;
       else {
         const t = FLOWER_ORDER[pk.cursor];
         const i = pk.chosen.indexOf(t);
@@ -652,9 +675,9 @@ function updatePick(s, inputs) {
     }
   }
   if (s.players.every((p) => p.pick.ready)) {
-    for (const p of s.players) { p.loadout = p.pick.chosen.slice(); p.sel = 0; }
+    s.players.forEach((p, k) => { p.loadout = p.pick.chosen.slice(); p.sel = 0; p.x = MAP.start.x + k * T; p.y = MAP.start.y; });
     s.phase = 'prep';
-    s.timer = 30;
+    s.timer = DIFFICULTY.firstWaveDelay;
     s.fx.push({ kind: 'banner', txt: 'Plant your flowers!', life: 2.2, max: 2.2 });
     ev(s, 'wave');
   }

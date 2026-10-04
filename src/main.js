@@ -109,9 +109,10 @@ addEventListener('pointerdown', initAudio);
 
 // ---- modes ------------------------------------------------------------------
 let lastLoadouts = [];
+let lastMap = 0;
 function newGame() {
-  if (state && state.players) lastLoadouts = state.players.map((p) => p.loadout || p.pick.chosen);
-  state = createState(nPlayers, (Math.random() * 1e9) | 0, { sharedScreen: mode === 'local' && nPlayers > 1, loadouts: lastLoadouts });
+  if (state && state.players) { lastLoadouts = state.players.map((p) => p.loadout || p.pick.chosen); lastMap = state.map; }
+  state = createState(nPlayers, (Math.random() * 1e9) | 0, { sharedScreen: mode === 'local' && nPlayers > 1, loadouts: lastLoadouts, map: lastMap });
   ui.cam.snap = true;
   ui.paused = false;
   play('wave');

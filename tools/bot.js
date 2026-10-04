@@ -5,8 +5,8 @@
 import * as sim from '../src/sim.js';
 import { T, W, H, PATH_TILES, FLOWER_ORDER, LOADOUT_SIZE, MAX_LEVEL } from '../src/data.js';
 
-export function runBot({ players = 2, seed = 1, loadouts, maxMinutes = 40 } = {}) {
-  const s = sim.createState(players, seed);
+export function runBot({ players = 2, seed = 1, loadouts, map = 0, maxMinutes = 40 } = {}) {
+  const s = sim.createState(players, seed, { map });
   s.players.forEach((p, i) => {
     const pick = loadouts?.[i] || FLOWER_ORDER.slice(i * 2, i * 2 + LOADOUT_SIZE);
     p.pick.chosen = pick.length === LOADOUT_SIZE ? pick : FLOWER_ORDER.slice(0, LOADOUT_SIZE);
@@ -39,8 +39,9 @@ export function runBot({ players = 2, seed = 1, loadouts, maxMinutes = 40 } = {}
         const up = s.flowers.filter((f) => f.lvl > 0 && f.lvl < MAX_LEVEL).sort((a, c) => a.lvl - c.lvl)[0];
         if (hurt && p.coins >= 5) { b.target = hurt; p.mode = 'heal'; p.onFlowerId = hurt.id; }
         else if (seedling && p.coins >= 5) { b.target = seedling; p.mode = 'grow'; p.onFlowerId = seedling.id; }
-        else if ((s.flowers.length < 14 || !up) && p.coins >= 25) {
-          const spot = spots.find(([x, y]) => sim.canBuildAt(s, x, y));
+        else if (s.flowers.length < Math.min(14, 3 + s.wave) || !up) {
+          // keep planting until there's a decent garden, saving up if needed
+          const spot = p.coins >= 25 && spots.find(([x, y]) => sim.canBuildAt(s, x, y));
           if (spot) {
             p.sel = built++ % p.loadout.length;
             p.building = true;

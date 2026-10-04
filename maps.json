@@ -1,0 +1,79 @@
+{
+  "_help": {
+    "coordinates": "All positions are tile coordinates [x, y], with [0, 0] at the top-left.",
+    "paths": "Each path is a list of corner points, from where enemies enter (on the map edge) to the base. Segments must be straight horizontal or vertical lines. Enemies are spread across all paths.",
+    "base": "The cottage enemies are trying to reach; every path must end here.",
+    "start": "Where the cats start.",
+    "obstacles": "Hand-placed things you can't plant on: pond (x, y, w, h), tree (x, y), rock (x, y).",
+    "waveSize": "Multiplies how many enemies come per wave on this map (maps with short roads or several entrances can use less than 1).",
+    "startCoins": "Multiplies the starting coins on this map (maps with several entrances need more flowers early).",
+    "scatter": "Extra trees and rocks placed randomly (but the same every game) on free tiles; change seed for a different layout."
+  },
+  "maps": [
+    {
+      "id": "meadow",
+      "name": "Meadow Trail",
+      "desc": "One long winding road",
+      "width": 36,
+      "height": 22,
+      "base": [35, 8],
+      "start": [5, 6],
+      "waveSize": 1,
+      "startCoins": 1,
+      "paths": [
+        [[0, 3], [7, 3], [7, 9], [3, 9], [3, 18], [11, 18], [11, 13], [16, 13], [16, 4], [23, 4], [23, 17], [29, 17], [29, 8], [35, 8]]
+      ],
+      "obstacles": [
+        { "type": "pond", "x": 18, "y": 8, "w": 4, "h": 3 },
+        { "type": "pond", "x": 31, "y": 18, "w": 4, "h": 3 }
+      ],
+      "scatter": { "trees": 30, "rocks": 14, "seed": 11 }
+    },
+    {
+      "id": "crossroads",
+      "name": "Crossroads",
+      "desc": "Three entrances, roads cross, cottage in the middle",
+      "width": 40,
+      "height": 28,
+      "base": [20, 14],
+      "start": [17, 11],
+      "waveSize": 0.7,
+      "startCoins": 2,
+      "paths": [
+        [[0, 4], [10, 4], [10, 12], [4, 12], [4, 22], [14, 22], [14, 17], [17, 17], [17, 14], [20, 14]],
+        [[28, 0], [28, 9], [8, 9], [8, 25], [23, 25], [23, 17], [20, 17], [20, 14]],
+        [[39, 22], [34, 22], [34, 13], [25, 13], [25, 3], [20, 3], [20, 14]]
+      ],
+      "obstacles": [
+        { "type": "pond", "x": 1, "y": 15, "w": 2, "h": 4 },
+        { "type": "pond", "x": 31, "y": 24, "w": 5, "h": 3 },
+        { "type": "pond", "x": 11, "y": 13, "w": 2, "h": 3 },
+        { "type": "rock", "x": 15, "y": 11 },
+        { "type": "rock", "x": 22, "y": 19 },
+        { "type": "tree", "x": 13, "y": 2 },
+        { "type": "tree", "x": 14, "y": 3 }
+      ],
+      "scatter": { "trees": 40, "rocks": 18, "seed": 5 }
+    },
+    {
+      "id": "lakeside",
+      "name": "Lakeside",
+      "desc": "Two long roads cross twice around the lake",
+      "width": 36,
+      "height": 24,
+      "base": [30, 12],
+      "start": [18, 11],
+      "waveSize": 0.85,
+      "startCoins": 1.5,
+      "paths": [
+        [[0, 2], [20, 2], [20, 9], [26, 9], [26, 12], [30, 12]],
+        [[0, 21], [16, 21], [16, 5], [23, 5], [23, 16], [30, 16], [30, 12]]
+      ],
+      "obstacles": [
+        { "type": "pond", "x": 3, "y": 8, "w": 9, "h": 7 },
+        { "type": "pond", "x": 32, "y": 19, "w": 3, "h": 4 }
+      ],
+      "scatter": { "trees": 40, "rocks": 18, "seed": 23 }
+    }
+  ]
+}

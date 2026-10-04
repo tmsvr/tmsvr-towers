@@ -1,7 +1,7 @@
 // Canvas rendering. Reads game state, never mutates it.
 // The world is bigger than the screen: everything on the map is drawn relative to ui.cam.
 import {
-  T, U, W, H, WORLD_W, WORLD_H, VIEW_W, MAP_H, HUD_H, TOTAL_WAVES, WAYPOINTS, SPAWN, BASE, PATH_TILES,
+  T, U, W, H, WORLD_W, WORLD_H, VIEW_W, MAP_H, HUD_H, TOTAL_WAVES, PATHS, BASE, PATH_TILES, BLOCKED, MAP, MAPS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, flowerStats, upgradeCost, PLAYER,
 } from './data.js';
 import { tileOf, canBuildAt, healCostPerHp } from './sim.js';
@@ -66,16 +66,16 @@ function mulberry(seed) {
 }
 const isPath = (x, y) => PATH_TILES.has(Math.floor(y / T) * W + Math.floor(x / T));
 
-// ---- static background (pre-rendered once) --------------------------------
+// ---- static background (pre-rendered once per map) -------------------------
 let bgCache = null;
 function getBg(dpr) {
-  if (bgCache && bgCache.dpr === dpr) return bgCache.cv;
+  if (bgCache && bgCache.dpr === dpr && bgCache.map === MAP) return bgCache.cv;
   const cv = document.createElement('canvas');
   cv.width = WORLD_W * dpr; cv.height = WORLD_H * dpr;
   const c = cv.getContext('2d');
   c.scale(dpr, dpr);
   paintBg(c);
-  bgCache = { dpr, cv };
+  bgCache = { dpr, cv, map: MAP };
   return cv;
 }
 
@@ -85,63 +85,118 @@ function strokePoly(c, pts, w, col) {
   c.lineWidth = w; c.strokeStyle = col; c.lineJoin = 'round'; c.lineCap = 'round'; c.stroke();
 }
 
+function drawPond(c, o, r) {
+  const x = o.x * T, y = o.y * T, w = o.w * T, h = o.h * T;
+  rrect(c, x + 2, y + 6, w - 4, h - 4, T * 0.45, 'rgba(0,0,0,0.12)');
+  rrect(c, x + 2, y + 2, w - 4, h - 4, T * 0.45, '#d8c48e', '#9c7444', 2.5);
+  const g = c.createLinearGradient(0, y, 0, y + h);
+  g.addColorStop(0, '#6cc0ea'); g.addColorStop(1, '#3f8fc9');
+  rrect(c, x + 9, y + 9, w - 18, h - 18, T * 0.35, g, '#2f6f9e', 2);
+  c.strokeStyle = 'rgba(255,255,255,0.35)'; c.lineWidth = 2; c.lineCap = 'round';
+  for (let i = 0; i < o.w * o.h * 0.8; i++) {
+    const rx = x + 18 + r() * (w - 36), ry = y + 18 + r() * (h - 36);
+    c.beginPath(); c.moveTo(rx - 6, ry); c.quadraticCurveTo(rx, ry - 3, rx + 6, ry); c.stroke();
+  }
+  for (let i = 0; i < Math.max(1, o.w * o.h / 6); i++) {
+    const px = x + 20 + r() * (w - 40), py = y + 20 + r() * (h - 40);
+    c.beginPath(); c.moveTo(px, py); c.arc(px, py, 7, 0.4, Math.PI * 2 - 0.1); c.closePath();
+    c.fillStyle = '#5fae4a'; c.fill(); c.strokeStyle = '#3e7a30'; c.lineWidth = 1.2; c.stroke();
+    if (r() < 0.4) circle(c, px + 2, py - 2, 2.5, '#ff9ecd');
+  }
+}
+
+function drawRock(c, o) {
+  const cx = (o.x + 0.5) * T, cy = (o.y + 0.5) * T;
+  ellipse(c, cx, cy + T * 0.22, T * 0.36, T * 0.12, 'rgba(0,0,0,0.18)');
+  const big = 0.7 + (o.v || 0.5) * 0.4;
+  ellipse(c, cx - 4, cy + 2, T * 0.3 * big, T * 0.24 * big, '#9a9aa2', OUT, 2);
+  ellipse(c, cx + T * 0.18, cy + 6, T * 0.17 * big, T * 0.13 * big, '#8a8a93', OUT, 2);
+  ellipse(c, cx - 8, cy - 4, T * 0.12 * big, T * 0.06 * big, 'rgba(255,255,255,0.35)');
+}
+
+function drawTree(c, o, time) {
+  const cx = (o.x + 0.5) * T, cy = (o.y + 0.5) * T;
+  const sway = Math.sin(time * 1.2 + o.x * 0.7 + o.y) * 1.5;
+  const sc = 0.85 + (o.v || 0.5) * 0.35;
+  ellipse(c, cx, cy + T * 0.3, T * 0.42 * sc, T * 0.14, 'rgba(0,0,0,0.22)');
+  rrect(c, cx - 5, cy - 4, 10, T * 0.38, 3, '#7a4f2c', OUT, 1.8);
+  const col = o.v > 0.6 ? '#3f8f3a' : '#4d9e3f';
+  for (const [dx, dy, rr] of [[-0.18, -0.12, 0.27], [0.18, -0.14, 0.26], [0, -0.38, 0.3]]) {
+    circle(c, cx + dx * T * sc + sway, cy + dy * T * sc - 6, rr * T * sc, col, OUT, 2);
+  }
+  circle(c, cx - T * 0.08 * sc + sway, cy - T * 0.45 * sc - 6, T * 0.08 * sc, 'rgba(255,255,255,0.18)');
+}
+
 function paintBg(c) {
-  const r = mulberry(7);
+  const r = mulberry(7 + MAP.index * 101);
+  const area = (W * H) / (36 * 22);
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) { c.fillStyle = (x + y) % 2 ? '#86c35a' : '#7fbd52'; c.fillRect(x * T, y * T, T, T); }
   // a few darker meadow patches for variety
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 14 * area; i++) {
     const g = c.createRadialGradient(0, 0, 0, 0, 0, 1);
     const x = r() * WORLD_W, y = r() * WORLD_H, rad = T * (2 + r() * 3);
     c.save(); c.translate(x, y); c.scale(rad, rad * 0.7);
     g.addColorStop(0, 'rgba(40,100,30,0.16)'); g.addColorStop(1, 'rgba(40,100,30,0)');
     c.fillStyle = g; c.beginPath(); c.arc(0, 0, 1, 0, Math.PI * 2); c.fill(); c.restore();
   }
-  for (let i = 0; i < 5600; i++) {
+  for (let i = 0; i < 5600 * area; i++) {
     c.fillStyle = r() < 0.5 ? 'rgba(255,255,255,0.07)' : 'rgba(0,70,0,0.09)';
     c.fillRect(r() * WORLD_W, r() * WORLD_H, 2, 2);
   }
+  const free = (x, y) => !isPath(x, y) && !BLOCKED.has(Math.floor(y / T) * W + Math.floor(x / T));
   c.strokeStyle = '#5f9e3c'; c.lineWidth = 2; c.lineCap = 'round';
-  for (let i = 0; i < 640; i++) {
+  for (let i = 0; i < 640 * area; i++) {
     const x = r() * WORLD_W, y = r() * WORLD_H;
-    if (isPath(x, y)) continue;
+    if (!free(x, y)) continue;
     c.beginPath();
     c.moveTo(x, y); c.lineTo(x - 4, y - 7); c.moveTo(x, y); c.lineTo(x, y - 9); c.moveTo(x, y); c.lineTo(x + 4, y - 7);
     c.stroke();
   }
   const wild = ['#ffffff', '#ffe066', '#ff9ecd', '#b9a4ff'];
-  for (let i = 0; i < 220; i++) {
+  for (let i = 0; i < 220 * area; i++) {
     const x = r() * WORLD_W, y = r() * WORLD_H;
-    if (isPath(x, y)) continue;
+    if (!free(x, y)) continue;
     const col = wild[Math.floor(r() * wild.length)];
     for (let k = 0; k < 3; k++) circle(c, x + (r() - 0.5) * 12, y + (r() - 0.5) * 8, 2.2, col);
   }
-  const pts = [{ x: SPAWN.x - T, y: SPAWN.y }, ...WAYPOINTS, { x: BASE.x + T, y: BASE.y }];
-  strokePoly(c, pts.map((p) => ({ x: p.x, y: p.y + 4 })), T * 0.94, 'rgba(0,0,0,0.12)');
-  strokePoly(c, pts, T * 0.94, '#9c7444');
-  strokePoly(c, pts, T * 0.82, '#e0bf86');
-  strokePoly(c, pts, T * 0.42, 'rgba(255,240,205,0.35)');
+  for (const o of MAP.obstacles) if (o.type === 'pond') drawPond(c, o, r);
+  // roads: all edges first, then all surfaces, so crossings merge cleanly
+  const roads = PATHS.map((p) => [{ x: p.spawn.x - Math.cos(p.dir) * T, y: p.spawn.y - Math.sin(p.dir) * T }, ...p.waypoints]);
+  for (const pts of roads) strokePoly(c, pts.map((p) => ({ x: p.x, y: p.y + 4 })), T * 0.94, 'rgba(0,0,0,0.12)');
+  for (const pts of roads) strokePoly(c, pts, T * 0.94, '#9c7444');
+  for (const pts of roads) strokePoly(c, pts, T * 0.82, '#e0bf86');
+  for (const pts of roads) strokePoly(c, pts, T * 0.42, 'rgba(255,240,205,0.35)');
   const pathTiles = [...PATH_TILES];
-  for (let i = 0; i < 700; i++) {
+  for (let i = 0; i < pathTiles.length * 7; i++) {
     const k = pathTiles[Math.floor(r() * pathTiles.length)];
     const x = (k % W + 0.5) * T + (r() - 0.5) * T * 0.7, y = (Math.floor(k / W) + 0.5) * T + (r() - 0.5) * T * 0.7;
     ellipse(c, x, y, 1.5 + r() * 2.5, 1 + r() * 2, r() < 0.5 ? '#c49f68' : '#f0dcae');
   }
-  // direction arrows painted on the path every few tiles
+  // direction arrows painted on each road every few tiles
   c.fillStyle = 'rgba(150,110,60,0.35)';
-  for (let i = 0; i < WAYPOINTS.length - 1; i++) {
-    const a = WAYPOINTS[i], b = WAYPOINTS[i + 1];
-    const ang = Math.atan2(b.y - a.y, b.x - a.x), len = Math.hypot(b.x - a.x, b.y - a.y);
-    for (let d = T * 1.5; d < len - T; d += T * 3) {
-      c.save(); c.translate(a.x + Math.cos(ang) * d, a.y + Math.sin(ang) * d); c.rotate(ang);
-      c.beginPath(); c.moveTo(8, 0); c.lineTo(-6, -7); c.lineTo(-3, 0); c.lineTo(-6, 7); c.closePath(); c.fill();
-      c.restore();
+  for (const path of PATHS) {
+    const wp = path.waypoints;
+    for (let i = 0; i < wp.length - 1; i++) {
+      const a = wp[i], b = wp[i + 1];
+      const ang = Math.atan2(b.y - a.y, b.x - a.x), len = Math.hypot(b.x - a.x, b.y - a.y);
+      for (let d = T * 1.5; d < len - T; d += T * 3) {
+        c.save(); c.translate(a.x + Math.cos(ang) * d, a.y + Math.sin(ang) * d); c.rotate(ang);
+        c.beginPath(); c.moveTo(8, 0); c.lineTo(-6, -7); c.lineTo(-3, 0); c.lineTo(-6, 7); c.closePath(); c.fill();
+        c.restore();
+      }
     }
   }
-  const cy = SPAWN.y;
-  ellipse(c, 6, cy + 6, T * 0.8, T * 0.8, '#5e5a66', OUT, 3);
-  ellipse(c, 10, cy - T * 0.25, T * 0.4, T * 0.3, '#77737f');
-  ellipse(c, 6, cy + 6, T * 0.5, T * 0.55, '#1b1424');
+  for (const o of MAP.obstacles) if (o.type === 'rock') drawRock(c, o);
+  // a monster cave where each road enters the map
+  for (const path of PATHS) {
+    const ex = path.waypoints[0].x - Math.cos(path.dir) * T * 0.55, ey = path.waypoints[0].y - Math.sin(path.dir) * T * 0.55;
+    c.save(); c.translate(ex, ey); c.rotate(path.dir);
+    ellipse(c, -6, 0, T * 0.75, T * 0.85, '#5e5a66', OUT, 3);
+    ellipse(c, -12, -T * 0.35, T * 0.3, T * 0.22, '#77737f');
+    ellipse(c, 0, 0, T * 0.42, T * 0.55, '#1b1424');
+    c.restore();
+  }
 }
 
 function drawCottage(c, x, y, lives, time) {
@@ -793,8 +848,9 @@ function drawBanners(c, s) {
 }
 
 // ---- minimap ---------------------------------------------------------------
-const MM_W = 216, MM_H = Math.round(MM_W * WORLD_H / WORLD_W), MM_X = VIEW_W - MM_W - 10, MM_Y = 10;
+const MM_W = 216, MM_X = VIEW_W - MM_W - 10, MM_Y = 10;
 function drawMinimap(c, s, ui) {
+  const MM_H = Math.round(MM_W * WORLD_H / WORLD_W);
   const sx = MM_W / WORLD_W, sy = MM_H / WORLD_H;
   const mx = (x) => MM_X + x * sx, my = (y) => MM_Y + y * sy;
   c.save();
@@ -802,6 +858,7 @@ function drawMinimap(c, s, ui) {
   c.globalAlpha = 0.85;
   c.drawImage(getBg(ui.dpr), MM_X, MM_Y, MM_W, MM_H);
   c.globalAlpha = 1;
+  for (const o of MAP.obstacles) if (o.type === 'tree') circle(c, mx((o.x + 0.5) * T), my((o.y + 0.5) * T), 1.8, '#2f6f2c');
   for (const f of s.flowers) {
     const r = 1.6 + f.lvl * 0.5;
     c.fillStyle = f.lvl === 0 ? '#3e8a2e' : FLOWERS[f.type].color;
@@ -847,6 +904,7 @@ function contextText(s, p, ui) {
   if (!f) {
     if (!p.building) return `[${key}] or [${cyc}] build mode`;
     if (PATH_TILES.has(ty * W + tx)) return "Can't plant on the path";
+    if (BLOCKED.has(ty * W + tx)) return "Something's in the way";
     const F = FLOWERS[p.loadout[p.sel]];
     return `[${key}] plant ${F.name} (${F.cost}) · [${cyc}] next · ${F.desc}`;
   }
@@ -920,37 +978,70 @@ function wrapText(c, txt, maxW, size, weight = 500) {
   return lines;
 }
 
-// Each player picks LOADOUT_SIZE of the flowers before the game starts.
+// A tiny overview of a map for the map picker.
+function drawMapThumb(c, m, x, y, w, h) {
+  const sc = Math.min(w / m.worldW, h / m.worldH);
+  const ox = x + (w - m.worldW * sc) / 2, oy = y + (h - m.worldH * sc) / 2;
+  rrect(c, ox, oy, m.worldW * sc, m.worldH * sc, 4, '#7fbd52');
+  for (const o of m.obstacles) {
+    if (o.type === 'pond') rrect(c, ox + o.x * T * sc, oy + o.y * T * sc, o.w * T * sc, o.h * T * sc, 3, '#4fa3d9');
+    else circle(c, ox + (o.x + 0.5) * T * sc, oy + (o.y + 0.5) * T * sc, T * sc * 0.4, o.type === 'tree' ? '#3f8f3a' : '#9a9aa2');
+  }
+  for (const p of m.paths) {
+    c.beginPath();
+    p.waypoints.forEach((wp, i) => (i ? c.lineTo : c.moveTo).call(c, ox + wp.x * sc, oy + wp.y * sc));
+    c.lineWidth = Math.max(2, T * sc * 0.8); c.strokeStyle = '#e0bf86'; c.lineJoin = 'round'; c.stroke();
+    circle(c, ox + p.waypoints[0].x * sc, oy + p.waypoints[0].y * sc, 4, '#8a5cff', OUT, 1);
+  }
+  circle(c, ox + m.base.x * sc, oy + m.base.y * sc, 5, '#d6504a', '#fff', 1.5);
+}
+
+// Before the game: choose a map (top row) and LOADOUT_SIZE flowers (bottom row).
 function drawPick(c, s, ui, time) {
-  c.fillStyle = 'rgba(12,18,26,0.82)'; c.fillRect(0, 0, VIEW_W, MAP_H);
-  label(c, `Choose ${LOADOUT_SIZE} flowers to bring`, VIEW_W / 2, 34, 30, '#ffe27a', 'center', 700, OUT);
-  const N = FLOWER_ORDER.length, cw = 130, gap = 8, x0 = (VIEW_W - (N * cw + (N - 1) * gap)) / 2, y0 = 62, ch = 340;
+  c.fillStyle = 'rgba(12,18,26,0.85)'; c.fillRect(0, 0, VIEW_W, MAP_H);
+  label(c, `Choose a map and ${LOADOUT_SIZE} flowers`, VIEW_W / 2, 22, 24, '#ffe27a', 'center', 700, OUT);
+  // maps
+  const mw = 210, mh = 112, mgap = 16, mx0 = (VIEW_W - (MAPS.length * mw + (MAPS.length - 1) * mgap)) / 2, my0 = 42;
+  MAPS.forEach((m, i) => {
+    const x = mx0 + i * (mw + mgap);
+    const sel = s.map === i;
+    rrect(c, x, my0, mw, mh, 12, sel ? 'rgba(255,226,122,0.16)' : 'rgba(255,255,255,0.05)', sel ? '#ffe27a' : 'rgba(255,255,255,0.18)', sel ? 3 : 1.5);
+    drawMapThumb(c, m, x + 8, my0 + 6, mw - 16, mh - 44);
+    label(c, m.name, x + mw / 2, my0 + mh - 30, 14, '#ffffff', 'center', 700, null);
+    label(c, fitText(c, m.desc, mw - 12, 11), x + mw / 2, my0 + mh - 13, 11, '#a9bccb', 'center', 500, null);
+    if (sel) s.players.forEach((p) => {
+      if (p.pick.row !== 0 || p.pick.ready) return;
+      const inset = p.id * 5;
+      c.globalAlpha = 0.7 + Math.sin(time * 6) * 0.3;
+      rrect(c, x - 4 + inset, my0 - 4 + inset, mw + 8 - inset * 2, mh + 8 - inset * 2, 15 - inset, null, PLAYER.scarves[p.id], 4);
+      c.globalAlpha = 1;
+    });
+  });
+  // flowers
+  const N = FLOWER_ORDER.length, cw = 130, gap = 8, x0 = (VIEW_W - (N * cw + (N - 1) * gap)) / 2, y0 = 170, ch = 290;
   FLOWER_ORDER.forEach((t, i) => {
     const F = FLOWERS[t];
     const x = x0 + i * (cw + gap), cx = x + cw / 2;
     const pickedBy = s.players.filter((p) => p.pick.chosen.includes(t));
     rrect(c, x, y0, cw, ch, 14, pickedBy.length ? 'rgba(255,240,180,0.13)' : 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.18)', 1.5);
-    drawFlower(c, { id: i, type: t, lvl: 3, x: cx, y: y0 + 112, angle: Math.PI / 2, flash: Math.sin(time * 2 + i) > 0.97 ? 0.1 : 0, hurtT: 0, hp: FLOWER_HP, headIdx: 0 }, time);
-    label(c, F.name, cx, y0 + 166, 16, '#ffffff', 'center', 700, null);
-    coinIcon(c, cx - 14, y0 + 190, 7);
-    label(c, `${F.cost}`, cx + 2, y0 + 191, 14, '#ffe27a', 'left', 700, null);
-    wrapText(c, F.desc, cw - 16, 12).forEach((l, j) => label(c, l, cx, y0 + 218 + j * 16, 12, '#cfe0ea', 'center', 500, null));
+    drawFlower(c, { id: i, type: t, lvl: 3, x: cx, y: y0 + 88, angle: Math.PI / 2, flash: Math.sin(time * 2 + i) > 0.97 ? 0.1 : 0, hurtT: 0, hp: FLOWER_HP, headIdx: 0 }, time);
+    label(c, F.name, cx, y0 + 134, 16, '#ffffff', 'center', 700, null);
+    coinIcon(c, cx - 14, y0 + 156, 7);
+    label(c, `${F.cost}`, cx + 2, y0 + 157, 14, '#ffe27a', 'left', 700, null);
+    wrapText(c, F.desc, cw - 16, 12).forEach((l, j) => label(c, l, cx, y0 + 180 + j * 15, 12, '#cfe0ea', 'center', 500, null));
     const st = flowerStats(t, 1);
-    label(c, `Range ${(st.range / T).toFixed(1)}`, cx, y0 + 292, 11, '#8fa5b3', 'center', 500, null);
-    label(c, F.kind === 'cloud' ? `${st.dmg}/s per stack` : F.kind === 'chomp' ? `Bite ${st.dmg}` : `Dmg ${st.dmg} · every ${st.rate}s`, cx, y0 + 308, 11, '#8fa5b3', 'center', 500, null);
-    // who has picked this card, in pick order
+    label(c, `Range ${(st.range / T).toFixed(1)}`, cx, y0 + 252, 11, '#8fa5b3', 'center', 500, null);
+    label(c, F.kind === 'cloud' ? `${st.dmg}/s per stack` : F.kind === 'chomp' ? `Bite ${st.dmg}` : `Dmg ${st.dmg} · every ${st.rate}s`, cx, y0 + 268, 11, '#8fa5b3', 'center', 500, null);
     pickedBy.forEach((p) => {
       const n = p.pick.chosen.indexOf(t) + 1;
       const bx = p.id === 0 ? x + 18 : x + cw - 18;
       circle(c, bx, y0 + 18, 12, PLAYER.scarves[p.id], '#ffffff', 2);
       label(c, `${n}`, bx, y0 + 19, 13, '#fff', 'center', 700, null);
     });
-    // cursors
     s.players.forEach((p) => {
-      if (p.pick.cursor !== i || p.pick.ready) return;
+      if (p.pick.cursor !== i || p.pick.ready || p.pick.row !== 1) return;
       const inset = p.id * 5;
-      const pulse = 0.7 + Math.sin(time * 6) * 0.3;
-      c.globalAlpha = pulse;
+      c.globalAlpha = 0.7 + Math.sin(time * 6) * 0.3;
       rrect(c, x - 3 + inset, y0 - 3 + inset, cw + 6 - inset * 2, ch + 6 - inset * 2, 16 - inset, null, PLAYER.scarves[p.id], 4);
       c.globalAlpha = 1;
     });
@@ -958,13 +1049,16 @@ function drawPick(c, s, ui, time) {
   // per-player status and controls
   s.players.forEach((p, i) => {
     const k = ui.keysFor(p.id);
-    const y = y0 + ch + 28 + i * 26;
+    const y = y0 + ch + 22 + i * 24;
     const n = p.pick.chosen.length;
-    const keys = `[${ui.keyLabel(k.left)}/${ui.keyLabel(k.right)}] move · [${ui.keyLabel(k.build)}] pick · [${ui.keyLabel(k.atk)}] ready`;
-    const msg = p.pick.ready ? 'Ready! ✓' : n < LOADOUT_SIZE ? `${n}/${LOADOUT_SIZE} chosen   ${keys}` : `4/4 chosen — press [${ui.keyLabel(k.atk)}] when ready   ${keys}`;
-    rrect(c, VIEW_W / 2 - 300, y - 11, 32, 22, 11, PLAYER.scarves[p.id]);
-    label(c, `P${p.id + 1}`, VIEW_W / 2 - 284, y + 0.5, 12, '#fff', 'center', 700, null);
-    label(c, msg, VIEW_W / 2 - 258, y + 1, 14, p.pick.ready ? '#8dff9a' : '#e8f1f7', 'left', 600, null);
+    const L = ui.keyLabel;
+    const keys = p.pick.row === 0
+      ? `[${L(k.left)}/${L(k.right)}] change map · [${L(k.down)}] flowers`
+      : `[${L(k.left)}/${L(k.right)}] move · [${L(k.build)}] pick · [${L(k.up)}] map · [${L(k.atk)}] ready`;
+    const msg = p.pick.ready ? 'Ready! ✓' : n < LOADOUT_SIZE ? `${n}/${LOADOUT_SIZE} chosen   ${keys}` : `4/4 chosen — [${L(k.atk)}] when ready   ${keys}`;
+    rrect(c, VIEW_W / 2 - 330, y - 11, 32, 22, 11, PLAYER.scarves[p.id]);
+    label(c, `P${p.id + 1}`, VIEW_W / 2 - 314, y + 0.5, 12, '#fff', 'center', 700, null);
+    label(c, msg, VIEW_W / 2 - 288, y + 1, 14, p.pick.ready ? '#8dff9a' : '#e8f1f7', 'left', 600, null);
   });
 }
 
@@ -1018,11 +1112,15 @@ export function render(c, s, ui) {
   const bg = getBg(ui.dpr);
   c.drawImage(bg, camX * ui.dpr, camY * ui.dpr, VIEW_W * ui.dpr, MAP_H * ui.dpr, 0, 0, VIEW_W, MAP_H);
   c.translate(-camX, -camY);
-  for (let i = 0; i < 3; i++) {
-    const a = time * 2 + i * 2.1;
-    circle(c, 6 + Math.cos(a) * 10, SPAWN.y + 6 + Math.sin(a) * 10, 5, 'rgba(160,110,255,0.6)');
+  for (const path of PATHS) {
+    const ex = path.waypoints[0].x - Math.cos(path.dir) * T * 0.55, ey = path.waypoints[0].y - Math.sin(path.dir) * T * 0.55;
+    for (let i = 0; i < 3; i++) {
+      const a = time * 2 + i * 2.1;
+      circle(c, ex + Math.cos(a) * 10, ey + Math.sin(a) * 10, 5, 'rgba(160,110,255,0.6)');
+    }
   }
   if (!s) {
+    for (const o of MAP.obstacles) if (o.type === 'tree') drawTree(c, o, time);
     drawCottage(c, BASE.x, BASE.y, 20, time);
     c.restore();
     drawMenu(c, time, ui);
@@ -1039,6 +1137,8 @@ export function render(c, s, ui) {
     ...s.flowers.filter(vis).map((f) => ({ y: f.y + T * 0.2, draw: () => drawFlower(c, f, time) })),
     ...s.enemies.filter((e) => !e.def.flying && vis(e)).map((e) => ({ y: e.y, draw: () => drawEnemy(c, e, time) })),
     ...s.players.map((p) => ({ y: p.y, draw: () => drawCat(c, p, time) })),
+    ...MAP.obstacles.filter((o) => o.type === 'tree' && vis({ x: (o.x + 0.5) * T, y: (o.y + 0.5) * T }))
+      .map((o) => ({ y: (o.y + 0.75) * T, draw: () => drawTree(c, o, time) })),
   ].sort((a, b) => a.y - b.y);
   for (const a of actors) a.draw();
   for (const f of s.flowers) if (vis(f)) drawFlowerStatus(c, f, s);

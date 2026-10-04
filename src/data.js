@@ -1,34 +1,86 @@
 // Game data. All tunable numbers live in /balance.json (in tiles and seconds);
 // this module loads it and converts to the pixel units the game uses.
-const BAL = await (await fetch(new URL('../balance.json', import.meta.url))).json();
+const BAL = await (await fetch(new URL('../balance.json', import.meta.url), { cache: 'no-store' })).json();
 export const BALANCE = BAL;
+
+const MAP_DEFS = (await (await fetch(new URL('../maps.json', import.meta.url), { cache: 'no-store' })).json()).maps;
 
 export const T = 56;
 export const U = T / 40;           // sprite scale (art is authored for a 40px tile)
-export const W = 36;               // world size in tiles
-export const H = 22;
-export const WORLD_W = W * T;
-export const WORLD_H = H * T;
 export const VIEW_W = 18 * T;      // visible part of the world
 export const MAP_H = 10 * T;
 export const HUD_H = 96;
 export const TOTAL_WAVES = BAL.difficulty.totalWaves;
 
-const PTS = [
-  [0, 3], [7, 3], [7, 9], [3, 9], [3, 18], [11, 18], [11, 13], [16, 13],
-  [16, 4], [23, 4], [23, 17], [29, 17], [29, 8], [35, 8],
-];
-export const WAYPOINTS = PTS.map(([x, y]) => ({ x: (x + 0.5) * T, y: (y + 0.5) * T }));
-export const SPAWN = { x: -T * 0.5, y: 3.5 * T };
-export const BASE = WAYPOINTS[WAYPOINTS.length - 1];
-
-export const PATH_TILES = new Set();
-for (let i = 0; i < PTS.length - 1; i++) {
-  const [x0, y0] = PTS[i];
-  const [x1, y1] = PTS[i + 1];
-  for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++)
-    for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) PATH_TILES.add(y * W + x);
+// ---- maps ----
+function seeded(seed) {
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
+
+function prepareMap(def, index) {
+  const w = def.width, h = def.height;
+  const center = ([x, y]) => ({ x: (x + 0.5) * T, y: (y + 0.5) * T });
+  const pathTiles = new Set();
+  const paths = def.paths.map((pts) => {
+    let length = 0;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [x0, y0] = pts[i], [x1, y1] = pts[i + 1];
+      for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++)
+        for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) pathTiles.add(y * w + x);
+      length += (Math.abs(x1 - x0) + Math.abs(y1 - y0)) * T;
+    }
+    // enemies appear one tile outside the map edge, walking in
+    const dx = Math.sign(pts[1][0] - pts[0][0]), dy = Math.sign(pts[1][1] - pts[0][1]);
+    const spawn = center([pts[0][0] - dx, pts[0][1] - dy]);
+    return { points: pts, waypoints: pts.map(center), spawn, dir: Math.atan2(dy, dx), length: length + T };
+  });
+  const blocked = new Set();
+  const obstacles = [];
+  for (const o of def.obstacles || []) {
+    if (o.type === 'pond') {
+      for (let y = o.y; y < o.y + o.h; y++) for (let x = o.x; x < o.x + o.w; x++) blocked.add(y * w + x);
+      obstacles.push({ ...o });
+    } else {
+      blocked.add(o.y * w + o.x);
+      obstacles.push({ ...o, w: 1, h: 1 });
+    }
+  }
+  // keep the cottage surroundings and the cats' starting spot clear
+  const near = (x, y, [px, py], r) => Math.abs(x - px) <= r && Math.abs(y - py) <= r;
+  for (let y = def.base[1] - 1; y <= def.base[1] + 1; y++)
+    for (let x = def.base[0] - 1; x <= def.base[0] + 1; x++) if (!pathTiles.has(y * w + x)) blocked.add(y * w + x);
+  const rnd = seeded(def.scatter?.seed || 1);
+  for (const [type, count] of [['tree', def.scatter?.trees || 0], ['rock', def.scatter?.rocks || 0]]) {
+    for (let placed = 0, tries = 0; placed < count && tries < count * 50; tries++) {
+      const x = Math.floor(rnd() * w), y = Math.floor(rnd() * h), k = y * w + x;
+      if (pathTiles.has(k) || blocked.has(k) || near(x, y, def.start, 2) || near(x, y, def.base, 2)) continue;
+      blocked.add(k);
+      obstacles.push({ type, x, y, w: 1, h: 1, v: rnd() });
+      placed++;
+    }
+  }
+  return {
+    index, id: def.id, name: def.name, desc: def.desc, W: w, H: h, waveSize: def.waveSize ?? 1, startCoins: def.startCoins ?? 1, worldW: w * T, worldH: h * T,
+    paths, base: center(def.base), start: center(def.start), pathTiles, blocked, obstacles,
+  };
+}
+
+export const MAPS = MAP_DEFS.map(prepareMap);
+
+// The current map. These are live bindings: every module that imports them
+// sees the new values after loadMap().
+export let MAP, W, H, WORLD_W, WORLD_H, PATHS, BASE, PATH_TILES, BLOCKED;
+export function loadMap(i) {
+  MAP = MAPS[i] || MAPS[0];
+  ({ W, H, worldW: WORLD_W, worldH: WORLD_H, paths: PATHS, base: BASE, pathTiles: PATH_TILES, blocked: BLOCKED } = MAP);
+  return MAP;
+}
+loadMap(0);
 
 // ---- enemies (pixels, pixels/second) ----
 export const ENEMIES = {};
