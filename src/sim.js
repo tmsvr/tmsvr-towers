@@ -65,6 +65,35 @@ export function canBuildAt(s, tx, ty) {
   return !PATH_TILES.has(k) && !BLOCKED.has(k) && !s.grid.has(k);
 }
 
+// Push a cat out of trees, rocks and ponds so it slides along their edges.
+const CAT_R = T * 0.22;
+export function collideCat(p) {
+  const tx = Math.floor(p.x / T), ty = Math.floor(p.y / T);
+  for (let pass = 0; pass < 2; pass++) {
+    for (let y = ty - 1; y <= ty + 1; y++) for (let x = tx - 1; x <= tx + 1; x++) {
+      if (x < 0 || y < 0 || x >= W || y >= H) continue;
+      for (const s of MAP.solids.get(y * W + x) || []) {
+        const nx = clamp(p.x, s.x0, s.x1), ny = clamp(p.y, s.y0, s.y1);
+        let dx = p.x - nx, dy = p.y - ny, d = Math.hypot(dx, dy);
+        const min = s.rad + CAT_R;
+        if (d >= min) continue;
+        if (d < 1e-6) {
+          // centre inside a pond's core: leave by the nearest side
+          const opts = [[p.x - s.x0, -1, 0], [s.x1 - p.x, 1, 0], [p.y - s.y0, 0, -1], [s.y1 - p.y, 0, 1]].sort((a, b) => a[0] - b[0]);
+          [, dx, dy] = opts[0];
+          if (dx) p.x = (dx < 0 ? s.x0 : s.x1) + dx * min;
+          if (dy) p.y = (dy < 0 ? s.y0 : s.y1) + dy * min;
+          continue;
+        }
+        p.x = nx + (dx / d) * min;
+        p.y = ny + (dy / d) * min;
+      }
+    }
+  }
+  p.x = clamp(p.x, 14, WORLD_W - 14);
+  p.y = clamp(p.y, 14, WORLD_H - 14);
+}
+
 export const healCostPerHp = (f) => (FLOWERS[f.type].cost * HEAL_COST) / FLOWER_HP;
 export const uprootRefund = (f) => Math.floor((f.spent || 0) * ECONOMY.uprootRefund);
 
@@ -345,6 +374,7 @@ function explode(s, b) {
     const push = 30 * U / Math.max(1, d) ;
     p.x = clamp(p.x + dx * push, 14, WORLD_W - 14);
     p.y = clamp(p.y + dy * push, 14, WORLD_H - 14);
+    collideCat(p);
     text(s, p.x, p.y - T * 0.6, 'Ouch!', '#ffb347');
     ev(s, 'catStun');
   }
@@ -466,6 +496,7 @@ function updatePlayers(s, dt, inputs) {
         p.y = clamp(p.y, o.y - (MAP_H - 90), o.y + (MAP_H - 90));
       }
     }
+    collideCat(p);
     // Fighting cancels build mode.
     if (inp.atk && p.atkCd <= 0) { swing(s, p); p.building = false; }
     if (inp.bomb && p.bombs >= 1) { throwBomb(s, p); p.building = false; }

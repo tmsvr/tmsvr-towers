@@ -4,7 +4,7 @@
 //   local     – this browser runs the game for 1 or 2 players on one keyboard
 //   host      – this browser runs the game; player 2's inputs arrive over the network
 //   guest     – this browser only sends inputs and draws snapshots from the host
-import { createState, step, updateFx } from './sim.js';
+import { createState, step, updateFx, collideCat } from './sim.js';
 import { render, VIEW_W, VIEW_H } from './render.js';
 import { initAudio, play, toggleMute, setMusicMood } from './audio.js';
 import { juiceEvent, hitStopping, toggleJuice } from './juice.js';
@@ -284,6 +284,7 @@ function predictOwnCat(k, dt) {
   if (l > 0 && !state.paused && !state.over && !state.won) {
     pred.x = Math.max(14, Math.min(W * T - 14, pred.x + (k.mx / l) * PLAYER.speed * dt));
     pred.y = Math.max(14, Math.min(H * T - 14, pred.y + (k.my / l) * PLAYER.speed * dt));
+    collideCat(pred);
     predDir = Math.atan2(k.my, k.mx);
   }
   const dx = me.nx - pred.x, dy = me.ny - pred.y, d = Math.hypot(dx, dy);

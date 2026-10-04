@@ -64,9 +64,28 @@ function prepareMap(def, index) {
       placed++;
     }
   }
+  // What cats bump into: rounded boxes (ponds) and circles (tree trunks, rocks),
+  // matched to the drawings. Each is listed under every tile it touches.
+  const solids = new Map();
+  for (const o of obstacles) {
+    let s;
+    if (o.type === 'pond') {
+      const rad = T * 0.4;
+      s = { x0: o.x * T + 4 + rad, y0: o.y * T + 4 + rad, x1: (o.x + o.w) * T - 4 - rad, y1: (o.y + o.h) * T - 4 - rad, rad };
+    } else {
+      const cx = (o.x + 0.5) * T, cy = (o.y + 0.5) * T + (o.type === 'tree' ? T * 0.08 : 2);
+      const rad = o.type === 'tree' ? T * 0.28 : T * 0.3 * (0.7 + (o.v || 0.5) * 0.4);
+      s = { x0: cx, y0: cy, x1: cx, y1: cy, rad };
+    }
+    for (let y = o.y; y < o.y + o.h; y++) for (let x = o.x; x < o.x + o.w; x++) {
+      const k = y * w + x;
+      if (!solids.has(k)) solids.set(k, []);
+      solids.get(k).push(s);
+    }
+  }
   return {
     index, id: def.id, name: def.name, desc: def.desc, W: w, H: h, waveSize: def.waveSize ?? 1, startCoins: def.startCoins ?? 1, worldW: w * T, worldH: h * T,
-    paths, base: center(def.base), start: center(def.start), pathTiles, blocked, obstacles,
+    paths, base: center(def.base), start: center(def.start), pathTiles, blocked, obstacles, solids,
   };
 }
 
