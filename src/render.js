@@ -332,18 +332,45 @@ function setSpriteScale(dpr) {
   if (k !== spriteScale) { spriteScale = k; sprites.clear(); }
 }
 
+// Each flower type has its own personality, and its face changes with level
+// in its own way (Thornrose gets angrier, Daisy happier, Frostbloom more
+// serenely magical...). Returns what to draw; l is the flower's level.
+const PERSONA = {
+  daisy: (l) => ({ eyes: 'round', sparkle: l >= 4, cheeks: '#ff7896', mouth: l >= 3 ? 'bigsmile' : 'smile' }),
+  sunflower: (l) => ({ eyes: 'round', squint: true, brows: l >= 4 ? 'flat' : null, mouth: 'smirk' }),
+  firelily: (l) => ({ eyes: 'round', brows: 'cheeky', mouth: l >= 3 ? 'teethgrin' : 'grin' }),
+  stink: (l) => ({ eyes: 'lazy', mouth: l >= 3 ? 'tongue' : 'smirk' }),
+  frost: (l) => ({ eyes: 'calm', lashes: true, cheeks: '#8fd6ff', mouth: 'soft', tiara: l >= 3 ? 'ice' : null, sparkle: l >= 2 }),
+  thorn: (l) => ({ eyes: 'round', narrow: l >= 4, brows: 'angry', anger: l, mouth: l >= 4 ? 'teethgrin' : l >= 2 ? 'scowl' : 'flat', fangs: l >= MAX_LEVEL }),
+  snap: (l) => ({ eyes: 'round', lashes: true, cheeks: '#ff7896', mouth: 'jaw', teeth: 3 + l, tiara: l >= 2 && l < MAX_LEVEL ? 'pink' : null }),
+};
+
 // A flower face: petals around a disc with eyes and a mouth.
-// o: { wither 0..1, spin (radians, petals only), look (radians), mouth, crown,
-//      mood 0..4: how mean the face looks, rising with the flower's level }
+// o: { wither 0..1, spin (radians, petals only), look (radians), mouth
+//      ('smile' normally, 'open' when firing, 'sad' when wilting), crown, lvl }
 function drawHead(c, type, o = {}) {
   const w = Math.round((o.wither || 0) * 8) / 8;
-  const mouth = o.mouth || 'smile', mood = o.mood || 0;
+  const mouth = o.mouth || 'smile', lvl = o.lvl || 1;
+  const face = PERSONA[type](lvl);
   const petals = sprite(`p${type}${w}`, (g) => paintPetals(g, type, w));
   if (o.spin) { c.save(); c.rotate(o.spin); stamp(c, petals); c.restore(); } else stamp(c, petals);
-  stamp(c, sprite(`f${type}${w}${mouth}${o.crown ? 1 : 0}${mood}`, (g) => paintFace(g, type, w, mouth, o.crown, mood)));
-  if (mouth !== 'sleep') {
-    const lx = o.look != null ? Math.cos(o.look) * 1.1 : 0, ly = o.look != null ? Math.sin(o.look) * 0.8 : 0;
-    for (const ex of [-2.4, 2.4]) circle(c, ex + lx, -1.1 + ly, 1, '#1a1a1a');
+  stamp(c, sprite(`f${type}${w}${mouth}${o.crown ? 1 : 0}${lvl}`, (g) => paintFace(g, type, w, mouth, o.crown, face)));
+  if (mouth === 'sleep') return;
+  const lx = o.look != null ? Math.cos(o.look) * 1.1 : 0, ly = o.look != null ? Math.sin(o.look) * 0.8 : 0;
+  for (const ex of [-2.4, 2.4]) {
+    circle(c, ex + lx, -1.1 + ly, 1, '#1a1a1a');
+    if (face.sparkle) circle(c, ex + lx + 0.45, -1.55 + ly, 0.38, '#ffffff');
+  }
+  // heavy lids sit over the pupils: half-closed and dreamy, or lazy and droopy
+  if (face.eyes === 'calm' || face.eyes === 'lazy') {
+    const lid = w ? mix(SPEC[type].face, WITHER, w * 0.6) : SPEC[type].face;
+    for (const ex of [-2.4, 2.4]) {
+      const low = face.eyes === 'calm' ? -0.9 : -0.5;
+      c.beginPath(); c.ellipse(ex, -1.2, 1.9, 2.3, 0, Math.PI, 0); c.lineTo(ex + 1.9, low); c.lineTo(ex - 1.9, low); c.closePath();
+      c.fillStyle = lid; c.fill();
+      c.strokeStyle = OUT; c.lineWidth = 0.9; c.beginPath(); c.moveTo(ex - 1.8, low); c.lineTo(ex + 1.8, low); c.stroke();
+      if (face.lashes) { c.lineWidth = 0.6; c.beginPath(); for (const k of [-1, 0, 1]) { c.moveTo(ex + k * 1.1, low); c.lineTo(ex + k * 1.4, low + 0.9); } c.stroke(); }
+    }
   }
 }
 
@@ -366,52 +393,82 @@ function paintPetals(c, type, w) {
   if (type === 'thorn') for (let i = 0; i < 5; i++) { c.save(); c.rotate((i / 5) * Math.PI * 2 + 0.3); ellipse(c, 4.5, 0, 4.5, 3.6, w ? mix('#e0283d', WITHER, w) : '#e0283d', OUT, 1.1); c.restore(); }
 }
 
-// Everything on the face except the pupils. mood 0 is a sweet smile; each
-// step up adds attitude: a flat mouth, frowning brows, a squint and a toothy
-// grin, then fangs.
-function paintFace(c, type, w, mouth, crown, mood = 0) {
+// Everything on the face except the pupils (and the eyelids, see drawHead).
+function paintFace(c, type, w, mouth, crown, face) {
   const sp = SPEC[type];
   const fr = (type === 'sunflower' ? 7.5 : 6.2) * (sp.big || 1);
   circle(c, 0, 0, fr, w ? mix(sp.face, WITHER, w * 0.6) : sp.face, OUT, 1.5);
   if (type === 'sunflower') for (let i = 0; i < 6; i++) circle(c, Math.cos(i * 1.3) * 6, 3.5 + Math.sin(i * 2.3) * 1.8, 0.8, '#3d220c');
+  c.lineCap = 'round';
   // eyes
   const eyeWhite = type === 'stink' ? '#e6ffb0' : '#ffffff';
   if (mouth === 'sleep') {
     c.strokeStyle = OUT; c.lineWidth = 1.1;
     for (const ex of [-2.4, 2.4]) { c.beginPath(); c.arc(ex, -1, 1.4, 0.2, Math.PI - 0.2); c.stroke(); }
   } else {
-    for (const ex of [-2.4, 2.4]) ellipse(c, ex, -1.2, 1.7, mood >= 3 ? 1.6 : 2.1, eyeWhite, OUT, 0.9);
-    if (type === 'sunflower') { // squinting sniper
-      c.strokeStyle = OUT; c.lineWidth = 1.2; c.beginPath(); c.moveTo(-4.5, -3.3); c.lineTo(4.5, -3.3); c.stroke();
+    for (const ex of [-2.4, 2.4]) ellipse(c, ex, -1.2, 1.7, face.narrow ? 1.5 : 2.1, eyeWhite, OUT, 0.9);
+    if (face.squint) { c.strokeStyle = OUT; c.lineWidth = 1.2; c.beginPath(); c.moveTo(-4.5, -3.3); c.lineTo(4.5, -3.3); c.stroke(); }
+    if (face.lashes && face.eyes === 'round') {
+      c.strokeStyle = OUT; c.lineWidth = 0.7;
+      for (const sx of [-1, 1]) { const ex = sx * 2.4; c.beginPath(); c.moveTo(ex + sx * 1.4, -2.4); c.lineTo(ex + sx * 2.5, -3.3); c.moveTo(ex + sx * 0.8, -3); c.lineTo(ex + sx * 1.4, -4.1); c.stroke(); }
     }
   }
-  // brows: none when sweet, then steeper and thicker as the mood darkens
-  const brow = Math.max(mood - 1, type === 'thorn' || type === 'firelily' || type === 'snap' || mouth === 'open' ? 1 : 0);
-  if (brow > 0) {
-    c.strokeStyle = OUT; c.lineWidth = 0.9 + brow * 0.35; c.lineCap = 'round';
-    const tilt = 0.6 + brow * 0.45;
+  // brows
+  c.strokeStyle = OUT;
+  const brows = mouth === 'open' && type === 'thorn' ? 'angry' : face.brows;
+  if (brows === 'angry') {
+    const a = face.anger || 2, tilt = 0.6 + a * 0.4;
+    c.lineWidth = 0.9 + a * 0.3;
     c.beginPath(); c.moveTo(-3.9, -3.4 - tilt); c.lineTo(-1.1, -3.1); c.moveTo(3.9, -3.4 - tilt); c.lineTo(1.1, -3.1); c.stroke();
+  } else if (brows === 'flat') {
+    c.lineWidth = 1.1; c.beginPath(); c.moveTo(-4, -4.1); c.lineTo(-1, -4.1); c.moveTo(4, -4.1); c.lineTo(1, -4.1); c.stroke();
+  } else if (brows === 'cheeky') {
+    c.lineWidth = 1; c.beginPath(); c.moveTo(-4, -3.6); c.lineTo(-1.2, -3.9); c.moveTo(1.2, -4.6); c.quadraticCurveTo(2.6, -5.6, 4, -4.8); c.stroke();
   }
-  if ((type === 'daisy' || type === 'frost') && mood < 2) { circle(c, -4, 1.6, 1.1, 'rgba(255,120,150,0.45)'); circle(c, 4, 1.6, 1.1, 'rgba(255,120,150,0.45)'); }
-  c.strokeStyle = OUT; c.lineWidth = 1.1; c.lineCap = 'round';
-  if (sp.teeth) {
-    // a big toothy jaw that gapes when it bites
-    const open = mouth === 'open' ? 3.4 : 1.7;
-    ellipse(c, 0, 3, 4.6, open, '#5a1a2a', OUT, 0.9);
-    c.fillStyle = '#ffffff';
-    const n = 4 + mood, tl = 1.5 + mood * 0.25; // more and longer teeth as it levels
-    for (let i = 0; i < n; i++) { const tx = -3.2 + (i / (n - 1)) * 6.4; c.beginPath(); c.moveTo(tx - 0.7, 3 - open + 0.3); c.lineTo(tx + 0.7, 3 - open + 0.3); c.lineTo(tx, 3 - open + 0.3 + tl); c.fill(); }
-  } else if (mouth === 'open') ellipse(c, 0, 2.6, 1.8, 2, type === 'firelily' ? '#ff9a3c' : type === 'stink' ? '#9ad14b' : '#5a1a1a', OUT, 0.9);
-  else if (mouth === 'sad') { c.beginPath(); c.arc(0, 4.2, 1.6, Math.PI + 0.4, -0.4); c.stroke(); }
-  else if (mouth !== 'sleep' && mood >= 3) {
-    // a toothy grin; fangs on top at full attitude
+  if (face.cheeks && mouth !== 'sad') { circle(c, -4, 1.6, 1.1, face.cheeks + '73'); circle(c, 4, 1.6, 1.1, face.cheeks + '73'); }
+  // mouth
+  c.strokeStyle = OUT; c.lineWidth = 1.1;
+  const m = mouth === 'sad' ? 'sad' : mouth === 'open' ? (face.mouth === 'jaw' ? 'jawOpen' : 'open') : face.mouth;
+  if (m === 'jaw' || m === 'jawOpen') {
+    if (m === 'jaw') {
+      // a sweet little smile... with two tiny fangs
+      c.beginPath(); c.arc(0, 1.6, 1.8, 0.3, Math.PI - 0.3); c.stroke();
+      c.fillStyle = '#ffffff'; c.lineWidth = 0.6;
+      for (const fx of [-0.9, 0.9]) { c.beginPath(); c.moveTo(fx - 0.5, 3.2); c.lineTo(fx + 0.5, 3.2); c.lineTo(fx, 4.4); c.closePath(); c.fill(); c.stroke(); }
+    } else {
+      // the real jaw only shows when it bites; more teeth every level
+      const open = 3.4;
+      ellipse(c, 0, 3, 4.6, open, '#5a1a2a', OUT, 0.9);
+      c.fillStyle = '#ffffff';
+      const n = face.teeth || 4;
+      for (let i = 0; i < n; i++) { const tx = -3.2 + (i / (n - 1)) * 6.4; c.beginPath(); c.moveTo(tx - 0.7, 3 - open + 0.3); c.lineTo(tx + 0.7, 3 - open + 0.3); c.lineTo(tx, 3 - open + 2); c.fill(); }
+    }
+  } else if (m === 'open') ellipse(c, 0, 2.6, 1.8, 2, type === 'firelily' ? '#ff9a3c' : type === 'stink' ? '#9ad14b' : '#5a1a1a', OUT, 0.9);
+  else if (m === 'sad') { c.beginPath(); c.arc(0, 4.2, 1.6, Math.PI + 0.4, -0.4); c.stroke(); }
+  else if (m === 'smile') { c.beginPath(); c.arc(0, 1.6, 1.6, 0.3, Math.PI - 0.3); c.stroke(); }
+  else if (m === 'soft') { c.beginPath(); c.arc(0, 1.9, 1.1, 0.4, Math.PI - 0.4); c.stroke(); }
+  else if (m === 'bigsmile') {
+    c.beginPath(); c.moveTo(-2.6, 1.6); c.quadraticCurveTo(0, 5.6, 2.6, 1.6); c.closePath();
+    c.fillStyle = '#7a2030'; c.fill(); c.stroke();
+    circle(c, 0, 3.4, 0.9, '#ff8fa3');
+  } else if (m === 'grin') { c.beginPath(); c.arc(0, 0.9, 2.8, 0.35, Math.PI - 0.35); c.stroke(); }
+  else if (m === 'smirk' || m === 'tongue') {
+    c.beginPath(); c.moveTo(-2, 2.6); c.quadraticCurveTo(0.5, 1.8, 2.2, 1.6); c.stroke();
+    if (m === 'tongue') { ellipse(c, 0.9, 3.2, 1.1, 1.4, '#ff8fb0', OUT, 0.8); c.beginPath(); c.moveTo(0.9, 2.4); c.lineTo(0.9, 3.8); c.lineWidth = 0.5; c.stroke(); }
+  } else if (m === 'flat') { c.beginPath(); c.moveTo(-1.8, 2.4); c.lineTo(1.8, 2.4); c.stroke(); }
+  else if (m === 'scowl') { c.beginPath(); c.arc(0, 4, 2, Math.PI + 0.5, -0.5); c.stroke(); }
+  else if (m === 'teethgrin') {
     rrect(c, -3.2, 1.6, 6.4, 2.6, 1.2, '#ffffff', OUT, 0.9);
     c.lineWidth = 0.6; c.beginPath(); for (const tx of [-1.6, 0, 1.6]) { c.moveTo(tx, 1.7); c.lineTo(tx, 4.1); } c.moveTo(-3, 2.9); c.lineTo(3, 2.9); c.stroke();
-    if (mood >= 4) { c.fillStyle = '#ffffff'; c.lineWidth = 0.8; for (const fx of [-2.2, 2.2]) { c.beginPath(); c.moveTo(fx - 0.9, 4.1); c.lineTo(fx + 0.9, 4.1); c.lineTo(fx, 6); c.closePath(); c.fill(); c.stroke(); } }
+    if (face.fangs) { c.fillStyle = '#ffffff'; c.lineWidth = 0.8; for (const fx of [-2.2, 2.2]) { c.beginPath(); c.moveTo(fx - 0.9, 4.1); c.lineTo(fx + 0.9, 4.1); c.lineTo(fx, 6); c.closePath(); c.fill(); c.stroke(); } }
   }
-  else if (type === 'stink' || (mouth !== 'sleep' && mood === 2)) { c.beginPath(); c.moveTo(-2, 2.6); c.quadraticCurveTo(0.5, 1.8, 2.2, 1.6); c.stroke(); } // smirk
-  else if (mouth !== 'sleep' && mood === 1) { c.beginPath(); c.moveTo(-1.8, 2.4); c.lineTo(1.8, 2.4); c.stroke(); }
-  else if (mouth !== 'sleep') { c.beginPath(); c.arc(0, 1.6, 1.6, 0.3, Math.PI - 0.3); c.stroke(); }
+  // headwear: a tiara for the princess and the ice queen, the crown at level 5
+  if (face.tiara && !crown) {
+    const ice = face.tiara === 'ice';
+    c.fillStyle = ice ? '#e8fbff' : '#ffd1e6'; c.strokeStyle = OUT; c.lineWidth = 0.9; c.lineJoin = 'round';
+    c.beginPath(); c.moveTo(-4, -fr + 0.5); c.lineTo(-3, -fr - 2.5); c.lineTo(-1.2, -fr - 1); c.lineTo(0, -fr - 4.5); c.lineTo(1.2, -fr - 1); c.lineTo(3, -fr - 2.5); c.lineTo(4, -fr + 0.5); c.closePath(); c.fill(); c.stroke();
+    circle(c, 0, -fr - 1.6, 0.9, ice ? '#7fd8ff' : '#ff4f9a', OUT, 0.5);
+  }
   if (crown) {
     c.fillStyle = '#ffd23f'; c.strokeStyle = OUT; c.lineWidth = 1.2; c.lineJoin = 'round';
     c.beginPath(); c.moveTo(-5, -fr - 1); c.lineTo(-5.5, -fr - 7); c.lineTo(-2.5, -fr - 4); c.lineTo(0, -fr - 8.5);
@@ -451,9 +508,9 @@ function flowerHead(c, o, x, y, scale, i, firing, extra) {
   c.rotate(Math.sin(time * 1.6 + i + f.id) * 0.08 + wither * (x < 0 ? -0.4 : 0.4));
   c.scale(scale, scale);
   drawHead(c, f.type, {
-    look: f.angle, wither, crown: lvl === MAX_LEVEL && i === 0, mood: lvl - 1,
+    look: f.angle, wither, crown: lvl === MAX_LEVEL && i === 0, lvl,
     mouth: firing ? 'open' : wither > 0.55 ? 'sad' : 'smile',
-    spin: f.type === 'frost' ? time * 0.8 + i : 0,
+    spin: f.type === 'frost' ? time * 0.35 + i : 0, // the frostbloom turns slowly and serenely
   });
   if (extra) extra(c);
   c.restore();
@@ -598,6 +655,13 @@ function bodyCrystal(c, o) {
     c.restore();
   }
   const hy = -12;
+  // a few twinkles drifting slowly upwards: it's a gentle, magical thing
+  for (let i = 0; i < 1 + lvl; i++) {
+    const k = (time * 0.25 + i / (1 + lvl) + f.id * 0.13) % 1, a = i * 2.4 + f.id;
+    c.globalAlpha = Math.sin(k * Math.PI) * 0.9;
+    star(c, Math.cos(a) * (9 + (i % 3) * 3), 6 - k * 30, 1.6 + Math.sin(time * 4 + i) * 0.6, '#ffffff', null);
+    c.globalAlpha = 1;
+  }
   stem(c, 0, 4, 0, hy * 0.5, 0, hy + 4, 2.4, deep);
   flowerHead(c, o, 0, hy, 1, 0, f.flash > 0);
   for (let i = 0; i < lvl - 2; i++) {
