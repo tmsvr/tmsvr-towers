@@ -27,7 +27,7 @@ export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, l
   loadMap(map);
   const s = {
     t: 0, nextId: 1, rng: seed, wave: 0, phase: 'pick', timer: DIFFICULTY.firstWaveDelay, queue: [], spawnWait: 0,
-    lives: DIFFICULTY.lives, players: [], flowers: [], enemies: [], drops: [], bombs: [], projs: [], clouds: [],
+    lives: DIFFICULTY.cottageHealth, maxLives: DIFFICULTY.cottageHealth, baseHitT: 0, lastAlarm: -99, players: [], flowers: [], enemies: [], drops: [], bombs: [], projs: [], clouds: [],
     fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, sharedScreen, map: MAP.index,
   };
   const coins = startCoins(nPlayers);
@@ -82,7 +82,7 @@ function spawnEnemy(s, type, from, path = 0) {
     hp: d.hp * hpScale, maxhp: d.hp * hpScale,
     stun: 0, slow: 1, slowT: 0, kx: 0, ky: 0, flash: 0, dead: false, wob: rnd(s) * 6, ang: 0,
     phaseT: rnd(s) * 2, spawnT: 0, under: false, dashing: false, chew: null, chewT: 0, chewCd: 1,
-    psn: 0, psnT: 0, psnDps: 0,
+    psn: 0, psnT: 0, psnDps: 0, atBase: false, baseAng: rnd(s) * Math.PI * 2,
   });
 }
 
@@ -189,29 +189,41 @@ function updateEnemies(s, dt) {
     e.wob += dt * 8 * e.slow;
     const sp = e.def.speed * e.slow * (e.dashing ? e.def.dash.speedMultiplier : 1) * (e.under ? e.def.burrow.speedMultiplier : 1);
     const wps = PATHS[e.path].waypoints;
-    const tgt = e.def.flying ? BASE : wps[e.seg];
+    // On the last stretch each enemy heads for its own spot around the cottage wall.
+    const final = e.def.flying || e.seg >= wps.length - 1;
+    const tgt = final
+      ? { x: clamp(BASE.x + Math.cos(e.baseAng) * T * 0.62, T * 0.3, WORLD_W - T * 0.3), y: clamp(BASE.y + Math.sin(e.baseAng) * T * 0.5, T * 0.3, WORLD_H - T * 0.3) }
+      : wps[e.seg];
     const dx = tgt.x - e.x, dy = tgt.y - e.y;
     const d = Math.hypot(dx, dy);
+    if (final && d < 3) { chompCottage(s, e, dt); continue; }
+    e.atBase = false;
     const mv = Math.min(sp * dt, d);
     if (d > 0) { e.x += (dx / d) * mv; e.y += (dy / d) * mv; e.ang = Math.atan2(dy, dx); }
     e.dist += mv;
     // how far is left to the cottage (flowers aim at whoever is closest to getting in)
-    e.left = e.def.flying ? Math.hypot(BASE.x - e.x, BASE.y - e.y) : PATHS[e.path].length - e.dist;
+    e.left = final ? Math.hypot(BASE.x - e.x, BASE.y - e.y) : PATHS[e.path].length - e.dist;
     if (e.dashing && rnd(s) < dt * 30) s.fx.push({ kind: 'puff', x: e.x, y: e.y, vx: 0, vy: 0, col: 'rgba(255,255,255,0.7)', size: 3, life: 0.25, max: 0.25 });
-    if (d - mv < 1) {
-      if (e.def.flying || e.seg >= wps.length - 1) leak(s, e);
-      else e.seg++;
-    }
+    if (!final && d - mv < 1) e.seg++;
   }
 }
 
-function leak(s, e) {
-  e.dead = true;
-  s.lives -= e.def.leak;
-  text(s, BASE.x, BASE.y - T * 0.6, `-${e.def.leak} ❤`, '#ff5555');
-  puff(s, BASE.x, BASE.y, '#ff5555', 10);
-  ev(s, 'leak');
-  ev(s, 'shake', { amt: 5 });
+// Enemies that reach the cottage keep biting it until someone deals with them.
+function chompCottage(s, e, dt) {
+  e.atBase = true;
+  e.left = 0;
+  e.wob += dt * 14;
+  e.ang = Math.atan2(BASE.y - e.y, BASE.x - e.x);
+  s.lives -= e.def.bite * dt;
+  s.baseHitT = 0.25;
+  if (rnd(s) < dt * 2) puff(s, BASE.x + (e.x - BASE.x) * 0.5, BASE.y + (e.y - BASE.y) * 0.5, '#e8d9b5', 3, 50);
+  ev(s, 'chomp');
+  if (s.t - s.lastAlarm > 10) {
+    s.lastAlarm = s.t;
+    s.fx.push({ kind: 'banner', txt: 'The cottage is under attack!', life: 2.2, max: 2.2 });
+    ev(s, 'leak');
+    ev(s, 'shake', { amt: 4 });
+  }
   if (s.lives <= 0) { s.lives = 0; s.over = true; ev(s, 'lose'); }
 }
 
@@ -687,6 +699,7 @@ export function step(s, inputs, dt) {
   if (s.phase === 'pick') { updatePick(s, inputs); updateFx(s, dt); return; }
   if (s.over || s.won) { updateFx(s, dt); return; }
   s.t += dt;
+  s.baseHitT = Math.max(0, s.baseHitT - dt);
   const ready = updatePlayers(s, dt, inputs);
   updateWaves(s, dt, ready);
   updateEnemies(s, dt);

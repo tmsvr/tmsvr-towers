@@ -17,12 +17,12 @@ export function makeSnapshot(s, events, paused) {
   for (const f of s.fx) if (!f._sent) { f._sent = true; fx.push(packFx(f)); }
   return {
     t: 'snap', paused, fx, events,
-    g: [s.lives, s.wave, ['wave', 'prep', 'pick'].indexOf(s.phase), r1(s.timer), s.queue.length, s.over ? 1 : 0, s.won ? 1 : 0, s.kills, s.map],
+    g: [r1(s.lives), s.wave, ['wave', 'prep', 'pick'].indexOf(s.phase), r1(s.timer), s.queue.length, s.over ? 1 : 0, s.won ? 1 : 0, s.kills, s.map, r2(s.baseHitT), s.maxLives],
     p: s.players.map((p) => [p.id, r1(p.x), r1(p.y), r2(p.dir), p.moving ? 1 : 0, r2(p.swingT), r2(p.swingDir || 0), r2(p.bombs), p.sel, p.mode === 'heal' ? 1 : 0, p.working ? p.working.id : 0, r1(p.coins), r2(p.stun),
       p.loadout ? p.loadout.map((t) => FLOWER_ORDER.indexOf(t)) : 0,
       [p.pick.cursor, p.pick.chosen.map((t) => FLOWER_ORDER.indexOf(t)), p.pick.ready ? 1 : 0, p.pick.row], p.building ? 1 : 0]),
     f: s.flowers.map((f) => [f.id, FLOWER_ORDER.indexOf(f.type), f.lvl, f.tx, f.ty, r2(f.angle), r2(f.flash), r2(f.hurtT), r1(f.hp), f.headIdx, f.grow ? [f.grow.to, f.grow.cost, r1(f.grow.paid)] : 0]),
-    e: s.enemies.map((e) => [e.id, e.type, r1(e.x), r1(e.y), r1(e.hp), r1(e.maxhp), r2(e.flash), r2(e.wob), r2(e.ang), r2(e.slowT), r2(e.stun), e.under ? 1 : 0, e.dashing ? 1 : 0, e.chew ? 1 : 0, e.psn]),
+    e: s.enemies.map((e) => [e.id, e.type, r1(e.x), r1(e.y), r1(e.hp), r1(e.maxhp), r2(e.flash), r2(e.wob), r2(e.ang), r2(e.slowT), r2(e.stun), e.under ? 1 : 0, e.dashing ? 1 : 0, e.chew ? 1 : 0, e.psn, e.atBase ? 1 : 0]),
     d: s.drops.map((d) => [d.id, r1(d.x), r1(d.y), d.meat ? 1 : 0, r1(d.age)]),
     pr: s.projs.map((p) => [p.id, p.kind, r1(p.x), r1(p.y), p.big || 0, p.color, r2(p.ang || 0), r2(p.k || 0)]),
     b: s.bombs.map((b) => [b.id, r1(b.x), r1(b.y), r1(b.h)]),
@@ -53,9 +53,9 @@ function withMotion(prevList, list) {
 export function applySnapshot(gs, m, now) {
   gs._interval = gs._at ? clamp(now - gs._at, 16, 250) : 33;
   gs._at = now;
-  const [lives, wave, prep, timer, qlen, over, won, kills, map] = m.g;
+  const [lives, wave, prep, timer, qlen, over, won, kills, map, baseHitT, maxLives] = m.g;
   if (gs.map !== map) { loadMap(map); gs.map = map; } // the host picked a different map
-  Object.assign(gs, { lives, wave, phase: ['wave', 'prep', 'pick'][prep], timer, over: !!over, won: !!won, kills, paused: m.paused });
+  Object.assign(gs, { lives, baseHitT, maxLives, wave, phase: ['wave', 'prep', 'pick'][prep], timer, over: !!over, won: !!won, kills, paused: m.paused });
   gs.queue = { length: qlen };
 
   gs.flowers = m.f.map(([id, ti, lvl, tx, ty, angle, flash, hurtT, hp, headIdx, g]) => ({
@@ -70,8 +70,8 @@ export function applySnapshot(gs, m, now) {
     loadout: loadout ? loadout.map((i) => FLOWER_ORDER[i]) : null,
     pick: { cursor: pick[0], chosen: pick[1].map((i) => FLOWER_ORDER[i]), ready: !!pick[2], row: pick[3] },
   })));
-  gs.enemies = withMotion(gs.enemies, m.e.map(([id, type, nx, ny, hp, maxhp, flash, wob, ang, slowT, stun, under, dashing, chew, psn]) => ({
-    id, type, def: ENEMIES[type], nx, ny, hp, maxhp, flash, wob, ang, slowT, stun, under: !!under, dashing: !!dashing, chew: !!chew, psn,
+  gs.enemies = withMotion(gs.enemies, m.e.map(([id, type, nx, ny, hp, maxhp, flash, wob, ang, slowT, stun, under, dashing, chew, psn, atBase]) => ({
+    id, type, def: ENEMIES[type], nx, ny, hp, maxhp, flash, wob, ang, slowT, stun, under: !!under, dashing: !!dashing, chew: !!chew, psn, atBase: !!atBase,
   })));
   gs.drops = withMotion(gs.drops, m.d.map(([id, nx, ny, meat, age]) => ({ id, nx, ny, meat: !!meat, age })));
   gs.projs = withMotion(gs.projs, m.pr.map(([id, kind, nx, ny, big, color, ang, k]) => ({ id, kind, nx, ny, big, color, ang, k })));

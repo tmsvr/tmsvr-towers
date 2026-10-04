@@ -199,22 +199,32 @@ function paintBg(c) {
   }
 }
 
-function drawCottage(c, x, y, lives, time) {
-  c.save(); c.translate(x, y - 4);
+function drawCottage(c, x, y, lives, maxLives, hitT, time) {
+  const r = clamp(lives / maxLives, 0, 1);
+  const shake = hitT > 0 ? Math.sin(time * 70) * 1.5 : 0;
+  c.save(); c.translate(x + shake, y - 4);
   ellipse(c, 0, T * 0.42, T * 0.6, T * 0.14, 'rgba(0,0,0,0.25)');
-  rrect(c, -T * 0.42, -T * 0.12, T * 0.84, T * 0.52, 4, '#f3e3c3', OUT, 2.5);
+  rrect(c, -T * 0.42, -T * 0.12, T * 0.84, T * 0.52, 4, hitT > 0 ? '#f7c9b8' : '#f3e3c3', OUT, 2.5);
   rrect(c, T * 0.18, -T * 0.62, T * 0.14, T * 0.3, 2, '#a5574a', OUT, 2);
   for (let i = 0; i < 3; i++) {
     const k = (time * 0.5 + i / 3) % 1;
-    circle(c, T * 0.25 + Math.sin(k * 6 + i) * 5, -T * 0.66 - k * T * 0.6, 4 + k * 6, `rgba(230,230,230,${0.5 * (1 - k)})`);
+    circle(c, T * 0.25 + Math.sin(k * 6 + i) * 5, -T * 0.66 - k * T * 0.6, 4 + k * 6, r < 0.35 ? `rgba(70,70,70,${0.6 * (1 - k)})` : `rgba(230,230,230,${0.5 * (1 - k)})`);
   }
   c.beginPath(); c.moveTo(-T * 0.55, -T * 0.08); c.lineTo(0, -T * 0.58); c.lineTo(T * 0.55, -T * 0.08); c.closePath();
   c.fillStyle = '#d6504a'; c.fill(); c.strokeStyle = OUT; c.lineWidth = 2.5; c.lineJoin = 'round'; c.stroke();
   rrect(c, -T * 0.09, T * 0.1, T * 0.18, T * 0.3, [6, 6, 0, 0], '#7a4b2a', OUT, 2);
   rrect(c, -T * 0.34, T * 0.02, T * 0.16, T * 0.14, 2, '#9fd8ff', OUT, 2);
   rrect(c, T * 0.18, T * 0.02, T * 0.16, T * 0.14, 2, '#9fd8ff', OUT, 2);
+  // bite marks and cracks appear as the cottage gets chewed up
+  c.strokeStyle = OUT; c.lineWidth = 1.5; c.lineCap = 'round';
+  if (r < 0.7) { c.beginPath(); c.moveTo(-T * 0.38, -T * 0.05); c.lineTo(-T * 0.3, T * 0.05); c.lineTo(-T * 0.35, T * 0.14); c.stroke(); }
+  if (r < 0.4) { c.beginPath(); c.moveTo(T * 0.4, T * 0.2); c.lineTo(T * 0.3, T * 0.27); c.lineTo(T * 0.36, T * 0.36); c.stroke(); circle(c, T * 0.42, -T * 0.02, 5, '#7fbd52'); }
   c.restore();
-  label(c, `❤ ${lives}`, x, y - T * 0.95, 15, lives > 5 ? '#ffd1d1' : '#ff6060');
+  // health bar
+  const w = T * 1.1, bx = x - w / 2, by = y - T * 0.98;
+  rrect(c, bx - 2, by - 2, w + 4, 11, 5, OUT);
+  rrect(c, bx, by, Math.max(0, w * r), 7, 3, r > 0.5 ? '#6be06b' : r > 0.25 ? '#ffd23f' : '#ff6a5a');
+  if (hitT > 0) label(c, '!', x + w / 2 + 10, by + 3, 16, '#ff6a5a', 'center', 700);
 }
 
 // ---- flower creatures -----------------------------------------------------
@@ -622,6 +632,7 @@ function drawEnemy(c, e, time) {
       }
     }
   }
+  if (e.atBase) label(c, 'nom!', 0, -r - 10 - Math.abs(Math.sin(time * 9)) * 4, 11, '#ffffff', 'center', 700);
   if (e.psn > 0) {
     c.globalAlpha = 0.35; circle(c, 0, 0, r + 1, '#8fc63e'); c.globalAlpha = 1;
     for (let i = 0; i < Math.min(3, e.psn); i++) {
@@ -865,7 +876,7 @@ function drawMinimap(c, s, ui) {
     c.fillRect(mx(f.x) - r, my(f.y) - r, r * 2, r * 2);
   }
   for (const e of s.enemies) circle(c, mx(e.x), my(e.y), e.def.boss ? 4.5 : e.def.r > 14 * U ? 3 : 2, e.def.boss ? '#ff3030' : '#e0405a');
-  circle(c, mx(BASE.x), my(BASE.y), 4, '#ffffff', OUT, 1.5);
+  circle(c, mx(BASE.x), my(BASE.y), s.baseHitT > 0 ? 6 + Math.sin(performance.now() / 80) * 2 : 4, s.baseHitT > 0 ? '#ff4040' : '#ffffff', OUT, 1.5);
   for (const p of s.players) circle(c, mx(p.x), my(p.y), 4.5, PLAYER.scarves[p.id], '#ffffff', 1.5);
   c.strokeStyle = 'rgba(255,255,255,0.9)'; c.lineWidth = 1.5;
   c.strokeRect(mx(ui.cam.x), my(ui.cam.y), VIEW_W * sx, MAP_H * sy);
@@ -875,6 +886,7 @@ function drawMinimap(c, s, ui) {
 // Arrows at the screen edge pointing at off-screen cats and the base when it's under attack.
 function drawEdgeMarkers(c, s, ui) {
   const markers = s.players.map((p) => ({ x: p.x, y: p.y, col: PLAYER.scarves[p.id], txt: `P${p.id + 1}` }));
+  if (s.baseHitT > 0) markers.push({ x: BASE.x, y: BASE.y, col: '#ff4040', txt: '🏠!' });
   for (const m of markers) {
     const vx = m.x - ui.cam.x, vy = m.y - ui.cam.y;
     if (vx > 0 && vx < VIEW_W && vy > 0 && vy < MAP_H) continue;
@@ -927,8 +939,12 @@ function drawHud(c, s, time, ui) {
   c.fillStyle = g; c.fillRect(0, y0, VIEW_W, HUD_H);
   c.fillStyle = '#4c6070'; c.fillRect(0, y0, VIEW_W, 3);
 
-  label(c, '❤', 24, y0 + 30, 20, '#ff6070', 'center', 700, null);
-  label(c, `${s.lives}`, 42, y0 + 31, 24, '#ffd1d1', 'left', 700, null);
+  // cottage health
+  const hr = clamp(s.lives / s.maxLives, 0, 1);
+  label(c, '🏠', 24, y0 + 30, 18, '#ffffff', 'center', 700, null);
+  rrect(c, 40, y0 + 22, 150, 16, 8, 'rgba(0,0,0,0.45)', s.baseHitT > 0 ? '#ff6a5a' : OUT, 2);
+  rrect(c, 42, y0 + 24, Math.max(0, 146 * hr), 12, 6, hr > 0.5 ? '#6be06b' : hr > 0.25 ? '#ffd23f' : '#ff6a5a');
+  label(c, `${Math.ceil(s.lives)} / ${s.maxLives}`, 115, y0 + 30.5, 12, '#ffffff', 'center', 700);
   label(c, `Wave ${Math.max(1, s.wave)}/${TOTAL_WAVES}`, 14, y0 + 58, 16, '#e8f1f7', 'left', 600, null);
   const status = s.phase === 'pick' ? 'Choosing flowers' : s.phase === 'prep' ? `Next in ${Math.ceil(s.timer)}s · Enter` : `${s.enemies.length + s.queue.length} enemies left`;
   label(c, status, 14, y0 + 78, 12, '#a9bccb', 'left', 500, null);
@@ -1121,7 +1137,7 @@ export function render(c, s, ui) {
   }
   if (!s) {
     for (const o of MAP.obstacles) if (o.type === 'tree') drawTree(c, o, time);
-    drawCottage(c, BASE.x, BASE.y, 20, time);
+    drawCottage(c, BASE.x, BASE.y, 1, 1, 0, time);
     c.restore();
     drawMenu(c, time, ui);
     return;
@@ -1130,7 +1146,7 @@ export function render(c, s, ui) {
   const M = T * 1.5;
   const vis = (o) => o.x > camX - M && o.x < camX + VIEW_W + M && o.y > camY - M && o.y < camY + MAP_H + M;
   for (const p of s.players) drawBuildGhost(c, p, s, time);
-  drawCottage(c, BASE.x, BASE.y, s.lives, time);
+  drawCottage(c, BASE.x, BASE.y, s.lives, s.maxLives, s.baseHitT, time);
   for (const cl of s.clouds) if (vis(cl)) drawCloud(c, cl, time);
   for (const d of s.drops) if (vis(d)) drawDrop(c, d, time);
   const actors = [

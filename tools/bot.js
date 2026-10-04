@@ -55,9 +55,12 @@ export function runBot({ players = 2, seed = 1, loadouts, map = 0, maxMinutes = 
       if (inp.buildTap) return;
       let foe = null, fd = 400;
       for (const e of s.enemies) { if (e.under || e.def.flying) continue; const d = Math.hypot(e.x - p.x, e.y - p.y); if (d < fd) { fd = d; foe = e; } }
+      // anything chewing on the cottage takes priority, wherever it is
+      const chomper = s.enemies.find((e) => e.atBase && !e.def.flying);
+      if (chomper) { foe = chomper; fd = Math.hypot(chomper.x - p.x, chomper.y - p.y); }
       let coin = null, cd = 1e9;
       for (const d of s.drops) { const dd = Math.hypot(d.x - p.x, d.y - p.y); if (dd < cd) { cd = dd; coin = d; } }
-      if (foe && (!coin || fd < cd)) {
+      if (foe && (!coin || fd < cd || foe.atBase)) {
         inp.mx = foe.x - p.x; inp.my = foe.y - p.y;
         if (fd < 60) { p.dir = Math.atan2(inp.my, inp.mx); inp.mx = 0; inp.my = 0; inp.atk = true; }
       } else if (coin) { inp.mx = coin.x - p.x; inp.my = coin.y - p.y; }

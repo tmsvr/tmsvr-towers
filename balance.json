@@ -6,6 +6,7 @@
     "flowers.kind": "single = homing seed, beam = instant hit, bolt = piercing fireball in a line, cloud = poison cloud (damage is per stack per second), pulse = hits everything in range, chomp = bite (small critters are swallowed whole).",
     "flowers.target": "first = enemy furthest along the path (default), strong = enemy with the most health.",
     "flowerLevels.perLevel": "Bonus added per level above 1, e.g. damage 0.5 means +50% damage per level.",
+    "enemies.bite": "Damage per second an enemy does to the cottage while chomping on it (it keeps chomping until killed).",
     "enemies.size": "Radius in tiles. 'light' enemies can be knocked back by the baton and swallowed by Snapdragons.",
     "difficulty": "Enemy health = base * (1 + hpPerWave*(wave-1) + hpPerWaveSquared*(wave-1)^2). Wave size budget = waveBudgetBase + waveBudgetPerWave*wave.",
     "waves": "Which enemies can appear: fromWave = first wave it shows up, weight = how often it is picked, cost = how much of the wave budget one group uses, group = how many spawn together."
@@ -37,7 +38,7 @@
 
   "difficulty": {
     "totalWaves": 15,
-    "lives": 20,
+    "cottageHealth": 250,
     "firstWaveDelay": 30,
     "timeBetweenWaves": 15,
     "hpPerWave": 0.3,
@@ -84,21 +85,21 @@
   },
 
   "enemies": {
-    "grunt":    { "hp": 32,   "speed": 1.88, "coins": 2,  "livesLost": 1, "size": 0.28, "armor": 0 },
-    "swarm":    { "hp": 9,    "speed": 2.7,  "coins": 1,  "livesLost": 1, "size": 0.18, "armor": 0, "light": true },
-    "runner":   { "hp": 20,   "speed": 3.75, "coins": 2,  "livesLost": 1, "size": 0.25, "armor": 0, "light": true },
-    "flyer":    { "hp": 26,   "speed": 2.33, "coins": 3,  "livesLost": 1, "size": 0.25, "armor": 0, "flying": true },
-    "wasp":     { "hp": 16,   "speed": 4.43, "coins": 2,  "livesLost": 1, "size": 0.2,  "armor": 0, "flying": true, "light": true },
-    "shield":   { "hp": 70,   "speed": 1.58, "coins": 4,  "livesLost": 1, "size": 0.33, "armor": 3 },
-    "healer":   { "hp": 44,   "speed": 1.73, "coins": 4,  "livesLost": 1, "size": 0.28, "armor": 0, "heals": { "radius": 2, "perSecond": 7 } },
-    "tank":     { "hp": 170,  "speed": 1.2,  "coins": 7,  "livesLost": 2, "size": 0.4,  "armor": 1 },
-    "dasher":   { "hp": 30,   "speed": 1.65, "coins": 3,  "livesLost": 1, "size": 0.25, "armor": 0, "dash": { "every": 2.4, "duration": 0.55, "speedMultiplier": 3.2 } },
-    "splitter": { "hp": 60,   "speed": 1.5,  "coins": 3,  "livesLost": 1, "size": 0.35, "armor": 0, "split": { "into": "blobling", "count": 3 } },
-    "blobling": { "hp": 12,   "speed": 3.68, "coins": 1,  "livesLost": 1, "size": 0.18, "armor": 0, "light": true },
-    "mole":     { "hp": 48,   "speed": 1.8,  "coins": 3,  "livesLost": 1, "size": 0.28, "armor": 0, "burrow": { "aboveSeconds": 2.6, "belowSeconds": 1.8, "speedMultiplier": 1.5 } },
-    "aphid":    { "hp": 28,   "speed": 1.95, "coins": 2,  "livesLost": 1, "size": 0.23, "armor": 0, "light": true, "eats": { "damagePerSecond": 8, "chewSeconds": 3.5, "cooldown": 4, "reach": 1.25 } },
-    "hive":     { "hp": 150,  "speed": 1.05, "coins": 7,  "livesLost": 2, "size": 0.43, "armor": 1, "spawns": { "type": "swarm", "every": 4.5, "count": 2 } },
-    "boss":     { "hp": 1000, "speed": 0.98, "coins": 40, "livesLost": 5, "size": 0.6,  "armor": 2, "boss": true, "spawns": { "type": "grunt", "every": 6, "count": 2 } }
+    "grunt":    { "hp": 32,   "speed": 1.88, "coins": 2,  "bite": 2, "size": 0.28, "armor": 0 },
+    "swarm":    { "hp": 9,    "speed": 2.7,  "coins": 1,  "bite": 2, "size": 0.18, "armor": 0, "light": true },
+    "runner":   { "hp": 20,   "speed": 3.75, "coins": 2,  "bite": 2, "size": 0.25, "armor": 0, "light": true },
+    "flyer":    { "hp": 26,   "speed": 2.33, "coins": 3,  "bite": 2, "size": 0.25, "armor": 0, "flying": true },
+    "wasp":     { "hp": 16,   "speed": 4.43, "coins": 2,  "bite": 2, "size": 0.2,  "armor": 0, "flying": true, "light": true },
+    "shield":   { "hp": 70,   "speed": 1.58, "coins": 4,  "bite": 2, "size": 0.33, "armor": 3 },
+    "healer":   { "hp": 44,   "speed": 1.73, "coins": 4,  "bite": 2, "size": 0.28, "armor": 0, "heals": { "radius": 2, "perSecond": 7 } },
+    "tank":     { "hp": 170,  "speed": 1.2,  "coins": 7,  "bite": 4, "size": 0.4,  "armor": 1 },
+    "dasher":   { "hp": 30,   "speed": 1.65, "coins": 3,  "bite": 2, "size": 0.25, "armor": 0, "dash": { "every": 2.4, "duration": 0.55, "speedMultiplier": 3.2 } },
+    "splitter": { "hp": 60,   "speed": 1.5,  "coins": 3,  "bite": 2, "size": 0.35, "armor": 0, "split": { "into": "blobling", "count": 3 } },
+    "blobling": { "hp": 12,   "speed": 3.68, "coins": 1,  "bite": 2, "size": 0.18, "armor": 0, "light": true },
+    "mole":     { "hp": 48,   "speed": 1.8,  "coins": 3,  "bite": 2, "size": 0.28, "armor": 0, "burrow": { "aboveSeconds": 2.6, "belowSeconds": 1.8, "speedMultiplier": 1.5 } },
+    "aphid":    { "hp": 28,   "speed": 1.95, "coins": 2,  "bite": 2, "size": 0.23, "armor": 0, "light": true, "eats": { "damagePerSecond": 8, "chewSeconds": 3.5, "cooldown": 4, "reach": 1.25 } },
+    "hive":     { "hp": 150,  "speed": 1.05, "coins": 7,  "bite": 4, "size": 0.43, "armor": 1, "spawns": { "type": "swarm", "every": 4.5, "count": 2 } },
+    "boss":     { "hp": 1000, "speed": 0.98, "coins": 40, "bite": 10, "size": 0.6,  "armor": 2, "boss": true, "spawns": { "type": "grunt", "every": 6, "count": 2 } }
   },
 
   "waves": [

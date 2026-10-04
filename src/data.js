@@ -90,7 +90,7 @@ for (const [id, e] of Object.entries(BAL.enemies)) {
     speed: e.speed * T,
     r: e.size * T,
     coin: e.coins,
-    leak: e.livesLost,
+    bite: e.bite,
     heals: e.heals && { radius: e.heals.radius * T, perSecond: e.heals.perSecond },
     eats: e.eats && { ...e.eats, reach: e.eats.reach * T },
   };
