@@ -9,7 +9,7 @@ import { ENEMIES, FLOWER_ORDER, CAT_ORDER } from './data.js';
 // so small numbers take one byte and a position in tenths of a pixel three.
 // Bump whenever a message changes shape, so mismatched copies refuse to play
 // together instead of misreading each other (checked when a guest joins).
-export const PROTOCOL = 4;
+export const PROTOCOL = 5;
 
 const utf8 = new TextEncoder(), fromUtf8 = new TextDecoder();
 
@@ -138,7 +138,7 @@ const ENEMY = struct([
   ['atBase', bool],
 ]);
 
-const DROP = struct([['id', int], ['x', r1], ['y', r1], ['meat', bool], ['age', r1]]);
+const DROP = struct([['id', int], ['x', r1], ['y', r1], ['big', bool], ['age', r1]]);
 const PROJ = struct([
   ['id', int], ['kind', oneOf(['single', 'bolt', 'lob'])], ['x', r1], ['y', r1], ['big', int], ['color', text],
   ['ang', r2], ['k', r2],

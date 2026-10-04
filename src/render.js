@@ -490,7 +490,39 @@ function drawFlower(c, f, time) {
   if (wither > 0.75 && Math.floor(time * 3) % 2) label(c, '!', f.x + T * 0.32, f.y - T * 0.5, 16, '#ff6a5a', 'center', 700);
 }
 
+const onFlower = (s, p, f) => p.loadout && p.stun <= 0 && Math.floor(p.x / T) === f.tx && Math.floor(p.y / T) === f.ty;
+
+// What the next level (and healing) costs the cat standing on this flower,
+// shown right above it so nobody has to look down at the HUD.
+function drawCostTag(c, f, s) {
+  const p = s.players.find((q) => onFlower(s, q, f));
+  if (!p) return;
+  const price = catStats(p).price;
+  const tags = [];
+  if (p.mode === 'dig') tags.push(['dig', `+${uprootRefund(f)}`, '#e0a060']);
+  else if (f.lvl >= MAX_LEVEL) tags.push(['', 'MAX', '#ffd23f']);
+  else {
+    const left = f.grow ? f.grow.cost - f.grow.paid : upgradeCost(f.type, f.lvl);
+    tags.push([`Lv${f.lvl + 1}`, `${Math.ceil(left * price)}`, '#ffe27a']);
+    if (f.lvl > 0 && f.hp < FLOWER_HP - 0.5) tags.push(['heal', `${Math.ceil((FLOWER_HP - f.hp) * healCostPerHp(f) * price)}`, '#8dff9a']);
+  }
+  c.font = `700 12px ${FONT}`;
+  const parts = tags.map(([a, b, col]) => ({ a, b, col, w: (a ? c.measureText(a + ' ').width : 0) + c.measureText(b).width + (a === '' || a === 'dig' ? 0 : 16) + 14 }));
+  const total = parts.reduce((t, q) => t + q.w, 0) + (parts.length - 1) * 4;
+  let x = f.x - total / 2;
+  const y = f.y - T * 1.22; // above the cat's P1/P2 badge
+  for (const q of parts) {
+    rrect(c, x, y - 10, q.w, 20, 10, 'rgba(20,28,36,0.85)', q.col, 1.5);
+    let tx = x + 7;
+    if (q.a) { label(c, q.a, tx, y + 0.5, 11, '#dce7ef', 'left', 600, null); c.font = `600 11px ${FONT}`; tx += c.measureText(q.a + ' ').width; }
+    if (q.a !== '' && q.a !== 'dig') { coinIcon(c, tx + 5, y, 5.5); tx += 13; }
+    label(c, q.b, tx, y + 0.5, 12, q.col, 'left', 700, null);
+    x += q.w + 4;
+  }
+}
+
 function drawFlowerStatus(c, f, s) {
+  drawCostTag(c, f, s);
   const workers = s.players.filter((p) => p.working === f);
   if (f.grow) {
     const p = f.grow.paid / f.grow.cost;
@@ -499,7 +531,7 @@ function drawFlowerStatus(c, f, s) {
     c.beginPath(); c.arc(f.x, f.y, r, 0, Math.PI * 2); c.strokeStyle = 'rgba(0,0,0,0.35)'; c.lineWidth = 6; c.stroke();
     c.beginPath(); c.arc(f.x, f.y, r, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2);
     c.strokeStyle = workers.length ? '#ffe066' : '#9be15d'; c.lineWidth = 4; c.stroke();
-    if (f.lvl > 0 || !workers.length) label(c, `${f.lvl > 0 ? 'Lv' + f.grow.to + ' ' : ''}${Math.floor(p * 100)}%`, f.x, f.y - T * 0.62, 12, '#ffe27a');
+    if (!s.players.some((q) => onFlower(s, q, f)) && (f.lvl > 0 || !workers.length)) label(c, `${f.lvl > 0 ? 'Lv' + f.grow.to + ' ' : ''}${Math.floor(p * 100)}%`, f.x, f.y - T * 0.62, 12, '#ffe27a');
   }
   if (f.lvl > 0 && f.lvl < MAX_LEVEL && f.hp < FLOWER_HP) {
     const w = T * 0.6, x = f.x - w / 2, y = f.y + T * 0.36;
@@ -913,18 +945,12 @@ function drawDrop(c, d, time) {
   if (d.age > 20 && Math.floor(time * 8) % 2) return;
   const bob = Math.sin(time * 5 + d.x) * 2;
   ellipse(c, d.x, d.y + 7, 6, 2.5, 'rgba(0,0,0,0.2)');
-  if (d.meat) {
-    c.save(); c.translate(d.x, d.y + bob - 2); c.rotate(-0.5); c.scale(U, U);
-    rrect(c, 2, -2, 10, 4, 2, '#f5efe0', OUT, 1.3);
-    circle(c, 12, -2.5, 2.5, '#f5efe0', OUT, 1.2); circle(c, 12, 2.5, 2.5, '#f5efe0', OUT, 1.2);
-    ellipse(c, -2, 0, 8, 6.5, '#d4583f', OUT, 1.6);
-    ellipse(c, -4, -2, 3, 1.8, 'rgba(255,255,255,0.35)');
-    c.restore();
-  } else {
-    const squash = Math.abs(Math.cos(time * 4 + d.x));
-    ellipse(c, d.x, d.y + bob - 2, 7 * U * (0.35 + 0.65 * squash), 7 * U, '#ffd23f', OUT, 1.6);
-    if (squash > 0.5) label(c, '$', d.x, d.y + bob - 1.5, 10, '#b37a00', 'center', 700, null);
-  }
+  // worth 4 or more: a bigger coin with a sparkle
+  const k = d.big ? 1.45 : 1;
+  const squash = Math.abs(Math.cos(time * 4 + d.x));
+  ellipse(c, d.x, d.y + bob - 2, 7 * U * k * (0.35 + 0.65 * squash), 7 * U * k, d.big ? '#ffc61a' : '#ffd23f', OUT, 1.6);
+  if (squash > 0.5) label(c, '$', d.x, d.y + bob - 1.5, 10 * k, '#b37a00', 'center', 700, null);
+  if (d.big) star(c, d.x + 7 * U, d.y + bob - 9 * U, 2.5 + Math.abs(Math.sin(time * 6 + d.x)) * 2.5, '#fffbe0', null);
 }
 
 function drawProj(c, p, time) {
@@ -1105,10 +1131,11 @@ function contextText(s, p, ui) {
   if (p.mode === 'dig') return `Hold [${key}] dig up ${name} · get back ${uprootRefund(f)} · [${cyc}] ${midLevel ? 'upgrade' : 'back'}`;
   if (f.lvl === 0) return `Hold [${key}] to grow ${name} · ${Math.floor(f.grow.paid)}/${f.grow.cost} · [${cyc}] dig up`;
   if (f.lvl >= MAX_LEVEL) return `${name} · max level, never wilts · [${cyc}] dig up`;
-  const paid = f.grow ? Math.floor(f.grow.paid) : 0, cost = f.grow ? f.grow.cost : upgradeCost(f.type, f.lvl);
-  const up = `[${key}] upgrade Lv${f.lvl + 1} ${paid}/${cost}`;
+  const price = catStats(p).price;
+  const left = Math.ceil((f.grow ? f.grow.cost - f.grow.paid : upgradeCost(f.type, f.lvl)) * price);
+  const up = `[${key}] upgrade to Lv${f.lvl + 1} (${left})`;
   if (f.hp >= FLOWER_HP - 0.5) return `${up} · healthy · [${cyc}] dig up`;
-  const healCost = Math.ceil((FLOWER_HP - f.hp) * healCostPerHp(f));
+  const healCost = Math.ceil((FLOWER_HP - f.hp) * healCostPerHp(f) * price);
   return `${up} · [${hk}] heal ${Math.floor(f.hp)}%→100 (${healCost}) · [${cyc}] dig`;
 }
 
@@ -1243,8 +1270,8 @@ function drawPick(c, s, ui, time) {
     label(c, fitText(c, K.desc, cw0 - 20, 11), x + 12, cy0 + 29, 11, '#cfe0ea', 'left', 500, null);
     pips(c, x + 92, cy0 + 51, 'Speed', K.speed);
     pips(c, x + 92, cy0 + 63, 'Baton', K.batonDamage / K.batonCooldown);
-    pips(c, x + 92, cy0 + 75, 'Garden', K.growSpeed);
-    pips(c, x + 92, cy0 + 87, 'Bomb', (K.bombRadius / K.bombRecharge) ** 0.6);
+    pips(c, x + 92, cy0 + 75, 'Garden', K.growSpeed / (K.upgradeCost ?? 1));
+    pips(c, x + 92, cy0 + 87, 'Bomb', ((K.bombRadius / K.bombRecharge) * (K.bombDamage ?? 1)) ** 0.4);
     if (owner && s.players.length > 1) {
       rrect(c, x + cw0 - 36, cy0 + 8, 28, 18, 9, PLAYER.scarves[owner.id]);
       label(c, `P${owner.id + 1}`, x + cw0 - 22, cy0 + 17.5, 11, '#fff', 'center', 700, null);

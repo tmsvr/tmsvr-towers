@@ -116,7 +116,9 @@ export function catStats(p) {
     bombRecharge: PLAYER.bombRecharge * k.bombRecharge,
     bombRadius: PLAYER.bombRadius * k.bombRadius,
     sprintSeconds: PLAYER.sprintSeconds * k.sprintSeconds,
+    bombDmg: PLAYER.bombDmg * (k.bombDamage ?? 1),
     grow: k.growSpeed,
+    price: k.upgradeCost ?? 1, // coins this cat pays per coin of upgrade or healing
   };
 }
 
@@ -180,7 +182,7 @@ function killEnemy(s, e) {
     const val = i === pieces - 1 ? v - base * (pieces - 1) : base;
     const a = rnd(s) * Math.PI * 2;
     const sp = (pieces > 1 ? 50 + rnd(s) * 60 : 20) * U;
-    s.drops.push({ id: s.nextId++, x: e.x, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, value: val, age: 0, meat: val >= 4 });
+    s.drops.push({ id: s.nextId++, x: e.x, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, value: val, age: 0, big: val >= 4 });
   }
 }
 
@@ -384,7 +386,7 @@ function throwBomb(s, p) {
   p.bombs -= 1;
   const tx = clamp(p.x + Math.cos(p.dir) * PLAYER.bombRange, 10, s.m.worldW - 10);
   const ty = clamp(p.y + Math.sin(p.dir) * PLAYER.bombRange, 10, s.m.worldH - 10);
-  s.bombs.push({ id: s.nextId++, sx: p.x, sy: p.y, tx, ty, x: p.x, y: p.y, h: 0, t: 0, dur: 0.6, r: catStats(p).bombRadius });
+  s.bombs.push({ id: s.nextId++, sx: p.x, sy: p.y, tx, ty, x: p.x, y: p.y, h: 0, t: 0, dur: 0.6, r: catStats(p).bombRadius, dmg: catStats(p).bombDmg });
   ev(s, 'throw');
 }
 
@@ -399,7 +401,7 @@ function explode(s, b) {
   for (const e of s.enemies) {
     if (!hittable(e)) continue;
     if (Math.hypot(e.x - b.tx, e.y - b.ty) <= R + e.def.r) {
-      damage(s, e, PLAYER.bombDmg, true);
+      damage(s, e, b.dmg ?? PLAYER.bombDmg, true);
       applyStun(e, PLAYER.bombStun);
     }
   }
@@ -449,8 +451,8 @@ function plant(s, p) {
 function heal(s, p, f, dt) {
   if (f.lvl === 0 || f.lvl >= MAX_LEVEL) return deny(s, p, f.x, f.y - T * 0.6, f.lvl ? 'Max level flowers never wilt' : 'Seedlings are fine');
   if (f.hp >= FLOWER_HP) return; // the HUD already says it's healthy
-  const cph = healCostPerHp(f);
-  const pay = Math.min((FLOWER_HP - f.hp) * cph, HEAL_RATE * catStats(p).grow * dt * cph, p.coins);
+  const cs = catStats(p), cph = healCostPerHp(f) * cs.price;
+  const pay = Math.min((FLOWER_HP - f.hp) * cph, HEAL_RATE * cs.grow * dt * cph, p.coins);
   if (pay <= 1e-6) return deny(s, p, f.x, f.y - T * 0.6, 'Out of coins!');
   p.coins -= pay;
   f.hp += pay / cph;
@@ -478,10 +480,13 @@ function work(s, p, f, dt) {
     f.grow = { to: f.lvl + 1, cost: upgradeCost(f.type, f.lvl), paid: 0 };
   }
   const g = f.grow;
-  const pay = Math.min(g.cost - g.paid, (g.cost / GROW_TIME[g.to]) * catStats(p).grow * dt, p.coins);
-  if (pay <= 1e-6) return deny(s, p, f.x, f.y - T * 0.6, 'Out of coins!');
+  const cs = catStats(p);
+  // progress is in the flower's own cost units; this cat pays `price` coins for each
+  const prog = Math.min(g.cost - g.paid, (g.cost / GROW_TIME[g.to]) * cs.grow * dt, p.coins / cs.price);
+  if (prog <= 1e-6) return deny(s, p, f.x, f.y - T * 0.6, 'Out of coins!');
+  const pay = prog * cs.price;
   p.coins -= pay;
-  g.paid += pay;
+  g.paid += prog;
   f.spent = (f.spent || 0) + pay;
   p.working = f;
   ev(s, 'pour');
@@ -760,8 +765,8 @@ function updateDrops(s, dt) {
         const share = s.players.length > 1 ? ECONOMY.coopCoinShare ?? 0 : 0;
         near.coins += d.value * (1 - share);
         for (const p of s.players) p.coins += (d.value * share) / s.players.length;
-        text(s, d.x, d.y - 10, `+${d.value}`, d.meat ? '#ff9d8a' : '#ffd23f');
-        ev(s, d.meat ? 'meat' : 'coin');
+        text(s, d.x, d.y - 10, `+${d.value}`, '#ffd23f');
+        ev(s, d.big ? 'bigCoin' : 'coin');
       }
     }
     if (d.age > 25) d.done = true;
