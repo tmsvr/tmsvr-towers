@@ -248,7 +248,8 @@ function updateEnemies(s, dt) {
           continue;
         }
       } else if ((e.chewCd -= dt) <= 0) {
-        const f = s.flowers.find((f) => !f.dead && f.lvl < MAX_LEVEL && dist(e, f) < e.def.eats.reach);
+        // one aphid per flower, so a crowd can't strip a flower in seconds
+        const f = s.flowers.find((f) => !f.dead && f.lvl < MAX_LEVEL && dist(e, f) < e.def.eats.reach && !s.enemies.some((o) => o.chew === f));
         if (f) { e.chew = f; e.chewT = e.def.eats.chewSeconds; e.ang = Math.atan2(f.y - e.y, f.x - e.x); continue; }
       }
     }
@@ -593,10 +594,11 @@ function updatePlayers(s, dt, inputs) {
 }
 
 // ---- Flowers & projectiles -----------------------------------------------
-function hurtFlower(s, f, amt) {
+// quiet: slow wear, so the flower doesn't flash as if it were being bitten.
+function hurtFlower(s, f, amt, quiet = false) {
   if (f.dead || f.lvl >= MAX_LEVEL) return;
   f.hp -= amt;
-  f.hurtT = 0.15;
+  if (!quiet) f.hurtT = 0.15;
   if (f.hp <= 0) {
     f.dead = true;
     s.grid.delete(f.ty * s.m.W + f.tx);
@@ -612,6 +614,10 @@ function updateFlowers(s, dt) {
     f.flash = Math.max(0, f.flash - dt);
     f.hurtT = Math.max(0, f.hurtT - dt);
     if (f.lvl === 0) continue; // seedlings don't fight
+    // Every flower wears out at the same steady pace while a wave is on,
+    // whatever its range or fire rate; higher levels wear slower, max never.
+    if (s.phase === 'wave') hurtFlower(s, f, WEAR_PER_SEC * WEAR_MULT[f.lvl] * dt, true);
+    if (f.dead) continue;
     f.cd -= dt;
     if (f.cd > 0) continue;
     const st = flowerStats(f.type, f.lvl);
@@ -661,8 +667,6 @@ function updateFlowers(s, dt) {
       }
     }
     ev(s, 'shoot_' + f.type);
-    // Fighting wears flowers out; max level flowers are hardy.
-    hurtFlower(s, f, WEAR_PER_SEC * st.rate * WEAR_MULT[f.lvl]);
   }
   prune(s.flowers, isDead);
 }

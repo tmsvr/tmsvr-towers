@@ -100,7 +100,7 @@ export function runBot({ players = 2, seed = 1, loadouts, cats, map = 0, maxMinu
     const inputs = s.players.map(() => ({}));
     s.players.forEach((p, i) => {
       const b = bots[i], inp = inputs[i];
-      if (b.target && (b.target.dead || (!b.target.grow && !(b.heal && b.target.hp < 100)) || p.coins < 1)) b.target = null;
+      if (b.target && (b.target.dead || (!b.target.grow && !(b.heal && b.target.hp < 95)) || p.coins < 1)) b.target = null;
       if (!b.target && tick % 10 === i * 5) {
         const hurt = s.flowers.find((f) => f.lvl > 0 && f.lvl < MAX_LEVEL && f.hp < 45);
         const seedling = s.flowers.find((f) => f.grow && f.lvl === 0);
