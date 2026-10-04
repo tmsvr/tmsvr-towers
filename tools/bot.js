@@ -3,10 +3,49 @@
 // otherwise bonk the nearest enemy or collect coins. It never uses bombs and
 // picks a random-ish flower mix, so real players should do noticeably better.
 import * as sim from '../src/sim.js';
-import { T, W, H, PATH_TILES, FLOWER_ORDER, LOADOUT_SIZE, MAX_LEVEL } from '../src/data.js';
+import { T, W, H, MAP, PATH_TILES, FLOWER_ORDER, FLOWERS, LOADOUT_SIZE, MAX_LEVEL } from '../src/data.js';
 
-export function runBot({ players = 2, seed = 1, loadouts, map = 0, maxMinutes = 40 } = {}) {
-  const s = sim.createState(players, seed, { map });
+// Walking directions around trees, rocks and ponds: a breadth-first distance
+// field from the target tile, cached per target.
+const fields = new Map();
+function field(tx, ty) {
+  const key = ty * W + tx;
+  let d = fields.get(key);
+  if (d) return d;
+  d = new Int32Array(W * H).fill(-1);
+  d[key] = 0;
+  const q = [key];
+  for (let i = 0; i < q.length; i++) {
+    const k = q[i], x = k % W, y = (k - x) / W;
+    for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+      const nk = ny * W + nx;
+      if (nx < 0 || ny < 0 || nx >= W || ny >= H || d[nk] >= 0 || MAP.solids.has(nk)) continue;
+      d[nk] = d[k] + 1;
+      q.push(nk);
+    }
+  }
+  fields.set(key, d);
+  return d;
+}
+
+// Direction for cat p to walk towards (x, y), going around obstacles.
+function towards(p, x, y) {
+  const tx = Math.floor(x / T), ty = Math.floor(y / T), px = Math.floor(p.x / T), py = Math.floor(p.y / T);
+  if (Math.abs(tx - px) + Math.abs(ty - py) <= 1) return [x - p.x, y - p.y];
+  const d = field(tx, ty);
+  let best = null, bd = d[py * W + px] >= 0 ? d[py * W + px] : 1e9;
+  for (const [nx, ny] of [[px + 1, py], [px - 1, py], [px, py + 1], [px, py - 1]]) {
+    if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+    const v = d[ny * W + nx];
+    if (v >= 0 && v < bd) { bd = v; best = [nx, ny]; }
+  }
+  if (!best) return [x - p.x, y - p.y];
+  return [(best[0] + 0.5) * T - p.x, (best[1] + 0.5) * T - p.y];
+}
+
+export function runBot({ players = 2, seed = 1, loadouts, cats, map = 0, maxMinutes = 40 } = {}) {
+  const s = sim.createState(players, seed, { map, cats });
+  fields.clear();
   s.players.forEach((p, i) => {
     const pick = loadouts?.[i] || FLOWER_ORDER.slice(i * 2, i * 2 + LOADOUT_SIZE);
     p.pick.chosen = pick.length === LOADOUT_SIZE ? pick : FLOWER_ORDER.slice(0, LOADOUT_SIZE);
@@ -44,6 +83,8 @@ export function runBot({ players = 2, seed = 1, loadouts, map = 0, maxMinutes = 
           const spot = p.coins >= 25 && spots.find(([x, y]) => sim.canBuildAt(s, x, y));
           if (spot) {
             p.sel = built++ % p.loadout.length;
+            // save expensive superweapons (Sunflower) until the first boss is near
+            if (FLOWERS[p.loadout[p.sel]].cost > 100 && s.wave < 4) p.sel = built++ % p.loadout.length;
             p.building = true;
             p.x = (spot[0] + 0.5) * T; p.y = (spot[1] + 0.5) * T;
             inp.buildTap = true; inp.build = true;
@@ -61,9 +102,9 @@ export function runBot({ players = 2, seed = 1, loadouts, map = 0, maxMinutes = 
       let coin = null, cd = 1e9;
       for (const d of s.drops) { const dd = Math.hypot(d.x - p.x, d.y - p.y); if (dd < cd) { cd = dd; coin = d; } }
       if (foe && (!coin || fd < cd || foe.atBase)) {
-        inp.mx = foe.x - p.x; inp.my = foe.y - p.y;
-        if (fd < 60) { p.dir = Math.atan2(inp.my, inp.mx); inp.mx = 0; inp.my = 0; inp.atk = true; }
-      } else if (coin) { inp.mx = coin.x - p.x; inp.my = coin.y - p.y; }
+        [inp.mx, inp.my] = towards(p, foe.x, foe.y);
+        if (fd < 60) { p.dir = Math.atan2(foe.y - p.y, foe.x - p.x); inp.mx = 0; inp.my = 0; inp.atk = true; }
+      } else if (coin) { [inp.mx, inp.my] = towards(p, coin.x, coin.y); }
     });
     sim.step(s, inputs, 1 / 60);
     s.events.length = 0;
