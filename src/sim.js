@@ -66,6 +66,12 @@ export function canBuildAt(s, tx, ty) {
 }
 
 export const healCostPerHp = (f) => (FLOWERS[f.type].cost * HEAL_COST) / FLOWER_HP;
+export const uprootRefund = (f) => Math.floor((f.spent || 0) * ECONOMY.uprootRefund);
+
+// What the mode key cycles through while standing on a flower.
+function modesFor(f) {
+  return f.lvl > 0 && f.lvl < MAX_LEVEL ? ['grow', 'heal', 'dig'] : ['grow', 'dig'];
+}
 
 // ---- Enemies --------------------------------------------------------------
 function spawnEnemy(s, type, from, path = 0) {
@@ -372,6 +378,13 @@ function plant(s, p) {
 
 // A cat holding the plant key pours its own coins into the flower it stands on.
 function work(s, p, f, dt) {
+  if (p.mode === 'dig') {
+    p.dig = (p.dig || 0) + dt / ECONOMY.uprootSeconds;
+    p.working = f;
+    ev(s, 'dig');
+    if (p.dig >= 1) uproot(s, p, f);
+    return;
+  }
   if (f.lvl > 0 && p.mode === 'heal') {
     if (f.hp >= FLOWER_HP) return;
     const cph = healCostPerHp(f);
@@ -397,6 +410,7 @@ function work(s, p, f, dt) {
   if (pay <= 1e-6) return deny(s, p, f.x, f.y - T * 0.6, 'Out of coins!');
   p.coins -= pay;
   g.paid += pay;
+  f.spent = (f.spent || 0) + pay;
   p.working = f;
   ev(s, 'pour');
   if (g.paid >= g.cost - 1e-6) {
@@ -410,6 +424,19 @@ function work(s, p, f, dt) {
     ev(s, 'grown');
     p.waitRelease = true; // don't roll straight into the next upgrade
   }
+}
+
+function uproot(s, p, f) {
+  const refund = uprootRefund(f);
+  p.coins += refund;
+  p.dig = 0;
+  p.mode = 'grow';
+  p.waitRelease = true;
+  f.dead = true;
+  s.grid.delete(f.ty * W + f.tx);
+  puff(s, f.x, f.y, '#9a7b55', 14, 110);
+  text(s, f.x, f.y - T * 0.6, refund > 0 ? `Dug up · +${refund}` : 'Dug up', '#ffe27a');
+  ev(s, 'uproot');
 }
 
 function updatePlayers(s, dt, inputs) {
@@ -448,7 +475,7 @@ function updatePlayers(s, dt, inputs) {
     if (f && f.id !== p.onFlowerId) p.mode = f.lvl > 0 && f.hp < FLOWER_HP * 0.6 ? 'heal' : 'grow';
     p.onFlowerId = f ? f.id : null;
     if (inp.cycle) {
-      if (f && f.lvl > 0 && f.lvl < MAX_LEVEL) p.mode = p.mode === 'heal' ? 'grow' : 'heal';
+      if (f) { const ms = modesFor(f); p.mode = ms[(ms.indexOf(p.mode) + 1) % ms.length]; }
       else if (!f) {
         // off → flower 1 → … → flower 4 → off
         if (!p.building) { p.building = true; p.sel = 0; }
@@ -463,6 +490,7 @@ function updatePlayers(s, dt, inputs) {
     }
     if (!inp.build) p.waitRelease = false;
     if (inp.build && f && !p.waitRelease) work(s, p, f, dt);
+    if (p.working?.id !== f?.id || p.mode !== 'dig') p.dig = 0; // digging only counts while held
   }
   return ready;
 }

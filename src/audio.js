@@ -89,13 +89,15 @@ const SOUNDS = {
   burrow: () => noise({ f: 450, f2: 150, dur: 0.3, vol: 0.18 }),
   dash: () => noise({ type: 'bandpass', f: 2400, f2: 500, q: 1.5, dur: 0.22, vol: 0.1 }),
   chomp: () => { noise({ type: 'bandpass', f: 1600, q: 3, dur: 0.05, vol: 0.12 }); noise({ type: 'bandpass', f: 1300, q: 3, dur: 0.05, vol: 0.1, delay: 0.09 }); },
+  dig: () => noise({ type: 'bandpass', f: 500 + Math.random() * 300, q: 1.5, dur: 0.08, vol: 0.12 }),
+  uproot: () => { noise({ f: 900, f2: 200, dur: 0.3, vol: 0.2 }); tone({ type: 'triangle', f: 700, f2: 300, dur: 0.2, vol: 0.1 }); tone({ type: 'square', f: 988, dur: 0.06, vol: 0.05, delay: 0.2 }); },
   win: () => arp([523, 523, 784, 784, 880, 1047, 1319], 0.14, { type: 'triangle', dur: 0.3, vol: 0.13 }),
   lose: () => arp([440, 392, 349, 262], 0.25, { type: 'triangle', dur: 0.4, vol: 0.13 }),
 };
 
 // Minimum seconds between repeats, so a dozen flowers don't deafen anyone.
 const LIMIT = { shoot_daisy: 0.07, shoot_frost: 0.2, shoot_thorn: 0.1, shoot_sunflower: 0.15, shoot_firelily: 0.12, shoot_stink: 0.15, splash: 0.08, die: 0.05, coin: 0.05, hit: 0.04,
-  pour: 0.09, chomp: 0.4, burrow: 0.15, dash: 0.15, spawn: 0.25, split: 0.08, deny: 0.3 };
+  pour: 0.09, dig: 0.16, chomp: 0.4, burrow: 0.15, dash: 0.15, spawn: 0.25, split: 0.08, deny: 0.3 };
 
 export function play(name) {
   if (!ctx || muted || !SOUNDS[name]) return;

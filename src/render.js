@@ -4,7 +4,7 @@ import {
   T, U, W, H, WORLD_W, WORLD_H, VIEW_W, MAP_H, HUD_H, TOTAL_WAVES, PATHS, BASE, PATH_TILES, BLOCKED, MAP, MAPS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, flowerStats, upgradeCost, PLAYER,
 } from './data.js';
-import { tileOf, canBuildAt, healCostPerHp } from './sim.js';
+import { tileOf, canBuildAt, healCostPerHp, uprootRefund } from './sim.js';
 import { isMuted } from './audio.js';
 
 export { VIEW_W };
@@ -414,11 +414,27 @@ function drawFlowerStatus(c, f, s) {
     rrect(c, x - 1.5, y - 1.5, w + 3, 7, 3, OUT);
     rrect(c, x, y, Math.max(0, w * r), 4, 2, r > 0.6 ? '#6be06b' : r > 0.3 ? '#ffd23f' : '#ff6a5a');
   }
+  const digger = workers.find((p) => p.mode === 'dig' && p.dig > 0);
+  if (digger) {
+    const r = T * 0.52;
+    c.lineCap = 'round';
+    c.beginPath(); c.arc(f.x, f.y, r, 0, Math.PI * 2); c.strokeStyle = 'rgba(0,0,0,0.35)'; c.lineWidth = 6; c.stroke();
+    c.beginPath(); c.arc(f.x, f.y, r, -Math.PI / 2, -Math.PI / 2 + Math.min(1, digger.dig) * Math.PI * 2);
+    c.strokeStyle = '#e0a060'; c.lineWidth = 4; c.stroke();
+  }
   if (f.lvl > 1) label(c, `${f.lvl}`, f.x + T * 0.36, f.y + T * 0.22, 11, f.lvl === MAX_LEVEL ? '#ffd23f' : '#ffffff', 'center', 700);
 }
 
 function drawWorkStream(c, p, time) {
   const f = p.working;
+  if (p.mode === 'dig') {
+    // clods of dirt flicking up from the flower's roots
+    for (let i = 0; i < 4; i++) {
+      const k = (time * 3 + i / 4) % 1, side = i % 2 ? 1 : -1;
+      circle(c, f.x + side * (6 + k * 18), f.y + T * 0.25 - Math.sin(k * Math.PI) * T * 0.45, 3.5 - k * 1.5, '#8a5a32', OUT, 1);
+    }
+    return;
+  }
   const heal = p.mode === 'heal' && !f.grow;
   for (let i = 0; i < 3; i++) {
     const k = (time * 2.5 + i / 3) % 1;
@@ -738,7 +754,7 @@ function drawBuildGhost(c, p, s, time) {
   if (!f && !p.building) return; // the placeholder only shows in build mode
   const type = p.loadout[p.sel];
   const valid = f ? true : canBuildAt(s, tx, ty);
-  const col = !valid ? '255,90,90' : f && p.mode === 'heal' && f.lvl > 0 ? '140,255,160' : '255,255,255';
+  const col = !valid ? '255,90,90' : f && p.mode === 'dig' ? '230,160,90' : f && p.mode === 'heal' && f.lvl > 0 ? '140,255,160' : '255,255,255';
   const pulse = 0.6 + Math.sin(time * 6) * 0.25;
   c.setLineDash([7, 5]); c.lineDashOffset = -time * 20;
   rrect(c, tx * T + 3, ty * T + 3, T - 6, T - 6, 8, `rgba(${col},0.12)`, `rgba(${col},${pulse})`, 2.5);
@@ -921,12 +937,14 @@ function contextText(s, p, ui) {
     return `[${key}] plant ${F.name} (${F.cost}) · [${cyc}] next · ${F.desc}`;
   }
   const name = FLOWERS[f.type].name;
-  if (f.lvl === 0) return `Hold [${key}] to grow ${name} · ${Math.floor(f.grow.paid)}/${f.grow.cost}`;
-  if (f.lvl >= MAX_LEVEL) return `${name} · max level, never wilts`;
+  const midLevel = f.lvl > 0 && f.lvl < MAX_LEVEL;
+  if (p.mode === 'dig') return `Hold [${key}] dig up ${name} · get back ${uprootRefund(f)} · [${cyc}] ${midLevel ? 'upgrade' : 'back'}`;
+  if (f.lvl === 0) return `Hold [${key}] to grow ${name} · ${Math.floor(f.grow.paid)}/${f.grow.cost} · [${cyc}] dig up`;
+  if (f.lvl >= MAX_LEVEL) return `${name} · max level, never wilts · [${cyc}] dig up`;
   if (p.mode === 'heal') {
-    if (f.hp >= FLOWER_HP) return `${name} is healthy · [${cyc}] upgrade mode`;
+    if (f.hp >= FLOWER_HP) return `${name} is healthy · [${cyc}] dig up mode`;
     const cost = Math.ceil((FLOWER_HP - f.hp) * healCostPerHp(f));
-    return `Hold [${key}] heal ${Math.floor(f.hp)}% → 100% (${cost}) · [${cyc}] upgrade`;
+    return `Hold [${key}] heal ${Math.floor(f.hp)}% → 100% (${cost}) · [${cyc}] dig up`;
   }
   const paid = f.grow ? Math.floor(f.grow.paid) : 0, cost = f.grow ? f.grow.cost : upgradeCost(f.type, f.lvl);
   return `Hold [${key}] upgrade → Lv${f.lvl + 1} (${paid}/${cost}) · [${cyc}] heal`;
@@ -1111,7 +1129,7 @@ function drawMenu(c, time, ui) {
   rows.forEach((r, ri) => r.forEach((t, ci) => label(c, t, cols[ci], 358 + ri * 28, ri ? 16 : 13, ri ? '#fff' : '#8fa5b3', 'center', ri ? 600 : 500, null)));
   const tips = [
     'Plant key: build mode, again to plant a seedling, then HOLD to pour coins in. Next-flower key cycles.',
-    'Flowers wear out as they fight: stand on one and switch to heal mode. Level 5 flowers never wilt.',
+    'Flowers wear out as they fight: stand on one and switch to heal mode (or dig it up for 60% back).',
     'Each cat brings 4 of the 7 flowers and keeps the coins it picks up. Bombs knock cats down too!',
   ];
   tips.forEach((t, i) => label(c, t, cx, 455 + i * 24, 13.5, '#cfe0ea', 'center', 500, null));

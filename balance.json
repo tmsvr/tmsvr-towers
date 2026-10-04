@@ -9,6 +9,7 @@
     "enemies.bite": "Damage per second an enemy does to the cottage while chomping on it (it keeps chomping until killed).",
     "enemies.size": "Radius in tiles. 'light' enemies can be knocked back by the baton and swallowed by Snapdragons.",
     "difficulty": "Enemy health = base * (1 + hpPerWave*(wave-1) + hpPerWaveSquared*(wave-1)^2). Wave size budget = waveBudgetBase + waveBudgetPerWave*wave.",
+    "economy.uprootRefund": "Share of the coins poured into a flower (planting + upgrades, not healing) you get back when you dig it up. uprootSeconds = how long you hold the key to dig.",
     "waves": "Which enemies can appear: fromWave = first wave it shows up, weight = how often it is picked, cost = how much of the wave budget one group uses, group = how many spawn together."
   },
 
@@ -33,7 +34,9 @@
     "coinDropMultiplier": 1,
     "waveBonusBase": 10,
     "waveBonusPerWave": 2,
-    "coopBonusShare": 0.6
+    "coopBonusShare": 0.6,
+    "uprootRefund": 0.6,
+    "uprootSeconds": 1.2
   },
 
   "difficulty": {
