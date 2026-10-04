@@ -312,12 +312,17 @@ function buildQueue(s, n) {
     for (const u of avail) { r -= weightOf(u); if (r <= 0) { pick = u; break; } }
     const path = Math.floor(rnd(s) * s.m.paths.length); // a group sticks together on one road
     const [lo, hi] = TUNE.spawnGap || [0.4, 1.2];
-    for (let i = 0; i < pick.group; i++) q.push({ type: pick.enemy, path, wait: pick.group > 1 ? 0.22 : lo + rnd(s) * (hi - lo) });
+    // packs (swarms, wasps) get bigger every wave after they first appear
+    const group = pick.group > 1 ? Math.round(pick.group * (1 + (TUNE.packGrowthPerWave ?? 0) * (n - pick.fromWave))) : 1;
+    for (let i = 0; i < group; i++) q.push({ type: pick.enemy, path, wait: group > 1 ? 0.18 : lo + rnd(s) * (hi - lo) });
     budget -= pick.cost;
   }
   if (bossWave) q.push({ type: 'boss', path: Math.floor(rnd(s) * s.m.paths.length), wait: 3 });
   const k = Math.max(TUNE.spawnGapMinScale ?? 0.5, 1 - n * (TUNE.spawnSpeedupPerWave ?? 0.03));
   for (const e of q) e.wait *= k;
+  // the opening rush: the first part of every wave pours out almost at once
+  const rush = Math.floor(q.length * (TUNE.openingRush ?? 0));
+  for (let i = 0; i < rush; i++) q[i].wait = Math.min(q[i].wait, 0.12);
   return q;
 }
 
