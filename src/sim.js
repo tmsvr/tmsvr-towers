@@ -593,7 +593,9 @@ function updateFlowers(s, dt) {
       if (!hittable(e) || (st.groundOnly && e.def.flying)) continue;
       if (dist(e, f) <= st.range + e.def.r) {
         inRange.push(e);
-        const better = st.target === 'strong' ? !best || e.hp > best.hp : !best || e.left < best.left;
+        // 'strong' locks onto the toughest monster (by max health), so a nearly
+        // dead boss isn't abandoned for its fresh minions
+        const better = st.target === 'strong' ? !best || e.maxhp > best.maxhp || (e.maxhp === best.maxhp && e.hp < best.hp) : !best || e.left < best.left;
         if (better) best = e;
       }
     }
