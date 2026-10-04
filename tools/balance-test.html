@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Balance Test</title>
+<style>
+  :root { --bg: #141b22; --panel: #1f2a33; --text: #e8f1f7; --muted: #8fa5b3; --win: #7dff8a; --lose: #ff7a6a; }
+  body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 900px; margin: 0 auto; }
+  h1 { margin: 0 0 4px; font-size: 24px; }
+  p { color: var(--muted); margin: 0 0 16px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; }
+  select, input, button { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid #4c6070; background: var(--panel); color: var(--text); }
+  button { background: #ffd23f; color: #2b2118; border: none; font-weight: 600; cursor: pointer; }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: 10px; overflow: hidden; }
+  th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #2c3a45; vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; }
+  .win { color: var(--win); font-weight: 600; } .lose { color: var(--lose); font-weight: 600; }
+  .log { color: var(--muted); font-size: 12px; font-family: ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Balance test</h1>
+  <p>Runs an autopilot through whole games using the current <code>balance.json</code>. It plays both cats, fights with the baton and builds flowers, but never uses bombs, so real players should last longer. Edit <code>balance.json</code>, reload this page and run again.</p>
+  <div class="controls">
+    <label>Players <select id="players"><option value="1">Solo</option><option value="2" selected>Co-op</option></select></label>
+    <label>Map <select id="map"></select></label>
+    <label>Games <input id="games" type="number" min="1" max="20" value="4" style="width:60px"></label>
+    <button id="run">Run</button>
+    <span id="status"></span>
+  </div>
+  <table><thead><tr><th>Seed</th><th>Result</th><th>Per wave: lives · coins · flowers (total levels)</th></tr></thead><tbody id="rows"></tbody></table>
+</main>
+<script type="module">
+  import { runBot } from './bot.js';
+  import * as data from '../src/data.js';
+  const mapSel = document.getElementById('map');
+  (data.MAPS || [{ name: 'Default' }]).forEach((m, i) => mapSel.add(new Option(m.name, i)));
+  document.getElementById('run').onclick = async () => {
+    const rows = document.getElementById('rows'), status = document.getElementById('status');
+    rows.innerHTML = '';
+    const n = +document.getElementById('games').value, players = +document.getElementById('players').value, map = +mapSel.value;
+    for (let seed = 1; seed <= n; seed++) {
+      status.textContent = `Running game ${seed}/${n}…`;
+      await new Promise((r) => setTimeout(r, 20));
+      const r = runBot({ players, seed, map });
+      const tr = rows.insertRow();
+      tr.insertCell().textContent = seed;
+      const res = tr.insertCell();
+      res.textContent = r.won ? `Won with ${r.lives} lives` : `Lost on wave ${r.wave}`;
+      res.className = r.won ? 'win' : 'lose';
+      const log = tr.insertCell();
+      log.className = 'log';
+      log.textContent = r.log.map((w) => `w${w.wave}: ${w.lives}♥ ${w.coins.join('/')}c ${w.flowers}f(${w.levels})`).join('  ');
+    }
+    status.textContent = 'Done';
+  };
+</script>
+</body>
+</html>

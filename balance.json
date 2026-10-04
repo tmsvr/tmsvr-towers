@@ -48,8 +48,8 @@
     "bossWaveBudget": 0.6,
     "soloWaveSize": 0.6,
     "soloBossHp": 0.6,
-    "coopWaveSize": 1.0,
-    "coopEnemyHp": 1.0
+    "coopWaveSize": 1.3,
+    "coopEnemyHp": 1.1
   },
 
   "flowerLevels": {
