@@ -41,6 +41,7 @@ them.
   `economy.coopCoinShare`), so the gardener can afford to garden.
 - P1: WASD move · Shift sprint · F baton · G bomb · E plant/upgrade (hold) · R heal (hold) · Q next flower / dig-up mode
 - P2 (local): arrows · Right Shift sprint · `,` baton · `.` bomb · `/` plant/upgrade · `'` heal · M next flower
+- L downloads the game logs (see below).
 - J turns the extra effects (damage numbers, confetti, hit-stop…) on and off.
 - Online, both players use the P1 keys on their own keyboard. Your friend needs
   the game too: easiest is hosting it on GitHub Pages (see above) and sending
@@ -57,6 +58,17 @@ them.
 
 The autopilot never uses bombs and picks flowers crudely, so treat its
 results as a lower bound on what real players can survive.
+
+## Game logs
+
+Every game keeps a log for balancing: per wave how long it took, which
+monsters came and died, cottage damage by monster type, each cat's coins
+(start, earned, spent on planting/upgrades/healing, end), damage and kills by
+each flower type, baton and bomb, flowers planted, upgraded, wilted (wear or
+aphids) and dug up, and the garden at the end of the wave. The last 20 games
+are kept in the browser; press **L** (in a game, on the end screen or in the
+menu) to download them as one JSON file. Online, the host's browser has the
+log. The code is in `src/stats.js`.
 
 ## Code
 

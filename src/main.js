@@ -5,6 +5,7 @@
 //   host      – this browser runs the game; player 2's inputs arrive over the network (host.js)
 //   guest     – this browser only sends inputs and draws snapshots from the host (guest.js)
 import { createState, step } from './sim.js';
+import { finishLog } from './stats.js';
 import { render, VIEW_W, VIEW_H } from './render.js';
 import { initAudio, play, toggleMute, setMusicMood } from './audio.js';
 import { juiceEvent, hitStopping, toggleJuice } from './juice.js';
@@ -93,6 +94,7 @@ addEventListener('keydown', (e) => {
   pressed.add(code);
   if (code === 'KeyN') toggleMute();
   if (code === 'KeyJ') toggleJuice();
+  if (code === 'KeyL') downloadLogs();
   if (code === 'Escape') { if (mode !== 'menu') backToMenu(); return; }
   if (mode === 'menu') {
     if (code === 'Digit1' || code === 'Numpad1') startLocal(1);
@@ -114,10 +116,44 @@ addEventListener('keyup', (e) => held.delete(e.code || KEY_TO_CODE[e.key] || '')
 addEventListener('blur', () => held.clear());
 addEventListener('pointerdown', initAudio);
 
+// ---- game logs (for balancing) -------------------------------------------------
+// Every finished (or abandoned) game's log is kept in this browser, the last
+// LOG_KEEP of them; L downloads them all as one JSON file. Only the copy that
+// runs the game (local play or the online host) has a log.
+const LOG_KEY = 'petalpatrol-logs', LOG_KEEP = 20;
+function savedLogs() {
+  try { return JSON.parse(localStorage.getItem(LOG_KEY)) || []; } catch { return []; }
+}
+function saveGameLog(how) {
+  if (!state?.stats || state.logSaved) return;
+  state.logSaved = true;
+  if (!state.stats.waves.length && !(state.stats.cur && state.wave > 0)) return; // nothing played yet
+  const entry = finishLog(state, how);
+  entry.mode = mode === 'host' ? 'online co-op (host)' : nPlayers > 1 ? 'local co-op' : 'solo';
+  try { localStorage.setItem(LOG_KEY, JSON.stringify([...savedLogs(), entry].slice(-LOG_KEEP))); } catch { /* storage full or blocked */ }
+}
+function downloadLogs() {
+  const logs = savedLogs();
+  // include the game in progress, as it stands
+  if (state?.stats && !state.logSaved && state.stats.waves.length) {
+    const { cur, ...now } = state.stats;
+    logs.push({ ...now, result: { how: 'in progress', wave: state.wave, cottage: Math.round(state.lives), kills: state.kills, seconds: Math.round(state.t) } });
+  }
+  if (!logs.length) { flashNote(mode === 'guest' ? 'The host has the game log' : 'No games logged yet'); return; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify({ games: logs }, null, 1)], { type: 'application/json' }));
+  a.download = `petal-patrol-log-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  flashNote(`Downloaded ${logs.length} game log${logs.length > 1 ? 's' : ''}`);
+}
+function flashNote(txt) { ui.note = { txt, until: performance.now() + 2500 }; }
+
 // ---- modes ------------------------------------------------------------------
 let lastLoadouts = [], lastCats = [];
 let lastMap = 0;
 function newGame() {
+  saveGameLog('quit');
   if (state && state.players) { lastLoadouts = state.players.map((p) => p.loadout || p.pick.chosen); lastCats = state.players.map((p) => p.cat); lastMap = state.map; }
   state = createState(nPlayers, (Math.random() * 1e9) | 0, { sharedScreen: mode === 'local' && nPlayers > 1, loadouts: lastLoadouts, cats: lastCats, map: lastMap });
   ui.cam.snap = true;
@@ -129,6 +165,7 @@ function newGame() {
 function startLocal(n) { mode = 'local'; nPlayers = n; newGame(); }
 
 function backToMenu() {
+  saveGameLog('quit');
   if (net) net.close();
   net = null;
   mode = 'menu';
@@ -297,6 +334,7 @@ function pump() {
         acc -= DT;
       }
     }
+    if (state && (state.over || state.won) && !state.logSaved) saveGameLog(state.won ? 'won' : 'lost');
     drainEffects(state, mode === 'host');
     if (!stopped && !ui.paused) { updateEffects(elapsed); spawnTrails(state, elapsed); }
     playEvents(state.events, mode === 'host');

@@ -9,6 +9,7 @@ import {
   POISON_TIME, START_COINS, LOADOUT_SIZE, WAVES, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER,
 } from './data.js';
 import { prune, clamp, nextSeed, randomFrom } from './util.js';
+import * as log from './stats.js';
 
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const isDead = (o) => o.dead, isDone = (o) => o.done, cloudGone = (c) => c.t >= c.dur;
@@ -131,6 +132,7 @@ const FLOWER_MODES = ['grow', 'dig'];
 
 // ---- Enemies --------------------------------------------------------------
 function spawnEnemy(s, type, from, path = 0) {
+  log.logSpawn(s, type);
   const d = ENEMIES[type];
   const w = Math.max(0, s.wave - 1);
   const solo = s.players.length === 1;
@@ -156,11 +158,15 @@ function spawnEnemy(s, type, from, path = 0) {
 // Whether flowers, bombs and batons can touch this enemy right now.
 export const hittable = (e) => !e.dead && !e.under;
 
-export function damage(s, e, amt, ignoreArmor = false, quiet = false) {
+// src (optional) is who did it, for the game log: a flower type, 'baton P1'...
+export function damage(s, e, amt, ignoreArmor = false, quiet = false, src = null) {
   if (e.dead) return;
-  e.hp -= ignoreArmor ? amt : Math.max(1, amt - e.def.armor);
+  const hit = ignoreArmor ? amt : Math.max(1, amt - e.def.armor);
+  const dealt = Math.min(hit, Math.max(0, e.hp));
+  e.hp -= hit;
   if (!quiet) e.flash = 0.1;
   if (e.hp <= 0) killEnemy(s, e);
+  log.logDamage(s, src, e, dealt, e.dead);
 }
 
 function killEnemy(s, e) {
@@ -199,7 +205,7 @@ function updateEnemies(s, dt) {
     if (e.slowT > 0) { e.slowT -= dt; if (e.slowT <= 0) e.slow = 1; }
     if (e.psnT > 0) {
       e.psnT -= dt;
-      damage(s, e, e.psn * e.psnDps * dt, true, true);
+      damage(s, e, e.psn * e.psnDps * dt, true, true, 'stink');
       if (e.psnT <= 0) e.psn = 0;
       if (e.dead) continue;
     }
@@ -244,7 +250,7 @@ function updateEnemies(s, dt) {
         else {
           e.chewT -= dt;
           e.wob += dt * 14;
-          hurtFlower(s, e.chew, e.def.eats.damagePerSecond * WEAR_MULT[e.chew.lvl] * dt); // sturdier flowers shrug off bites
+          hurtFlower(s, e.chew, e.def.eats.damagePerSecond * WEAR_MULT[e.chew.lvl] * dt, false, 'aphid'); // sturdier flowers shrug off bites
           ev(s, 'chomp');
           if (e.chewT <= 0) { e.chew = null; e.chewCd = e.def.eats.cooldown; }
           continue;
@@ -283,6 +289,7 @@ function chompCottage(s, e, dt) {
   e.wob += dt * 14;
   e.ang = Math.atan2(s.m.base.y - e.y, s.m.base.x - e.x);
   s.lives -= e.def.bite * dt;
+  log.logCottage(s, e.type, e.def.bite * dt);
   s.baseHitT = 0.25;
   ev(s, 'chomp');
   if (s.t - s.lastAlarm > 10) {
@@ -291,7 +298,7 @@ function chompCottage(s, e, dt) {
     ev(s, 'leak');
     ev(s, 'shake', { amt: 4 });
   }
-  if (s.lives <= 0) { s.lives = 0; s.over = true; ev(s, 'lose'); }
+  if (s.lives <= 0) { s.lives = 0; s.over = true; log.logWaveEnd(s, 'lost'); ev(s, 'lose'); }
 }
 
 // ---- Waves ----------------------------------------------------------------
@@ -331,6 +338,7 @@ function startWave(s) {
   s.phase = 'wave';
   s.queue = buildQueue(s, s.wave);
   s.spawnWait = 0.5;
+  log.logWaveStart(s);
   const boss = s.wave % TUNE.bossEvery === 0;
   banner(s, boss ? `Wave ${s.wave} — BOSS!` : `Wave ${s.wave}`);
   ev(s, boss ? 'boss' : 'wave');
@@ -351,12 +359,13 @@ function updateWaves(s, dt, ready) {
       s.spawnWait = e.wait;
     }
   } else if (!s.enemies.some((e) => !e.dead)) {
-    if (s.wave >= TOTAL_WAVES) { s.won = true; ev(s, 'win'); return; }
+    if (s.wave >= TOTAL_WAVES) { s.won = true; log.logWaveEnd(s, 'won'); ev(s, 'win'); return; }
     s.phase = 'prep';
     s.timer = TUNE.timeBetweenWaves;
     // Everyone gets a share; in co-op each cat gets a bit more than half.
     const bonus = Math.round((ECONOMY.waveBonusBase + s.wave * ECONOMY.waveBonusPerWave) * (s.players.length > 1 ? ECONOMY.coopBonusShare : 1));
     for (const p of s.players) p.coins += bonus;
+    log.logWaveEnd(s, 'cleared');
     banner(s, bonus > 0 ? `Wave cleared!  +${bonus} each` : 'Wave cleared!');
     ev(s, 'clear');
   }
@@ -383,7 +392,7 @@ function swing(s, p) {
     let da = Math.atan2(dy, dx) - p.dir;
     da = Math.atan2(Math.sin(da), Math.cos(da));
     if (Math.abs(da) > PLAYER.atkArc / 2 && d > e.def.r + 10 * U) continue;
-    damage(s, e, cs.atkDmg);
+    damage(s, e, cs.atkDmg, false, false, `baton P${p.id + 1}`);
     hit = true;
     if (e.chew) { e.chew = null; e.chewCd = 2; }
     // Only small critters get knocked back, so the baton can't juggle big ones in a kill zone.
@@ -397,7 +406,7 @@ function throwBomb(s, p) {
   p.bombs -= 1;
   const tx = clamp(p.x + Math.cos(p.dir) * PLAYER.bombRange, 10, s.m.worldW - 10);
   const ty = clamp(p.y + Math.sin(p.dir) * PLAYER.bombRange, 10, s.m.worldH - 10);
-  s.bombs.push({ id: s.nextId++, sx: p.x, sy: p.y, tx, ty, x: p.x, y: p.y, h: 0, t: 0, dur: 0.6, r: catStats(p).bombRadius, dmg: catStats(p).bombDmg });
+  s.bombs.push({ id: s.nextId++, sx: p.x, sy: p.y, tx, ty, x: p.x, y: p.y, h: 0, t: 0, dur: 0.6, r: catStats(p).bombRadius, dmg: catStats(p).bombDmg, owner: p.id });
   ev(s, 'throw');
 }
 
@@ -412,7 +421,7 @@ function explode(s, b) {
   for (const e of s.enemies) {
     if (!hittable(e)) continue;
     if (Math.hypot(e.x - b.tx, e.y - b.ty) <= R + e.def.r) {
-      damage(s, e, b.dmg ?? PLAYER.bombDmg, true);
+      damage(s, e, b.dmg ?? PLAYER.bombDmg, true, false, `bomb P${(b.owner ?? 0) + 1}`);
       applyStun(e, PLAYER.bombStun);
     }
   }
@@ -453,6 +462,7 @@ function plant(s, p) {
     hp: FLOWER_HP, headIdx: 0, dead: false, grow: { to: 1, cost: plantCost(type), paid: 0 },
   };
   s.flowers.push(nf);
+  log.logPlanted(s, type);
   s.grid.set(k, nf);
   puff(s, nf.x, nf.y, '#c9a26b', 10);
   ev(s, 'plant');
@@ -466,6 +476,7 @@ function heal(s, p, f, dt) {
   const pay = Math.min((FLOWER_HP - f.hp) * cph, HEAL_RATE * cs.grow * dt * cph, p.coins);
   if (pay <= 1e-6) return deny(s, p, f.x, f.y - T * 0.6, 'Out of coins!');
   p.coins -= pay;
+  log.logCoins(s, p, 'heal', pay);
   f.hp += pay / cph;
   p.working = f;
   ev(s, 'pour');
@@ -497,12 +508,14 @@ function work(s, p, f, dt) {
   if (prog <= 1e-6) return deny(s, p, f.x, f.y - T * 0.6, 'Out of coins!');
   const pay = prog * cs.price;
   p.coins -= pay;
+  log.logCoins(s, p, g.to === 1 ? 'plant' : 'upgrade', pay);
   g.paid += prog;
   f.spent = (f.spent || 0) + pay;
   p.working = f;
   ev(s, 'pour');
   if (g.paid >= g.cost - 1e-6) {
     f.lvl = g.to;
+    if (f.lvl > 1) log.logUpgrade(s, f.type, f.lvl);
     f.grow = null;
     f.hp = FLOWER_HP;
     f.flash = 0.5;
@@ -517,6 +530,8 @@ function work(s, p, f, dt) {
 function uproot(s, p, f) {
   const refund = uprootRefund(f);
   p.coins += refund;
+  log.logCoins(s, p, 'refund', refund);
+  log.logDug(s, f.type);
   p.dig = 0;
   p.mode = 'grow';
   p.waitRelease = true;
@@ -611,7 +626,7 @@ function updatePlayers(s, dt, inputs) {
 
 // ---- Flowers & projectiles -----------------------------------------------
 // quiet: slow wear, so the flower doesn't flash as if it were being bitten.
-function hurtFlower(s, f, amt, quiet = false) {
+function hurtFlower(s, f, amt, quiet = false, cause = 'wear') {
   if (f.dead || f.lvl >= MAX_LEVEL) return;
   f.hp -= amt;
   if (!quiet) f.hurtT = 0.15;
@@ -621,6 +636,7 @@ function hurtFlower(s, f, amt, quiet = false) {
     puff(s, f.x, f.y, '#9a7b55', 16, 100);
     text(s, f.x, f.y - T * 0.5, 'Wilted…', '#d9b38c');
     ev(s, 'wilt');
+    log.logWilt(s, f.type, cause);
   }
 }
 
@@ -632,7 +648,7 @@ function updateFlowers(s, dt) {
     if (f.lvl === 0) continue; // seedlings don't fight
     // Every flower wears out at the same steady pace while a wave is on,
     // whatever its range or fire rate; higher levels wear slower, max never.
-    if (s.phase === 'wave') hurtFlower(s, f, WEAR_PER_SEC * WEAR_MULT[f.lvl] * dt, true);
+    if (s.phase === 'wave') hurtFlower(s, f, WEAR_PER_SEC * WEAR_MULT[f.lvl] * dt, true, 'wear');
     if (f.dead) continue;
     f.cd -= dt;
     if (f.cd > 0) continue;
@@ -656,18 +672,18 @@ function updateFlowers(s, dt) {
     f.headIdx = (f.headIdx + 1) % Math.min(f.lvl, 5);
     const hx = f.x, hy = f.y - T * 0.35;
     if (st.kind === 'single') {
-      s.projs.push({ id: s.nextId++, kind: 'single', x: hx, y: hy, target: best, speed: 460 * U, dmg: st.dmg, color: st.color });
+      s.projs.push({ id: s.nextId++, kind: 'single', x: hx, y: hy, target: best, speed: 460 * U, dmg: st.dmg, color: st.color, src: f.type });
     } else if (st.kind === 'beam') {
-      damage(s, best, st.dmg);
+      damage(s, best, st.dmg, false, false, f.type);
       s.fx.push({ kind: 'beam', x: hx, y: hy, x2: best.x, y2: best.y, col: st.color, w: 4 + f.lvl });
       puff(s, best.x, best.y, '#fff3a0', 10, 110);
     } else if (st.kind === 'bolt') {
       const a = Math.atan2(best.y - hy, best.x - hx);
-      s.projs.push({ id: s.nextId++, kind: 'bolt', x: hx, y: hy, ang: a, speed: 420 * U, dmg: st.dmg, left: st.range * 1.25, hit: [], pierce: st.pierce ?? Infinity, color: st.color, big: f.lvl });
+      s.projs.push({ id: s.nextId++, kind: 'bolt', x: hx, y: hy, ang: a, speed: 420 * U, dmg: st.dmg, left: st.range * 1.25, hit: [], pierce: st.pierce ?? Infinity, color: st.color, big: f.lvl, src: f.type });
     } else if (st.kind === 'chomp') {
       // small critters get swallowed whole, everything else takes a big bite
       const gulp = best.def.light && !best.def.boss;
-      damage(s, best, gulp ? best.hp + 1 : st.dmg, gulp);
+      damage(s, best, gulp ? best.hp + 1 : st.dmg, gulp, false, f.type);
       s.fx.push({ kind: 'bite', x: best.x, y: best.y, r: best.def.r + 8 * U });
       if (gulp) text(s, best.x, best.y - T * 0.4, 'GULP!', '#ff9ac8');
     } else if (st.kind === 'cloud') {
@@ -678,7 +694,7 @@ function updateFlowers(s, dt) {
     } else {
       s.fx.push({ kind: 'ring', x: f.x, y: f.y, r: st.range, col: st.color, life: 0.35 });
       for (const e of inRange) {
-        if (st.dmg > 0) damage(s, e, st.dmg); // the frostbloom only slows
+        if (st.dmg > 0) damage(s, e, st.dmg, false, false, f.type); // the frostbloom only slows
         if (st.slow) { e.slow = Math.min(e.slow, st.slow); e.slowT = Math.max(e.slowT, st.slowSeconds); }
       }
     }
@@ -694,7 +710,7 @@ function updateProjs(s, dt) {
       const dx = p.target.x - p.x, dy = p.target.y - p.y;
       const d = Math.hypot(dx, dy), mv = p.speed * dt;
       p.ang = Math.atan2(dy, dx);
-      if (d <= mv + p.target.def.r) { damage(s, p.target, p.dmg); p.done = true; puff(s, p.target.x, p.target.y, p.color, 3, 60); }
+      if (d <= mv + p.target.def.r) { damage(s, p.target, p.dmg, false, false, p.src); p.done = true; puff(s, p.target.x, p.target.y, p.color, 3, 60); }
       else { p.x += (dx / d) * mv; p.y += (dy / d) * mv; }
     } else if (p.kind === 'bolt') {
       const mv = p.speed * dt;
@@ -704,7 +720,7 @@ function updateProjs(s, dt) {
         if (!hittable(e) || p.hit.includes(e.id)) continue;
         if (Math.hypot(e.x - p.x, e.y - p.y) <= e.def.r + 10 * U) {
           p.hit.push(e.id);
-          damage(s, e, p.dmg);
+          damage(s, e, p.dmg, false, false, p.src);
           puff(s, e.x, e.y, '#ffb347', 5, 80);
           if (p.hit.length >= p.pierce) { p.done = true; break; } // burnt out
         }
@@ -776,7 +792,8 @@ function updateDrops(s, dt) {
         // starved by whoever runs around fighting.
         const share = s.players.length > 1 ? ECONOMY.coopCoinShare ?? 0 : 0;
         near.coins += d.value * (1 - share);
-        for (const p of s.players) p.coins += (d.value * share) / s.players.length;
+        log.logCoins(s, near, 'earned', d.value * (1 - share));
+        for (const p of s.players) { p.coins += (d.value * share) / s.players.length; log.logCoins(s, p, 'earned', (d.value * share) / s.players.length); }
         text(s, d.x, d.y - 10, `+${d.value}`, '#ffd23f');
         ev(s, d.big ? 'bigCoin' : 'coin');
       }
@@ -845,6 +862,7 @@ function updatePick(s, inputs) {
     s.timer = DIFFICULTY.firstWaveDelay;
     banner(s, 'Plant your flowers!');
     ev(s, 'wave');
+    log.startLog(s);
   }
 }
 
