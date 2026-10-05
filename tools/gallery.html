@@ -23,12 +23,12 @@
   <canvas id="c"></canvas>
 </main>
 <script type="module">
-import { drawFlower } from '../src/render.js';
-import { FLOWER_ORDER, FLOWERS, MAX_LEVEL, T } from '../src/data.js';
+import { drawFlower, drawCat } from '../src/render.js';
+import { FLOWER_ORDER, FLOWERS, MAX_LEVEL, T, CAT_ORDER, CATS, PLAYER } from '../src/data.js';
 
 const ZOOM = +new URLSearchParams(location.search).get('zoom') || 2.2, COL = T * 1.5, ROW = T * 1.9, LEFT = 110, TOP = 40;
 const cv = document.getElementById('c'), dpr = Math.min(2, devicePixelRatio || 1);
-const W = LEFT + (MAX_LEVEL + 1) * COL, H = TOP + FLOWER_ORDER.length * ROW;
+const W = LEFT + (MAX_LEVEL + 1) * COL, H = TOP + (FLOWER_ORDER.length + CAT_ORDER.length) * ROW;
 cv.width = W * ZOOM * dpr; cv.height = H * ZOOM * dpr;
 if (ZOOM !== 2.2) { cv.style.width = W * ZOOM + 'px'; document.querySelector('main').style.maxWidth = 'none'; }
 const c = cv.getContext('2d');
@@ -49,6 +49,16 @@ function frame() {
         grow: l ? null : { to: 1, cost: 10, paid: 7 },
       }, time);
     }
+  });
+  // cats: standing facing right, facing left, then three moments of a swing
+  CAT_ORDER.forEach((cat, i) => {
+    const y = TOP + (FLOWER_ORDER.length + i + 0.55) * ROW;
+    c.textAlign = 'left'; c.fillStyle = '#20301a'; c.fillText(CATS[cat].name, 10, y + 0.05 * ROW);
+    const poses = [{ dir: 0 }, { dir: Math.PI }, { swing: 0.15 }, { swing: 0.5 }, { swing: 0.85 }];
+    poses.forEach((o, j) => drawCat(c, {
+      id: i % 2, cat, noTag: true, x: LEFT + (j + 0.5) * COL, y, dir: o.dir ?? 0, moving: false, stun: 0,
+      swingT: o.swing ? PLAYER.swingTime * (1 - o.swing) : 0, swingDir: 0,
+    }, time));
   });
   requestAnimationFrame(frame);
 }

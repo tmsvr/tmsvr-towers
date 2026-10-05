@@ -1138,6 +1138,63 @@ function drawCatGear(c, cat, time) {
   }
 }
 
+// Each cat's own weapon, lying along +x from the grip (0) to the tip (len).
+function drawWeapon(c, cat, len) {
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  const stick = (x0, x1, w, col) => {
+    c.strokeStyle = OUT; c.lineWidth = w + 3; c.beginPath(); c.moveTo(x0, 0); c.lineTo(x1, 0); c.stroke();
+    c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(x0, 0); c.lineTo(x1, 0); c.stroke();
+  };
+  if (cat === 'brawler') {
+    // Brick: a baseball bat, thin taped handle swelling into a fat barrel
+    c.beginPath();
+    c.moveTo(0, -1.8); c.lineTo(len * 0.35, -2.2); c.quadraticCurveTo(len * 0.7, -5.5, len - 4, -5.5);
+    c.arc(len - 4, 0, 5.5, -Math.PI / 2, Math.PI / 2);
+    c.quadraticCurveTo(len * 0.7, 5.5, len * 0.35, 2.2); c.lineTo(0, 1.8); c.closePath();
+    c.fillStyle = '#d9a35e'; c.fill(); c.strokeStyle = OUT; c.lineWidth = 1.6; c.stroke();
+    c.beginPath(); c.moveTo(len * 0.45, -1.5); c.quadraticCurveTo(len * 0.75, -3.6, len - 4, -3.4);
+    c.strokeStyle = 'rgba(255,255,255,0.45)'; c.lineWidth = 1.2; c.stroke();
+    rrect(c, 0, -2.2, len * 0.28, 4.4, 1.5, '#3b3b48', OUT, 1.2);
+    circle(c, -0.5, 0, 3, '#3b3b48', OUT, 1.2);
+  } else if (cat === 'bomber') {
+    // Boom: a pirate cutlass, brass guard and a curved blade
+    const g = len * 0.24;
+    stick(0, g, 3.4, '#7a4a22');
+    c.beginPath();
+    c.moveTo(g, -2.4); c.lineTo(len * 0.8, -2.6); c.quadraticCurveTo(len - 1, -3.4, len + 1, -6);
+    c.quadraticCurveTo(len * 0.9, 4, len * 0.62, 4.6); c.quadraticCurveTo(len * 0.4, 4.4, g, 2.6); c.closePath();
+    c.fillStyle = '#dfe7ee'; c.fill(); c.strokeStyle = OUT; c.lineWidth = 1.5; c.stroke();
+    c.beginPath(); c.moveTo(g + 2, -0.6); c.lineTo(len * 0.8, -1); c.strokeStyle = 'rgba(140,160,175,0.9)'; c.lineWidth = 1; c.stroke();
+    c.beginPath(); c.moveTo(g, -4.5); c.quadraticCurveTo(g + 2.5, 0, g, 4.5); c.quadraticCurveTo(g - 6, 6, -1, 2);
+    c.strokeStyle = OUT; c.lineWidth = 4; c.stroke(); c.strokeStyle = '#f2c14e'; c.lineWidth = 2.2; c.stroke();
+    circle(c, -0.5, 0, 2.2, '#f2c14e', OUT, 1);
+  } else if (cat === 'gardener') {
+    // Fern: a garden spade, D-handle, wooden shaft and a rounded steel blade
+    const b = len * 0.66;
+    stick(2, b, 2.8, '#b07a3c');
+    c.beginPath(); c.ellipse(1, 0, 3, 4, 0, 0, Math.PI * 2); c.strokeStyle = OUT; c.lineWidth = 3.6; c.stroke();
+    c.strokeStyle = '#b07a3c'; c.lineWidth = 1.8; c.stroke();
+    rrect(c, b - 1.5, -2.6, 4, 5.2, 1.2, '#8e9aa3', OUT, 1.2);
+    c.beginPath();
+    c.moveTo(b + 2, -5); c.lineTo(len - 4, -5); c.quadraticCurveTo(len + 1, -4, len + 1.5, 0);
+    c.quadraticCurveTo(len + 1, 4, len - 4, 5); c.lineTo(b + 2, 5); c.closePath();
+    c.fillStyle = '#b9c4cc'; c.fill(); c.strokeStyle = OUT; c.lineWidth = 1.5; c.stroke();
+    c.beginPath(); c.moveTo(b + 4, -2.5); c.lineTo(len - 4, -2.5); c.strokeStyle = 'rgba(255,255,255,0.6)'; c.lineWidth = 1.2; c.stroke();
+    ellipse(c, len - 3, 2.6, 2.4, 1.4, '#7a5432');
+  } else {
+    // Zip: a light twig, a little fork and a leaf on the end
+    stick(0, len, 2.2, '#9a6a3a');
+    c.beginPath(); c.moveTo(len * 0.55, 0); c.lineTo(len * 0.72, -4.5);
+    c.strokeStyle = OUT; c.lineWidth = 3.6; c.stroke(); c.strokeStyle = '#9a6a3a'; c.lineWidth = 1.6; c.stroke();
+    c.save(); c.translate(len * 0.72, -4.5); c.rotate(-0.6);
+    ellipse(c, 2.6, 0, 3.2, 1.6, '#6bbf4a', OUT, 1);
+    c.restore();
+    c.save(); c.translate(len, 0); c.rotate(0.4);
+    ellipse(c, 3, 0, 3.6, 1.8, '#7fd35a', OUT, 1);
+    c.restore();
+  }
+}
+
 function drawCat(c, p, time) {
   const K = CATS[p.cat] || {};
   const col = K.fur || '#ff9a3c', dark = K.dark || '#c4600f', scarf = PLAYER.scarves[p.id];
@@ -1211,16 +1268,15 @@ function drawCat(c, p, time) {
       c.globalAlpha = 1;
       outer = reach * 0.85;
     } else {
-      a = -Math.PI / 2 + face * 0.6;
-      inner = 6 * U; outer = 22 * U;
+      // resting on the shoulder, held out to the side so it doesn't hide the face
+      a = -Math.PI / 2 + face * 0.5;
+      inner = 0; outer = 26 * U;
     }
-    const hx = bx + face * (p.swingT > 0 ? 0 : 9 * U), hy = by + (p.swingT > 0 ? 0 : 4 * U);
+    const hx = bx + face * (p.swingT > 0 ? 0 : 15 * U), hy = by + (p.swingT > 0 ? 0 : 10 * U);
     const x1 = hx + Math.cos(a) * inner, y1 = hy + Math.sin(a) * inner, x2 = hx + Math.cos(a) * outer, y2 = hy + Math.sin(a) * outer;
-    c.lineCap = 'round';
-    const thick = p.cat === 'brawler' ? 1.6 : p.cat === 'scout' ? 0.8 : 1; // Brick swings a club, Zip a twig
-    c.strokeStyle = OUT; c.lineWidth = 7 * U * thick; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
-    c.strokeStyle = '#8a5a2b'; c.lineWidth = 4 * U * thick; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
-    circle(c, x2, y2, 3.8 * U * thick, '#ffd23f', OUT, 1.5);
+    c.save(); c.translate(x1, y1); c.rotate(a); c.scale(U, U * face);
+    drawWeapon(c, p.cat, (outer - inner) / U);
+    c.restore();
   }
   if (p.noTag) return;
   rrect(c, p.x - 14, p.y - 34 * U, 28, 16, 8, scarf, OUT, 1.5);
@@ -1778,8 +1834,8 @@ function addActor(y, kind, o) {
 }
 const byY = (a, b) => a.y - b.y;
 
-// For tools/gallery.html: one flower, drawn exactly as in the game.
-export { drawFlower };
+// For tools/gallery.html: flowers and cats, drawn exactly as in the game.
+export { drawFlower, drawCat };
 
 export function render(c, s, ui) {
   const time = performance.now() / 1000;
