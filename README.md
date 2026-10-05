@@ -37,8 +37,8 @@ them.
   (grows and heals faster) or Boom (faster, bigger bombs).
 - Standing on a flower, hold E to upgrade it and R to heal it. Q switches E to
   dig-up mode, which removes the flower and refunds part of what was spent on it.
-- In co-op, coins picked up are shared between both cats (see
-  `economy.coopCoinShare`), so the gardener can afford to garden.
+- In co-op, each cat keeps the coins it picks up (`economy.coopCoinShare` in
+  `balance.json` can split a share of every pickup with the other cat).
 - P1: WASD move · Shift sprint · F baton · G bomb · E plant/upgrade (hold) · R heal (hold) · Q next flower / dig-up mode
 - P2 (local): arrows · Right Shift sprint · `,` baton · `.` bomb · `/` plant/upgrade · `'` heal · M next flower
 - I (in the menu or while picking) opens the flower guide: every flower's stats at each level, worked out from `balance.json`.
@@ -72,6 +72,8 @@ menu) to download them as one JSON file. Online, the host's browser has the
 log. The code is in `src/stats.js`.
 
 ## Code
+
+Developer guide (architecture, testing, deploying, conventions): [AGENTS.md](AGENTS.md).
 
 | File | Role |
 |---|---|
