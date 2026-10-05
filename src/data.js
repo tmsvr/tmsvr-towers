@@ -183,7 +183,7 @@ function computeStats(type, lvl) {
     dmg: b.dmg * (1 + pl.damage * l),
     rate: b.rate * (1 - pl.fasterFiring * l),
     slow: b.slow ? Math.max(0.25, b.slow - pl.slowStrength * l) : undefined,
-    pierce: b.pierce ? b.pierce + (pl.pierce ?? 0) * l : undefined,
+    pierce: b.pierce ? Math.floor(b.pierce + (pl.pierce ?? 0) * l) : undefined,
     slowSeconds: b.slow ? (b.slowSeconds ?? 1.3) * (1 + (pl.slowDuration ?? 0) * l) : undefined,
     stacks: b.stacks ? b.stacks + pl.poisonStacks * l : undefined,
     cloudR: b.cloudR ? b.cloudR * (1 + pl.cloudSize * l) : undefined,
