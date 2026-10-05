@@ -1606,7 +1606,7 @@ function drawPick(c, s, ui, time) {
     const lines = [st.range >= GLOBAL_RANGE ? 'Range: whole map' : `Range ${(st.range / T).toFixed(1)}`];
     if (F.kind === 'cloud') lines.push(`${st.dmg} dmg/s per stack (x${st.stacks})`, `cloud every ${+st.rate.toFixed(2)}s`);
     else {
-      lines.push(F.kind === 'chomp' ? `${st.dmg} dmg bite` : F.kind === 'bolt' ? `${st.dmg} dmg, pierces` : F.kind === 'pulse' ? (st.slow ? `${st.dmg} dmg + ${+st.slowSeconds.toFixed(1)}s slow` : `${st.dmg} dmg to all near`) : `${st.dmg} dmg`);
+      lines.push(F.kind === 'chomp' ? `${st.dmg} dmg bite` : F.kind === 'bolt' ? `${st.dmg} dmg, pierces ${st.pierce}` : F.kind === 'pulse' ? (st.slow ? `slows to ${Math.round(st.slow * 100)}% for ${+st.slowSeconds.toFixed(1)}s` : `${st.dmg} dmg to all near`) : `${st.dmg} dmg`);
       lines.push(`every ${+st.rate.toFixed(2)}s`);
     }
     lines.forEach((t, j) => label(c, fitText(c, t, cw - 8, 11), cx, y0 + 215 - (lines.length - 1 - j) * 13, 11, j ? '#cfe0ea' : '#8fa5b3', 'center', 500, null));

@@ -663,7 +663,7 @@ function updateFlowers(s, dt) {
       puff(s, best.x, best.y, '#fff3a0', 10, 110);
     } else if (st.kind === 'bolt') {
       const a = Math.atan2(best.y - hy, best.x - hx);
-      s.projs.push({ id: s.nextId++, kind: 'bolt', x: hx, y: hy, ang: a, speed: 420 * U, dmg: st.dmg, left: st.range * 1.25, hit: [], color: st.color, big: f.lvl });
+      s.projs.push({ id: s.nextId++, kind: 'bolt', x: hx, y: hy, ang: a, speed: 420 * U, dmg: st.dmg, left: st.range * 1.25, hit: [], pierce: st.pierce ?? Infinity, color: st.color, big: f.lvl });
     } else if (st.kind === 'chomp') {
       // small critters get swallowed whole, everything else takes a big bite
       const gulp = best.def.light && !best.def.boss;
@@ -678,7 +678,7 @@ function updateFlowers(s, dt) {
     } else {
       s.fx.push({ kind: 'ring', x: f.x, y: f.y, r: st.range, col: st.color, life: 0.35 });
       for (const e of inRange) {
-        damage(s, e, st.dmg);
+        if (st.dmg > 0) damage(s, e, st.dmg); // the frostbloom only slows
         if (st.slow) { e.slow = Math.min(e.slow, st.slow); e.slowT = Math.max(e.slowT, st.slowSeconds); }
       }
     }
@@ -706,6 +706,7 @@ function updateProjs(s, dt) {
           p.hit.push(e.id);
           damage(s, e, p.dmg);
           puff(s, e.x, e.y, '#ffb347', 5, 80);
+          if (p.hit.length >= p.pierce) { p.done = true; break; } // burnt out
         }
       }
       if (p.left <= 0 || p.x < -T || p.y < -T || p.x > s.m.worldW + T || p.y > s.m.worldH + T) p.done = true;
