@@ -1817,7 +1817,7 @@ function drawMenu(c, time, ui) {
   const tips = [
     'Plant key: build mode, again to plant a seedling, then HOLD to pour coins in. Next-flower key cycles.',
     'Flowers wear out as they fight: stand on one and HOLD the heal key. Mode key on a flower: dig it up for 60% back.',
-    `Each player picks a different cat and ${LOADOUT_SIZE} of the ${FLOWER_ORDER.length} flowers. In co-op, coins picked up are shared.`,
+    `Each player picks a different cat and ${LOADOUT_SIZE} of the ${FLOWER_ORDER.length} flowers. In co-op, each cat keeps the coins it picks up.`,
   ];
   tips.forEach((t, i) => label(c, t, cx, 455 + i * 24, 13.5, '#cfe0ea', 'center', 500, null));
   label(c, 'Enter: early wave  ·  P: pause  ·  N: sound  ·  J: effects  ·  I: flower guide  ·  L: game logs  ·  Esc: menu', cx, 545, 14, '#8fa5b3', 'center', 500, null);
