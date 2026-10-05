@@ -64,7 +64,7 @@
     "totalWaves": 10,
     "cottageHealth": 200,
     "firstWaveDelay": 40,
-    "timeBetweenWaves": 15,
+    "timeBetweenWaves": 25,
     "hpPerWave": 0.3,
     "hpPerWaveSquared": 0.025,
     "waveBudgetBase": 20,
@@ -104,7 +104,7 @@
     "upgradeCostMultipliers": [0.9, 1.4, 2.0, 2.8],
     "plantPrice": 0.5,
     "upgradePrice": 1,
-    "growSeconds": [1.6, 2.4, 3.6, 4.8, 6],
+    "growSeconds": [1.36, 2.04, 3.06, 4.08, 5.1],
     "perLevel": {
       "damage": 0.5,
       "range": 0.06,
