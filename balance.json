@@ -53,6 +53,8 @@
     "startCoinsSolo": 70,
     "startCoinsCoop": 50,
     "coinDropMultiplier": 1.2,
+    "coinFadePerWave": 0.05,
+    "coinFadeMin": 0.5,
     "waveBonusBase": 0,
     "waveBonusPerWave": 0,
     "coopBonusShare": 0.6,
@@ -130,7 +132,7 @@
     "firelily":  { "name": "Fire Lily",  "desc": "Fireball pierces a few monsters in a line", "cost": 45, "range": 3, "damage": 14, "rate": 1.6, "kind": "bolt", "pierce": 3, "color": "#ff7a2f" },
     "stink":     { "name": "Stinkbloom", "desc": "Poison clouds stack, ignore armor (ground)", "cost": 45, "range": 2.6, "damage": 2.2, "rate": 2.4, "kind": "cloud", "cloudRadius": 0.95, "cloudSeconds": 3.5, "maxStacks": 5, "groundOnly": true, "color": "#9ad14b" },
     "frost":     { "name": "Frostbloom", "desc": "Cheap. No damage, slows everything nearby", "cost": 16, "range": 1.8, "damage": 0, "rate": 2.2, "kind": "pulse", "slow": 0.45, "slowSeconds": 2.5, "color": "#8fe3ff" },
-    "thorn":     { "name": "Thornrose",  "desc": "Spiky pulse hits all close enemies (ground)", "cost": 35, "range": 1.3, "damage": 11, "rate": 1.0, "kind": "pulse", "groundOnly": true, "color": "#ff4d5e" },
+    "thorn":     { "name": "Thornrose",  "desc": "Spiky pulse hits all close enemies (ground)", "cost": 35, "range": 1.3, "damage": 9, "rate": 1.0, "kind": "pulse", "groundOnly": true, "color": "#ff4d5e" },
     "snap":      { "name": "Snapdragon", "desc": "Swallows small critters whole, big bite on the rest (ground)", "cost": 40, "range": 1.3, "damage": 45, "rate": 2.4, "kind": "chomp", "groundOnly": true, "color": "#e0569b" }
   },
 

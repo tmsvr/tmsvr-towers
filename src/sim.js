@@ -180,7 +180,12 @@ function killEnemy(s, e) {
     puff(s, e.x, e.y, '#e08ae8', 12, 120);
     ev(s, 'split');
   }
-  const v = Math.max(1, Math.round(e.def.coin * ECONOMY.coinDropMultiplier));
+  // Drops shrink a little each wave, so bigger waves don't pay out ever more;
+  // fractions round up by chance, so even 1-coin monsters drop less on average.
+  const fade = Math.max(ECONOMY.coinFadeMin ?? 0, 1 - (ECONOMY.coinFadePerWave ?? 0) * Math.max(0, s.wave - 1));
+  const raw = e.def.coin * ECONOMY.coinDropMultiplier * fade;
+  const v = Math.floor(raw + rnd(s));
+  if (v <= 0) return;
   // Large drops split into a few pickups so they scatter nicely.
   const pieces = v >= 20 ? 6 : v >= 5 ? 2 : 1;
   const base = Math.floor(v / pieces);
