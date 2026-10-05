@@ -127,7 +127,7 @@
   },
 
   "flowers": {
-    "daisy":     { "name": "Daisy",      "desc": "Rapid little seeds", "cost": 20, "range": 2.2, "damage": 5, "rate": 0.3, "kind": "single", "color": "#ffffff" },
+    "daisy":     { "name": "Daisy",      "desc": "Rapid little seeds", "cost": 20, "range": 2.2, "damage": 4.5, "rate": 0.3, "kind": "single", "color": "#ffffff" },
     "sunflower": { "name": "Sunflower",  "desc": "Superweapon. Blasts the strongest monster on the map.", "cost": 120, "range": 99, "damage": 315, "rate": 12, "kind": "beam", "target": "strong", "color": "#ffd23f" },
     "firelily":  { "name": "Fire Lily",  "desc": "Fireball pierces a few monsters in a line", "cost": 45, "range": 3, "damage": 14, "rate": 1.6, "kind": "bolt", "pierce": 3, "color": "#ff7a2f" },
     "stink":     { "name": "Stinkbloom", "desc": "Poison clouds stack, ignore armor (ground)", "cost": 45, "range": 2.6, "damage": 2.2, "rate": 2.4, "kind": "cloud", "cloudRadius": 0.95, "cloudSeconds": 3.5, "maxStacks": 5, "groundOnly": true, "color": "#9ad14b" },
