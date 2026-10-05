@@ -51,7 +51,7 @@
   "economy": {
     "startCoinsSolo": 70,
     "startCoinsCoop": 50,
-    "coinDropMultiplier": 1.1,
+    "coinDropMultiplier": 1.2,
     "waveBonusBase": 0,
     "waveBonusPerWave": 0,
     "coopBonusShare": 0.6,
