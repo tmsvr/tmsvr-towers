@@ -244,7 +244,7 @@ function updateEnemies(s, dt) {
         else {
           e.chewT -= dt;
           e.wob += dt * 14;
-          hurtFlower(s, e.chew, e.def.eats.damagePerSecond * dt);
+          hurtFlower(s, e.chew, e.def.eats.damagePerSecond * WEAR_MULT[e.chew.lvl] * dt); // sturdier flowers shrug off bites
           ev(s, 'chomp');
           if (e.chewT <= 0) { e.chew = null; e.chewCd = e.def.eats.cooldown; }
           continue;
