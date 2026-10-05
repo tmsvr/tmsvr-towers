@@ -19,11 +19,23 @@ import { MAPS, MAP_H, DATA_HASH, FLOWER_ORDER } from './data.js';
 
 const canvas = document.getElementById('game');
 const lobby = document.getElementById('lobby');
-const dpr = Math.min(2, window.devicePixelRatio || 1);
-canvas.width = VIEW_W * dpr;
-canvas.height = VIEW_H * dpr;
 const ctx = canvas.getContext('2d');
-ctx.scale(dpr, dpr);
+// The game is laid out at VIEW_W x VIEW_H and stretched to fit the window; the
+// canvas gets as many real pixels as it is shown at, so it stays sharp at any
+// size. Steps of 0.25 keep resizing from rebuilding the caches every frame;
+// the cap keeps the pre-drawn map background a sensible size.
+function pixelScale() {
+  const shown = canvas.getBoundingClientRect().width || VIEW_W;
+  return Math.min(3, Math.max(1, Math.round(((shown * (window.devicePixelRatio || 1)) / VIEW_W) * 4) / 4));
+}
+function fitCanvas() {
+  const k = pixelScale();
+  if (k === ui.dpr && canvas.width === Math.round(VIEW_W * k)) return;
+  canvas.width = Math.round(VIEW_W * k);
+  canvas.height = Math.round(VIEW_H * k);
+  ctx.setTransform(k, 0, 0, k, 0, 0);
+  ui.dpr = k;
+}
 
 const KEYS = [
   { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', atk: 'KeyF', bomb: 'KeyG', build: 'KeyE', heal: 'KeyR', cycle: 'KeyQ', sprint: 'ShiftLeft' },
@@ -42,12 +54,14 @@ let roomCode = '';
 const ui = {
   cam: { x: 0, y: 0, snap: true },
   menuMap: MAPS[0], // the map behind the menu: the last one played
-  paused: false, shake: 0, dpr, keys: KEYS, netLabel: '', disconnected: false, guide: null,
+  paused: false, shake: 0, dpr: 0, keys: KEYS, netLabel: '', disconnected: false, guide: null,
   // Online, each person plays with the P1 layout on their own keyboard.
   keysFor: (pid) => (mode === 'local' ? KEYS[pid] : KEYS[0]),
   keyLabel: (code) => DEFAULT_LABELS[code] || code.replace(/^Key|^Digit/, ''),
   mode: () => mode,
 };
+fitCanvas();
+addEventListener('resize', fitCanvas);
 
 // Keys are bound by physical position; show what is printed on this keyboard layout.
 navigator.keyboard?.getLayoutMap?.().then((map) => {
