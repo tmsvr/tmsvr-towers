@@ -15,7 +15,7 @@ import { decodeFast, PROTOCOL } from './schema.js';
 import { createHostLink } from './host.js';
 import { createGuestLink } from './guest.js';
 import { spawnEffect, spawnTrails, updateEffects, resetEffects } from './fx.js';
-import { MAPS, MAP_H, DATA_HASH } from './data.js';
+import { MAPS, MAP_H, DATA_HASH, FLOWER_ORDER } from './data.js';
 
 const canvas = document.getElementById('game');
 const lobby = document.getElementById('lobby');
@@ -42,7 +42,7 @@ let roomCode = '';
 const ui = {
   cam: { x: 0, y: 0, snap: true },
   menuMap: MAPS[0], // the map behind the menu: the last one played
-  paused: false, shake: 0, dpr, keys: KEYS, netLabel: '', disconnected: false,
+  paused: false, shake: 0, dpr, keys: KEYS, netLabel: '', disconnected: false, guide: null,
   // Online, each person plays with the P1 layout on their own keyboard.
   keysFor: (pid) => (mode === 'local' ? KEYS[pid] : KEYS[0]),
   keyLabel: (code) => DEFAULT_LABELS[code] || code.replace(/^Key|^Digit/, ''),
@@ -90,6 +90,15 @@ addEventListener('keydown', (e) => {
   initAudio(); // browsers only allow audio after a user gesture
   if (e.repeat) return;
   const code = e.code || KEY_TO_CODE[e.key] || '';
+  // the flower guide sits on top and keeps the keys to itself
+  if (ui.guide != null) {
+    const n = FLOWER_ORDER.length;
+    if (code === 'ArrowLeft' || code === 'KeyA') ui.guide = (ui.guide + n - 1) % n;
+    if (code === 'ArrowRight' || code === 'KeyD') ui.guide = (ui.guide + 1) % n;
+    if (code === 'KeyI' || code === 'Escape') ui.guide = null;
+    return;
+  }
+  if (code === 'KeyI' && (mode === 'menu' || state?.phase === 'pick')) { ui.guide = 0; held.clear(); return; }
   held.add(code);
   pressed.add(code);
   if (code === 'KeyN') toggleMute();
