@@ -78,7 +78,7 @@
     "spawnGap": [0.25, 0.75],
     "spawnSpeedupPerWave": 0.06,
     "spawnGapMinScale": 0.35,
-    "newEnemyBoost": 1.8,
+    "newEnemyBoost": 1.6,
     "oldEnemyFade": 0.05,
     "oldEnemyMin": 0.6,
     "packGrowthPerWave": 0.2,
