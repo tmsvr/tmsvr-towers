@@ -10,7 +10,7 @@
 // with each entity carrying the fields schema.js sends for it.
 import {
   T, U, VIEW_W, MAP_H, HUD_H, TOTAL_WAVES, MAPS,
-  FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, GLOBAL_RANGE, GROW_TIME, WEAR_MULT, ENEMIES, INTROS,
+  FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, GLOBAL_RANGE, ENEMIES, INTROS,
 } from './data.js';
 import { tileOf, canBuildAt, healCostPerHp, uprootRefund, catStats } from './sim.js';
 import { isMuted } from './audio.js';
@@ -1736,15 +1736,12 @@ function guideRows(t) {
   const lv = Array.from({ length: MAX_LEVEL }, (_, i) => i + 1);
   const st = lv.map((l) => flowerStats(t, l));
   const costs = lv.map((l) => (l === 1 ? plantCost(t) : upgradeCost(t, l - 1)));
-  let sum = 0;
-  const rows = [
-    ['Cost', costs.map((v) => `${v}`)],
-    ['Total spent', costs.map((v) => `${(sum += v)}`)],
-    ['Growing time', lv.map((l) => `${fmt(GROW_TIME[l])}s`)],
-  ];
+  // only what helps choose and upgrade; the rest (growing time, wear, cloud
+  // size...) is in the README and balance.json
+  const rows = [['Cost', costs.map((v) => `${v}`)]];
   if (F.kind === 'cloud') {
     rows.push(['Poison per stack', st.map((x) => `${fmt(x.dmg)}/s`)], ['Max stacks', st.map((x) => `${x.stacks}`)],
-      ['Cloud every', st.map((x) => `${fmt(x.rate)}s`)], ['Cloud size', st.map((x) => fmt(x.cloudR / T))]);
+      ['Cloud every', st.map((x) => `${fmt(x.rate)}s`)]);
   } else if (st[0].slow) {
     rows.push(['Slows to', st.map((x) => `${Math.round(x.slow * 100)}%`)], ['Slow lasts', st.map((x) => `${fmt(x.slowSeconds)}s`)],
       ['Pulse every', st.map((x) => `${fmt(x.rate)}s`)]);
@@ -1756,7 +1753,6 @@ function guideRows(t) {
   rows.push(['Range', st.map((x) => (x.range >= GLOBAL_RANGE ? 'whole map' : `${fmt(x.range / T)} tiles`))]);
   if (F.kind === 'cloud') rows.push(['Max poison/s', st.map((x) => fmt(x.dmg * x.stacks))]);
   else if (!st[0].slow) rows.push(['Damage/s', st.map((x) => fmt(x.dmg / x.rate))]);
-  rows.push(['Wears out', lv.map((l) => (WEAR_MULT[l] ? `${Math.round(WEAR_MULT[l] * 100)}%` : 'never'))]);
   return rows;
 }
 
@@ -1790,29 +1786,27 @@ function drawGuide(c, time, sel) {
     label(c, txt, lx + 9, 273.5 + j * 28, 12, col, 'left', 600, null);
   });
   const notes = [
-    'Every level: +50% of the starting damage, +6% range and 7% faster attacks.',
-    `Growing time is for a normal cat; ${CATS.gardener.name} grows ${CATS.gardener.growSpeed}x faster.`,
-    `${CATS.brawler.name} pays ${CATS.brawler.upgradeCost}x for upgrades, ${CATS.gardener.name} ${CATS.gardener.upgradeCost}x.`,
-    'Armour is taken off every hit, so small hits suffer most.',
+    'Each level: more damage, a little more range, faster attacks.',
+    'Level 5 flowers never wear out.',
   ];
   let ny = 262 + tags.length * 28 + 20;
   for (const n of notes) for (const l of wrapText(c, n, 240, 12)) { label(c, l, lx, ny, 12, '#8fa5b3', 'left', 500, null); ny += 16; }
   // right: the five levels side by side
   const rows = guideRows(t);
   const tx = 300, lw = 150, cw = (VIEW_W - 30 - tx - lw) / MAX_LEVEL;
-  rrect(c, tx - 12, 160, VIEW_W - 30 - tx + 24, 144 + rows.length * 28, 14, 'rgba(255,255,255,0.04)', 'rgba(255,255,255,0.12)', 1);
+  rrect(c, tx - 12, 160, VIEW_W - 30 - tx + 24, 150 + rows.length * 34, 14, 'rgba(255,255,255,0.04)', 'rgba(255,255,255,0.12)', 1);
   for (let l = 1; l <= MAX_LEVEL; l++) {
     const cx = tx + lw + (l - 0.5) * cw;
     drawFlower(c, { id: sel * 7 + l, type: t, lvl: l, x: cx, y: 236, angle: Math.PI / 2, flash: 0, hurtT: 0, hp: FLOWER_HP, headIdx: 0 }, time);
     label(c, `Level ${l}`, cx, 280, 14, l === MAX_LEVEL ? '#ffe27a' : '#ffffff', 'center', 700, null);
   }
   rows.forEach(([name, vals], r) => {
-    const y = 310 + r * 28;
-    if (r % 2 === 0) rrect(c, tx - 4, y - 13, VIEW_W - 30 - tx + 8, 26, 6, 'rgba(255,255,255,0.04)');
-    label(c, name, tx + 4, y, 13, '#a9bccb', 'left', 600, null);
+    const y = 312 + r * 34;
+    if (r % 2 === 0) rrect(c, tx - 4, y - 15, VIEW_W - 30 - tx + 8, 30, 6, 'rgba(255,255,255,0.04)');
+    label(c, name, tx + 4, y, 14, '#a9bccb', 'left', 600, null);
     vals.forEach((v, l) => {
       const up = l > 0 && v !== vals[l - 1];
-      label(c, fitText(c, v, cw - 6, 14), tx + lw + (l + 0.5) * cw, y, 14, r < 2 ? '#ffe27a' : up ? '#ffffff' : '#a9bccb', 'center', 600, null);
+      label(c, fitText(c, v, cw - 6, 15, 600), tx + lw + (l + 0.5) * cw, y, 15, r < 1 ? '#ffe27a' : up ? '#ffffff' : '#a9bccb', 'center', 600, null);
     });
   });
   label(c, '←/→ or A/D: other flowers  ·  I or Esc: close', VIEW_W / 2, VIEW_H - 22, 14, '#8fa5b3', 'center', 500, null);
