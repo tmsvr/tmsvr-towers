@@ -116,7 +116,7 @@
       "pierce": 0.5,
       "slowStrength": 0.05,
       "slowDuration": 0.25,
-      "poisonStacks": 1,
+      "poisonStacks": 0.5,
       "cloudSize": 0.08
     },
     "health": 100,
