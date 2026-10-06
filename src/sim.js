@@ -67,7 +67,7 @@ function puff(s, x, y, col, n = 6, spd = 90) {
   s.fx.push({ kind: 'puff', x, y, col, n, spd });
 }
 
-const banner = (s, txt, sub) => s.fx.push(sub ? { kind: 'banner', txt, sub, life: 4.5 } : { kind: 'banner', txt });
+const banner = (s, txt) => s.fx.push({ kind: 'banner', txt });
 
 export function tileOf(m, p) {
   return { tx: clamp(Math.floor(p.x / T), 0, m.W - 1), ty: clamp(Math.floor(p.y / T), 0, m.H - 1) };
@@ -137,7 +137,7 @@ function spawnEnemy(s, type, from, path = 0) {
   // the first of a new kind of monster says what it is and what stops it
   if (!s.seen[type]) {
     s.seen[type] = true;
-    if (INTROS[type]) banner(s, INTROS[type][0], INTROS[type][1]);
+    if (INTROS[type]) s.fx.push({ kind: 'intro', type }); // a card with its picture and hint
   }
   const d = ENEMIES[type];
   const w = Math.max(0, s.wave - 1);

@@ -9,7 +9,7 @@ import { U } from './data.js';
 import { prune } from './util.js';
 
 const burntOut = (f) => f.life <= 0;
-const LIFE = { puff: 0.45, text: 0.9, ring: 0.4, flash: 0.15, beam: 0.3, bite: 0.35, banner: 2.2 };
+const LIFE = { puff: 0.45, text: 0.9, ring: 0.4, flash: 0.15, beam: 0.3, bite: 0.35, banner: 2.2, intro: 9 };
 
 const live = [];
 export const liveEffects = () => live;
@@ -31,10 +31,10 @@ function burst(x, y, col, n, spd) {
 // from the host, so anything odd is ignored rather than trusted).
 export function spawnEffect(d) {
   if (!d || !(d.kind in LIFE)) return;
-  // banners sit on the screen, not in the world, so they have no position
-  if (d.kind === 'banner' ? typeof d.txt !== 'string' : !Number.isFinite(d.x + d.y)) return;
+  // banners and new-monster cards sit on the screen, not in the world, so they have no position
+  if (d.kind === 'banner' ? typeof d.txt !== 'string' : d.kind === 'intro' ? typeof d.type !== 'string' : !Number.isFinite(d.x + d.y)) return;
   if (d.kind === 'puff') { burst(d.x, d.y, d.col, Math.min(d.n | 0, 64), +d.spd || 0); return; }
-  const life = Math.min(+d.life || LIFE[d.kind], 5);
+  const life = Math.min(+d.life || LIFE[d.kind], 10);
   live.push({ ...d, life, max: life });
 }
 

@@ -10,7 +10,7 @@
 // with each entity carrying the fields schema.js sends for it.
 import {
   T, U, VIEW_W, MAP_H, HUD_H, TOTAL_WAVES, MAPS,
-  FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, GLOBAL_RANGE, GROW_TIME, WEAR_MULT,
+  FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, GLOBAL_RANGE, GROW_TIME, WEAR_MULT, ENEMIES, INTROS,
 } from './data.js';
 import { tileOf, canBuildAt, healCostPerHp, uprootRefund, catStats } from './sim.js';
 import { isMuted } from './audio.js';
@@ -1388,35 +1388,47 @@ function drawFx(c) {
   }
 }
 
-// Banners stack downwards when several are up at once (a new wave and a new
-// kind of monster often arrive together). A banner with a hint (`sub`) is a
-// warning about a monster type the players haven't met yet.
 function drawBanners(c) {
   let y0 = 120;
   for (const f of liveEffects()) {
     if (f.kind !== 'banner') continue;
-    const sub = typeof f.sub === 'string' ? f.sub : '';
     const k = f.life / f.max;
     const inT = Math.min(1, (f.max - f.life) * 6);
     c.globalAlpha = Math.min(1, k * 4);
+    c.font = `700 40px ${FONT}`;
+    const w = c.measureText(f.txt).width + 60;
     const y = y0 - (1 - inT) * 30;
-    if (sub) {
-      c.font = `700 32px ${FONT}`;
-      const tw = c.measureText(f.txt).width;
-      c.font = `600 16px ${FONT}`;
-      const w = Math.min(VIEW_W - 40, Math.max(tw, c.measureText(sub).width) + 60);
-      rrect(c, VIEW_W / 2 - w / 2, y - 32, w, 84, 26, 'rgba(60,24,24,0.82)', '#ffb347', 2.5);
-      label(c, f.txt, VIEW_W / 2, y - 2, 32, '#ffd27a', 'center', 700, null);
-      label(c, fitText(c, sub, w - 40, 16, 600), VIEW_W / 2, y + 32, 16, '#fff4e0', 'center', 600, null);
-      y0 += 96;
-    } else {
-      c.font = `700 40px ${FONT}`;
-      const w = c.measureText(f.txt).width + 60;
-      rrect(c, VIEW_W / 2 - w / 2, y - 32, w, 64, 32, 'rgba(30,24,40,0.75)', 'rgba(255,255,255,0.6)', 2);
-      label(c, f.txt, VIEW_W / 2, y + 2, 40, f.txt.includes('BOSS') ? '#ff7a6a' : '#fff4c2', 'center', 700, null);
-      y0 += 76;
-    }
+    rrect(c, VIEW_W / 2 - w / 2, y - 32, w, 64, 32, 'rgba(30,24,40,0.75)', 'rgba(255,255,255,0.6)', 2);
+    label(c, f.txt, VIEW_W / 2, y + 2, 40, f.txt.includes('BOSS') ? '#ff7a6a' : '#fff4c2', 'center', 700, null);
     c.globalAlpha = 1;
+    y0 += 76; // two at once stack instead of overlapping
+  }
+}
+
+// The first monster of a new kind: a small card down the left side with its
+// picture, its name and what stops it. Out of the way of the fighting, and up
+// long enough to read.
+const INTRO_W = 340, INTRO_H = 62;
+function drawIntros(c, ui, time) {
+  let y = ui.netLabel ? 42 : 12;
+  for (const f of liveEffects()) {
+    if (f.kind !== 'intro' || !INTROS[f.type] || !ENEMIES[f.type]) continue;
+    const [title, hint] = INTROS[f.type];
+    const age = f.max - f.life;
+    const slide = Math.min(1, age * 5);
+    c.globalAlpha = Math.min(1, f.life / 0.8);
+    const x = 10 - (1 - slide) * (INTRO_W + 20);
+    rrect(c, x, y, INTRO_W, INTRO_H, 14, 'rgba(28,22,34,0.86)', '#ffb347', 2);
+    circle(c, x + 31, y + INTRO_H / 2, 22, 'rgba(255,255,255,0.1)');
+    c.save(); c.beginPath(); c.arc(x + 31, y + INTRO_H / 2, 22, 0, Math.PI * 2); c.clip();
+    const d = ENEMIES[f.type], big = Math.max(d.r, T * 0.2);
+    c.translate(x + 31, y + INTRO_H / 2 + (d.flying ? 13 : 2)); c.scale(Math.min(1.4, (T * 0.3) / big), Math.min(1.4, (T * 0.3) / big));
+    drawEnemy(c, { id: 0, type: f.type, def: d, x: 0, y: 0, ang: 0, wob: time * 8, hp: 1, maxhp: 1, flash: 0, psn: 0, slowT: 0, stun: 0, under: false, atBase: false, chew: null, dashing: false }, time);
+    c.restore();
+    label(c, title, x + 62, y + 17, 15, '#ffd27a', 'left', 700, null);
+    wrapText(c, hint, INTRO_W - 72, 12, 500).slice(0, 2).forEach((l, i) => label(c, l, x + 62, y + 35 + i * 14, 12, '#f2e8dc', 'left', 500, null));
+    c.globalAlpha = 1;
+    y += INTRO_H + 8;
   }
 }
 
@@ -1914,6 +1926,7 @@ export function render(c, s, ui) {
   c.save();
   drawEdgeMarkers(c, s, ui);
   drawBanners(c);
+  drawIntros(c, ui, time);
   drawMinimap(c, s, ui);
   c.restore();
   drawHud(c, s, time, ui);
