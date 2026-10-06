@@ -22,11 +22,12 @@ const lobby = document.getElementById('lobby');
 const ctx = canvas.getContext('2d');
 // The game is laid out at VIEW_W x VIEW_H and stretched to fit the window; the
 // canvas gets as many real pixels as it is shown at, so it stays sharp at any
-// size. Steps of 0.25 keep resizing from rebuilding the caches every frame;
-// the cap keeps the pre-drawn map background a sensible size.
+// size. Steps of 0.25 keep resizing from rebuilding the caches every frame.
+// The 2x cap matters: past it the pre-drawn map background gets huge, and
+// Firefox in particular slows right down copying from it every frame.
 function pixelScale() {
   const shown = canvas.getBoundingClientRect().width || VIEW_W;
-  return Math.min(3, Math.max(1, Math.round(((shown * (window.devicePixelRatio || 1)) / VIEW_W) * 4) / 4));
+  return Math.min(2, Math.max(1, Math.round(((shown * (window.devicePixelRatio || 1)) / VIEW_W) * 4) / 4));
 }
 function fitCanvas() {
   const k = pixelScale();
@@ -54,7 +55,7 @@ let roomCode = '';
 const ui = {
   cam: { x: 0, y: 0, snap: true },
   menuMap: MAPS[0], // the map behind the menu: the last one played
-  paused: false, shake: 0, dpr: 0, keys: KEYS, netLabel: '', disconnected: false, guide: null,
+  paused: false, shake: 0, dpr: 0, fps: 60, keys: KEYS, netLabel: '', disconnected: false, guide: null,
   // Online, each person plays with the P1 layout on their own keyboard.
   keysFor: (pid) => (mode === 'local' ? KEYS[pid] : KEYS[0]),
   keyLabel: (code) => DEFAULT_LABELS[code] || code.replace(/^Key|^Digit/, ''),
@@ -427,6 +428,7 @@ let lastDraw = performance.now();
 function frame(now) {
   const frameDt = Math.min(0.1, (now - lastDraw) / 1000);
   lastDraw = now;
+  if (frameDt > 0) ui.fps += (1 / frameDt - ui.fps) * 0.05; // smoothed, shown online next to the ping
   pump();
   if (mode === 'guest') {
     interpolate(state, now);

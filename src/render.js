@@ -1902,11 +1902,12 @@ export function render(c, s, ui) {
   drawHud(c, s, time, ui);
   drawJuiceScreen(c);
   if (ui.netLabel) {
+    const txt = `${ui.netLabel} · ${Math.round(ui.fps)} fps`;
     c.font = `600 13px ${FONT}`;
-    const w = c.measureText(ui.netLabel).width + 26;
+    const w = c.measureText(txt).width + 26;
     rrect(c, 10, 8, w, 24, 12, 'rgba(20,28,36,0.75)', 'rgba(255,255,255,0.3)', 1.5);
     circle(c, 22, 20, 4, ui.netLabel.includes('disconnected') ? '#ff6a5a' : '#6be06b');
-    label(c, ui.netLabel, 32, 20.5, 13, '#e8f1f7', 'left', 600, null);
+    label(c, txt, 32, 20.5, 13, '#e8f1f7', 'left', 600, null);
   }
   if (s.phase === 'pick' && !ui.disconnected) drawPick(c, s, ui, time);
   if (ui.guide != null) drawGuide(c, time, ui.guide);

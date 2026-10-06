@@ -82,7 +82,8 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
 - **Fixed logical screen.** Everything is laid out for `VIEW_W × VIEW_H`
   (1008 × 656: an 18 × 10 tile map view plus a 96 px HUD). CSS scales the
   canvas to fit the window; `fitCanvas()` in `main.js` gives the backing store
-  as many real pixels as it is shown at (capped at 3×). Caches (map background,
+  as many real pixels as it is shown at (capped at 2×: bigger makes Firefox
+  slow). Online, the top-left label shows ping and frame rate. Caches (map background,
   sprite heads) are keyed by that scale (`ui.dpr`).
 - **Game phases.** Menu → pick screen (`s.phase === 'pick'`: map, cat, 3
   flowers per player) → waves → won/over overlay.
