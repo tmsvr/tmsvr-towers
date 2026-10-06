@@ -148,7 +148,7 @@
     "tank":     { "hp": 170,  "speed": 1.2,  "coins": 7,  "bite": 4, "size": 0.4,  "armor": 1 },
     "dasher":   { "hp": 30,   "speed": 1.65, "coins": 3,  "bite": 2, "size": 0.25, "armor": 0, "dash": { "every": 2.4, "duration": 0.55, "speedMultiplier": 3.2 } },
     "splitter": { "hp": 60,   "speed": 1.5,  "coins": 3,  "bite": 2, "size": 0.35, "armor": 0, "split": { "into": "blobling", "count": 3 } },
-    "blobling": { "hp": 12,   "speed": 3.68, "coins": 1,  "bite": 2, "size": 0.18, "armor": 0, "light": true },
+    "blobling": { "hp": 12,   "speed": 3.5,  "coins": 1,  "bite": 2, "size": 0.18, "armor": 0, "light": true },
     "mole":     { "hp": 48,   "speed": 1.8,  "coins": 3,  "bite": 2, "size": 0.28, "armor": 0, "burrow": { "aboveSeconds": 2.6, "belowSeconds": 1.8, "speedMultiplier": 1.5 } },
     "aphid":    { "hp": 28,   "speed": 1.95, "coins": 2,  "bite": 2, "size": 0.23, "armor": 0, "light": true, "eats": { "damagePerSecond": 3, "chewSeconds": 2.5, "cooldown": 6, "reach": 1.25 } },
     "hive":     { "hp": 150,  "speed": 1.05, "coins": 7,  "bite": 4, "size": 0.43, "armor": 1, "spawns": { "type": "swarm", "every": 4.5, "count": 2 } },
