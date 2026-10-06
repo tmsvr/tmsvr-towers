@@ -13,6 +13,7 @@
     "enemies.bite": "Damage per second an enemy does to the cottage while chomping on it (it keeps chomping until killed).",
     "enemies.eats": "Aphids stop to chew flowers near the road: damagePerSecond for chewSeconds, then rest for cooldown. One aphid per flower at a time, and higher-level flowers take less (wearMultiplierByLevel; max level is immune).",
     "enemies.size": "Radius in tiles. 'light' enemies can be knocked back by the baton and swallowed by Snapdragons.",
+    "intros": "The warning shown the first time each monster type turns up in a game: [title, hint]. Leave a type out to skip its warning.",
     "difficulty.spawn": "spawnGap = seconds between single monsters (random between the two), shrinking by spawnSpeedupPerWave each wave down to spawnGapMinScale of it. packGrowthPerWave makes packs (swarms, wasps) that much bigger every wave after they appear. openingRush = the share of each wave that pours out right at the start. newEnemyBoost multiplies how often a monster type appears in its first two waves; after that older types fade by oldEnemyFade per wave down to oldEnemyMin, so every wave feels different.",
     "difficulty": "Enemy health = base * enemyHp * (1 + hpPerWave*(wave-1) + hpPerWaveSquared*(wave-1)^2). Wave size budget = waveBudgetBase + waveBudgetPerWave*wave + waveBudgetPerWaveSquared*wave^2. Both grow slowly at first and steeply towards the last waves. Every bossEvery-th wave has a boss; the one on the last wave has finalBossHp times more health.",
     "economy.coopCoinShare": "In co-op, the share of every coin picked up that is split evenly between all cats (1 = fully shared, 0 = whoever picks it up keeps it).",
@@ -152,6 +153,21 @@
     "aphid":    { "hp": 28,   "speed": 1.95, "coins": 2,  "bite": 2, "size": 0.23, "armor": 0, "light": true, "eats": { "damagePerSecond": 3, "chewSeconds": 2.5, "cooldown": 6, "reach": 1.25 } },
     "hive":     { "hp": 150,  "speed": 1.05, "coins": 7,  "bite": 4, "size": 0.43, "armor": 1, "spawns": { "type": "swarm", "every": 4.5, "count": 2 } },
     "boss":     { "hp": 600,  "speed": 0.98, "coins": 40, "bite": 8,  "size": 0.6,  "armor": 1, "boss": true, "spawns": { "type": "grunt", "every": 6, "count": 2 } }
+  },
+
+  "intros": {
+    "swarm":    ["Swarms!", "Tiny bugs in big packs. Thornrose, Stinkbloom and Fire Lily hit many at once"],
+    "runner":   ["Runners!", "Very fast. Frostbloom slows them down"],
+    "dasher":   ["Dashers!", "They put on sudden bursts of speed"],
+    "flyer":    ["Flyers!", "They fly straight to the cottage. Only Daisy, Fire Lily and Sunflower can hit them"],
+    "splitter": ["Splitters!", "They burst into fast little bloblings. Keep some flowers near the cottage"],
+    "aphid":    ["Aphids!", "They stop to chew your flowers. Hold heal on bitten flowers"],
+    "shield":   ["Shield beetles!", "Heavy armour. Big hits and poison get through it"],
+    "mole":     ["Moles!", "They dig under the ground where flowers can't hit them"],
+    "tank":     ["Tanks!", "Slow and very tough. Snapdragon and Sunflower bite through"],
+    "healer":   ["Healers!", "They mend the monsters around them. Take them out first"],
+    "hive":     ["Hives!", "Tough, and they keep letting out swarm bugs"],
+    "wasp":     ["Wasps!", "Fast flyers in packs. Only Daisy, Fire Lily and Sunflower can hit them"]
   },
 
   "waves": [

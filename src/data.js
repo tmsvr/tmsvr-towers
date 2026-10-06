@@ -121,6 +121,8 @@ function prepareMap(def, index) {
 export const MAPS = MAP_DEFS.map(prepareMap);
 
 // ---- enemies (pixels, pixels/second) ----
+// The warning shown the first time each monster type turns up: [title, hint].
+export const INTROS = BAL.intros || {};
 export const ENEMIES = {};
 for (const [id, e] of Object.entries(BAL.enemies)) {
   ENEMIES[id] = {

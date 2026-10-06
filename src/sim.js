@@ -4,7 +4,7 @@
 // sounds and shake in s.events, visual effects (described, not simulated) in
 // s.fx. Both are drained by the caller.
 import {
-  T, U, VIEW_W, MAP_H, TOTAL_WAVES, MAPS, ENEMIES,
+  T, U, VIEW_W, MAP_H, TOTAL_WAVES, MAPS, ENEMIES, INTROS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, GROW_TIME, FLOWER_HP, WEAR_PER_SEC, WEAR_MULT, HEAL_RATE, HEAL_COST,
   POISON_TIME, START_COINS, LOADOUT_SIZE, WAVES, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER,
 } from './data.js';
@@ -39,6 +39,7 @@ export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, l
     t: 0, nextId: 1, rng: seed, wave: 0, phase: 'pick', timer: DIFFICULTY.firstWaveDelay, queue: [], spawnWait: 0,
     lives: DIFFICULTY.cottageHealth, maxLives: DIFFICULTY.cottageHealth, baseHitT: 0, lastAlarm: -99, players: [], flowers: [], enemies: [], drops: [], bombs: [], projs: [], clouds: [],
     fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, sharedScreen, map: m.index,
+    seen: {}, // monster types met so far (each gets one warning banner)
   };
   const coins = startCoins(m, nPlayers);
   const taken = new Set();
@@ -66,7 +67,7 @@ function puff(s, x, y, col, n = 6, spd = 90) {
   s.fx.push({ kind: 'puff', x, y, col, n, spd });
 }
 
-const banner = (s, txt) => s.fx.push({ kind: 'banner', txt });
+const banner = (s, txt, sub) => s.fx.push(sub ? { kind: 'banner', txt, sub, life: 4.5 } : { kind: 'banner', txt });
 
 export function tileOf(m, p) {
   return { tx: clamp(Math.floor(p.x / T), 0, m.W - 1), ty: clamp(Math.floor(p.y / T), 0, m.H - 1) };
@@ -133,6 +134,11 @@ const FLOWER_MODES = ['grow', 'dig'];
 // ---- Enemies --------------------------------------------------------------
 function spawnEnemy(s, type, from, path = 0) {
   log.logSpawn(s, type);
+  // the first of a new kind of monster says what it is and what stops it
+  if (!s.seen[type]) {
+    s.seen[type] = true;
+    if (INTROS[type]) banner(s, INTROS[type][0], INTROS[type][1]);
+  }
   const d = ENEMIES[type];
   const w = Math.max(0, s.wave - 1);
   const solo = s.players.length === 1;

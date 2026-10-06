@@ -1388,17 +1388,34 @@ function drawFx(c) {
   }
 }
 
+// Banners stack downwards when several are up at once (a new wave and a new
+// kind of monster often arrive together). A banner with a hint (`sub`) is a
+// warning about a monster type the players haven't met yet.
 function drawBanners(c) {
+  let y0 = 120;
   for (const f of liveEffects()) {
     if (f.kind !== 'banner') continue;
+    const sub = typeof f.sub === 'string' ? f.sub : '';
     const k = f.life / f.max;
     const inT = Math.min(1, (f.max - f.life) * 6);
     c.globalAlpha = Math.min(1, k * 4);
-    c.font = `700 40px ${FONT}`;
-    const w = c.measureText(f.txt).width + 60;
-    const y = 120 - (1 - inT) * 30;
-    rrect(c, VIEW_W / 2 - w / 2, y - 32, w, 64, 32, 'rgba(30,24,40,0.75)', 'rgba(255,255,255,0.6)', 2);
-    label(c, f.txt, VIEW_W / 2, y + 2, 40, f.txt.includes('BOSS') ? '#ff7a6a' : '#fff4c2', 'center', 700, null);
+    const y = y0 - (1 - inT) * 30;
+    if (sub) {
+      c.font = `700 32px ${FONT}`;
+      const tw = c.measureText(f.txt).width;
+      c.font = `600 16px ${FONT}`;
+      const w = Math.min(VIEW_W - 40, Math.max(tw, c.measureText(sub).width) + 60);
+      rrect(c, VIEW_W / 2 - w / 2, y - 32, w, 84, 26, 'rgba(60,24,24,0.82)', '#ffb347', 2.5);
+      label(c, f.txt, VIEW_W / 2, y - 2, 32, '#ffd27a', 'center', 700, null);
+      label(c, fitText(c, sub, w - 40, 16, 600), VIEW_W / 2, y + 32, 16, '#fff4e0', 'center', 600, null);
+      y0 += 96;
+    } else {
+      c.font = `700 40px ${FONT}`;
+      const w = c.measureText(f.txt).width + 60;
+      rrect(c, VIEW_W / 2 - w / 2, y - 32, w, 64, 32, 'rgba(30,24,40,0.75)', 'rgba(255,255,255,0.6)', 2);
+      label(c, f.txt, VIEW_W / 2, y + 2, 40, f.txt.includes('BOSS') ? '#ff7a6a' : '#fff4c2', 'center', 700, null);
+      y0 += 76;
+    }
     c.globalAlpha = 1;
   }
 }
