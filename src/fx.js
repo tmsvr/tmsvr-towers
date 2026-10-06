@@ -30,7 +30,9 @@ function burst(x, y, col, n, spd) {
 // d: { kind, ...where and what } as pushed by the simulation (or received
 // from the host, so anything odd is ignored rather than trusted).
 export function spawnEffect(d) {
-  if (!d || !(d.kind in LIFE) || !Number.isFinite(d.x + d.y)) return;
+  if (!d || !(d.kind in LIFE)) return;
+  // banners sit on the screen, not in the world, so they have no position
+  if (d.kind === 'banner' ? typeof d.txt !== 'string' : !Number.isFinite(d.x + d.y)) return;
   if (d.kind === 'puff') { burst(d.x, d.y, d.col, Math.min(d.n | 0, 64), +d.spd || 0); return; }
   const life = Math.min(+d.life || LIFE[d.kind], 5);
   live.push({ ...d, life, max: life });
