@@ -3,6 +3,7 @@
 // otherwise bonk the nearest enemy or collect coins. It never uses bombs and
 // picks a random-ish flower mix, so real players should do noticeably better.
 import * as sim from '../src/sim.js';
+import { finishLog } from '../src/stats.js';
 import { T, FLOWER_ORDER, FLOWERS, LOADOUT_SIZE, MAX_LEVEL } from '../src/data.js';
 
 // Walking directions around trees, rocks and ponds on map m: a breadth-first
@@ -144,5 +145,6 @@ export function runBot({ players = 2, seed = 1, loadouts, cats, map = 0, maxMinu
       log.push({ wave: s.wave, lives: s.lives, coins: s.players.map((p) => Math.floor(p.coins)), flowers: s.flowers.length, levels: s.flowers.reduce((a, f) => a + f.lvl, 0) });
     }
   }
-  return { won: s.won, wave: s.wave, lives: s.lives, log };
+  // game: the same detailed log a real game saves (see src/stats.js)
+  return { won: s.won, wave: s.wave, lives: s.lives, log, game: finishLog(s, s.won ? 'won' : s.over ? 'lost' : 'timeout') };
 }

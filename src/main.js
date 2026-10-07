@@ -5,7 +5,7 @@
 //   host      – this browser runs the game; player 2's inputs arrive over the network (host.js)
 //   guest     – this browser only sends inputs and draws snapshots from the host (guest.js)
 import { createState, step } from './sim.js';
-import { finishLog } from './stats.js';
+import { finishLog, currentLog } from './stats.js';
 import { render, VIEW_W, VIEW_H } from './render.js';
 import { initAudio, play, toggleMute, setMusicMood } from './audio.js';
 import { juiceEvent, hitStopping, toggleJuice } from './juice.js';
@@ -160,8 +160,7 @@ function downloadLogs() {
   const logs = savedLogs();
   // include the game in progress, as it stands
   if (state?.stats && !state.logSaved && state.stats.waves.length) {
-    const { cur, ...now } = state.stats;
-    logs.push({ ...now, result: { how: 'in progress', wave: state.wave, cottage: Math.round(state.lives), kills: state.kills, seconds: Math.round(state.t) } });
+    logs.push({ ...currentLog(state), result: { how: 'in progress', wave: state.wave, cottage: Math.round(state.lives), kills: state.kills, seconds: Math.round(state.t) } });
   }
   if (!logs.length) { flashNote(mode === 'guest' ? 'The host has the game log' : 'No games logged yet'); return; }
   const a = document.createElement('a');

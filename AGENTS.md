@@ -129,9 +129,13 @@ There is no automated test suite. Check changes like this:
    returns `{ won, wave, lives, log }`.
 3. **Art**: `/tools/gallery.html` (add `?zoom=5`).
 4. **Real playtest logs**: players press **L** to download the last 20 games
-   as JSON (per wave: monsters, cottage damage by type, coins
-   earned/spent per cat, damage and kills per flower, garden snapshot). This
-   is the main source for balance decisions; online, only the host has it.
+   as JSON (per wave: monsters, cottage damage by type and by road, coins
+   earned/spent per cat, time spent per activity, damage and kills per flower
+   type, garden snapshot; plus a timeline of plants, level-ups, heals, digs,
+   bombs, leaks and cat positions, and a per-flower record with tile, levels
+   and own damage). The format is documented at the top of `src/stats.js`.
+   This is the main source for balance decisions; online, only the host has
+   it. `runBot()` returns the same log as `game`.
 5. **Online**: open two browser windows; host with 3, join with 4 using the
    room code. Test with the same build in both.
 

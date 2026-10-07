@@ -67,7 +67,12 @@ Every game keeps a log for balancing: per wave how long it took, which
 monsters came and died, cottage damage by monster type, each cat's coins
 (start, earned, spent on planting/upgrades/healing, end), damage and kills by
 each flower type, baton and bomb, flowers planted, upgraded, wilted (wear or
-aphids) and dug up, and the garden at the end of the wave. The last 20 games
+aphids) and dug up, cottage damage per road, how long each cat spent
+building, healing, fighting or walking, and the garden at the end of the wave.
+It also keeps a timeline (every planting and level-up with its tile, who did
+it and when, heals, digs, bombs, leaks, and each cat's position every 2
+seconds) and a record of every flower with its own damage and kills, so
+placement and play style can be studied. The last 20 games
 are kept in the browser; press **L** (in a game, on the end screen or in the
 menu) to download them as one JSON file. Online, the host's browser has the
 log. The code is in `src/stats.js`.

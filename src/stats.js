@@ -2,14 +2,34 @@
 // what dealt the damage and what hurt the cottage. The sim calls these hooks;
 // they only count, so they never change how the game plays. Only the copy of
 // the game that runs the rules (local play or the online host) keeps a log.
+//
+// Besides the per-wave summaries, the log keeps (format 2):
+//  - timeline: what happened when, as compact arrays [t, kind, ...]:
+//      [t, 'wave', n]                        a wave starts
+//      [t, 'end', n, how, cottage]           a wave ends ('cleared' | 'lost' | 'won')
+//      [t, 'plant', p, fid, type, tx, ty]    player p puts a seedling on tile tx, ty
+//      [t, 'lvl', p, fid, lvl, coins]        flower fid reaches lvl (1 = done growing); p finished it, coins = p's coins after
+//      [t, 'heal', p, fid, hp]               p starts healing flower fid (at hp health)
+//      [t, 'dig', p, fid, lvl, refund]       p digs flower fid up
+//      [t, 'wilt', fid, cause]               flower fid wilts ('wear' | 'aphid')
+//      [t, 'bomb', p, tx, ty, hits]          p's bomb lands on tile tx, ty and hits that many monsters
+//      [t, 'leak', type, road]               a monster reaches the cottage (road = index into the map's paths)
+//      [t, 'pos', p, tx, ty, act, coins]     every 2 s: where each cat is and what it mostly did since the last sample
+//                                            (b = growing/upgrading, h = healing, d = digging, f = fighting, m = moving, i = idle)
+//  - flowers: every flower ever planted, with its tile, who planted it when,
+//    each level reached [t, lvl, by], how it ended, and its own damage and kills
+//    (in total and per wave), so placement can be judged flower by flower.
+// t is game seconds; tiles are map tile coordinates.
 import { DATA_HASH, CATS } from './data.js';
 
 const add = (o, k, v = 1) => { o[k] = (o[k] || 0) + v; };
 const r1 = (v) => Math.round(v * 10) / 10;
+const SAMPLE = 2; // seconds between position samples
 
 // Called when the pick screen ends: who played what, where.
 export function startLog(s) {
   s.stats = {
+    format: 2,
     version: DATA_HASH,
     date: new Date().toISOString(),
     map: s.m.id,
@@ -17,7 +37,10 @@ export function startLog(s) {
     cottageHealth: s.maxLives,
     result: null,
     waves: [],
+    timeline: [],
+    flowers: {},
     cur: null,
+    acts: s.players.map(() => ({})), sampleT: 0,
   };
   openPeriod(s);
 }
@@ -29,17 +52,23 @@ function openPeriod(s) {
     wave: s.wave + 1,
     prepStartT: s.t, waveStartT: null, endT: null,
     cottageStart: s.lives,
-    cottageDamage: {},
+    cottageDamage: {}, cottageDamageByRoad: {},
     spawned: {}, killed: {},
     damage: {}, kills: {},
     coins: s.players.map((p) => ({ start: p.coins, earned: 0, plant: 0, upgrade: 0, heal: 0, refund: 0 })),
+    activity: s.players.map(() => ({})), // seconds spent on each activity (same letters as 'pos')
     planted: {}, upgrades: {}, wilted: { wear: {}, aphid: {} }, dug: {},
   };
 }
 
 const cur = (s) => s.stats?.cur;
+const ev = (s, ...a) => { s.stats.timeline.push([r1(s.t), ...a]); };
 
-export function logWaveStart(s) { if (cur(s)) cur(s).waveStartT = s.t; }
+export function logWaveStart(s) {
+  if (!cur(s)) return;
+  cur(s).waveStartT = s.t;
+  ev(s, 'wave', s.wave);
+}
 
 // how: 'cleared' | 'lost' | 'won'
 export function logWaveEnd(s, how) {
@@ -51,12 +80,15 @@ export function logWaveEnd(s, how) {
   w.waveSeconds = r1(s.t - (w.waveStartT ?? s.t));
   w.cottageEnd = r1(s.lives);
   for (const k in w.cottageDamage) w.cottageDamage[k] = r1(w.cottageDamage[k]);
+  for (const k in w.cottageDamageByRoad) w.cottageDamageByRoad[k] = r1(w.cottageDamageByRoad[k]);
   for (const k in w.damage) w.damage[k] = Math.round(w.damage[k]);
   w.coins.forEach((c, i) => { c.end = Math.round(s.players[i].coins); for (const k in c) c[k] = Math.round(c[k]); });
-  w.garden = s.flowers.filter((f) => !f.dead).map((f) => ({ type: f.type, lvl: f.lvl, hp: Math.round(f.hp) }));
+  w.activity.forEach((a) => { for (const k in a) a[k] = Math.round(a[k]); });
+  w.garden = s.flowers.filter((f) => !f.dead).map((f) => ({ id: f.id, type: f.type, lvl: f.lvl, hp: Math.round(f.hp), tx: f.tx, ty: f.ty }));
   delete w.prepStartT; delete w.waveStartT; delete w.endT;
   s.stats.waves.push(w);
   s.stats.cur = null;
+  ev(s, 'end', w.wave, how, r1(s.lives));
   if (how === 'cleared') openPeriod(s);
 }
 
@@ -66,35 +98,116 @@ export function finishLog(s, how) {
   if (cur(s) && cur(s).waveStartT != null) logWaveEnd(s, how);
   const st = s.stats;
   st.result = { how, wave: s.wave, won: !!s.won, cottage: r1(s.lives), kills: s.kills, seconds: Math.round(s.t) };
-  const totals = { damage: {}, kills: {}, cottageDamage: {}, coins: s.players.map(() => ({ earned: 0, plant: 0, upgrade: 0, heal: 0, refund: 0 })) };
+  const totals = { damage: {}, kills: {}, cottageDamage: {}, cottageDamageByRoad: {}, coins: s.players.map(() => ({ earned: 0, plant: 0, upgrade: 0, heal: 0, refund: 0 })) };
   for (const w of st.waves) {
     for (const k in w.damage) add(totals.damage, k, w.damage[k]);
     for (const k in w.kills) add(totals.kills, k, w.kills[k]);
     for (const k in w.cottageDamage) add(totals.cottageDamage, k, w.cottageDamage[k]);
+    for (const k in w.cottageDamageByRoad) add(totals.cottageDamageByRoad, k, w.cottageDamageByRoad[k]);
     w.coins.forEach((c, i) => { for (const k in totals.coins[i]) totals.coins[i][k] += c[k] || 0; });
   }
   totals.coins.forEach((c, i) => { c.left = Math.round(s.players[i].coins); });
   st.totals = totals;
-  const { cur: _, ...log } = st;
+  return currentLog(s);
+}
+
+// The log as it stands, without closing anything (for downloading mid-game).
+export function currentLog(s) {
+  const { cur: _, acts: __, sampleT: ___, flowers, ...log } = s.stats;
+  log.flowers = Object.values(flowers).map((f) => {
+    const out = { ...f, dmg: Math.round(f.dmg), dmgByWave: {} };
+    for (const k in f.dmgByWave) out.dmgByWave[k] = Math.round(f.dmgByWave[k]);
+    return out;
+  });
   return log;
 }
 
 export function logSpawn(s, type) { if (cur(s)) add(cur(s).spawned, type); }
 
-// src says what did it: a flower type, 'baton P1', 'bomb P2', 'poison'...
-export function logDamage(s, src, e, dealt, killed) {
+// src says what did it: a flower type, 'baton P1', 'bomb P2', 'stink'...;
+// fid is the flower that did it, when a flower did.
+export function logDamage(s, src, e, dealt, killed, fid) {
   const w = cur(s);
   if (!w || !src) return;
   add(w.damage, src, dealt);
   if (killed) { add(w.kills, src); add(w.killed, e.type); }
+  const f = fid != null && s.stats.flowers[fid];
+  if (f) {
+    f.dmg += dealt;
+    add(f.dmgByWave, s.wave, dealt);
+    if (killed) f.kills++;
+  }
 }
 
-export function logCottage(s, type, amt) { if (cur(s)) add(cur(s).cottageDamage, type, amt); }
+// A monster chewing the cottage; the first bite also goes on the timeline.
+export function logCottage(s, e, amt) {
+  const w = cur(s);
+  if (!w) return;
+  add(w.cottageDamage, e.type, amt);
+  add(w.cottageDamageByRoad, e.path, amt);
+  if (!e.leakLogged) { e.leakLogged = true; ev(s, 'leak', e.type, e.path); }
+}
 
 // kind: 'earned' | 'plant' | 'upgrade' | 'heal' | 'refund'
 export function logCoins(s, p, kind, amt) { const c = cur(s)?.coins[p.id]; if (c) c[kind] += amt; }
 
-export function logPlanted(s, type) { if (cur(s)) add(cur(s).planted, type); }
-export function logUpgrade(s, type, lvl) { const w = cur(s); if (w) { w.upgrades[type] ??= {}; add(w.upgrades[type], `Lv${lvl}`); } }
-export function logWilt(s, type, cause) { if (cur(s)) add(cur(s).wilted[cause], type); }
-export function logDug(s, type) { if (cur(s)) add(cur(s).dug, type); }
+export function logPlanted(s, p, f) {
+  if (!cur(s)) return;
+  add(cur(s).planted, f.type);
+  s.stats.flowers[f.id] = {
+    id: f.id, type: f.type, tx: f.tx, ty: f.ty, by: p.id, t: r1(s.t), wave: s.wave, inWave: s.phase === 'wave',
+    levels: [], end: null, dmg: 0, kills: 0, dmgByWave: {},
+  };
+  ev(s, 'plant', p.id, f.id, f.type, f.tx, f.ty);
+}
+
+// A flower finished growing (lvl 1) or an upgrade (lvl 2+); p poured the last coin.
+export function logLevel(s, p, f) {
+  const w = cur(s);
+  if (!w) return;
+  if (f.lvl > 1) { w.upgrades[f.type] ??= {}; add(w.upgrades[f.type], `Lv${f.lvl}`); }
+  s.stats.flowers[f.id]?.levels.push([r1(s.t), f.lvl, p.id]);
+  ev(s, 'lvl', p.id, f.id, f.lvl, Math.round(p.coins));
+}
+
+export function logHealStart(s, p, f) { if (cur(s)) ev(s, 'heal', p.id, f.id, Math.round(f.hp)); }
+
+export function logWilt(s, f, cause) {
+  if (!cur(s)) return;
+  add(cur(s).wilted[cause], f.type);
+  const rec = s.stats.flowers[f.id];
+  if (rec) rec.end = [r1(s.t), 'wilt', cause];
+  ev(s, 'wilt', f.id, cause);
+}
+
+export function logDug(s, p, f, refund) {
+  if (!cur(s)) return;
+  add(cur(s).dug, f.type);
+  const rec = s.stats.flowers[f.id];
+  if (rec) rec.end = [r1(s.t), 'dug', f.lvl];
+  ev(s, 'dig', p.id, f.id, f.lvl, refund);
+}
+
+export function logBomb(s, b, tx, ty, hits) { if (cur(s)) ev(s, 'bomb', b.owner ?? 0, tx, ty, hits); }
+
+// Every tick: what each cat is doing; every SAMPLE seconds, where it is and
+// what it mostly did since the last sample.
+export function logTick(s, dt, tileOf) {
+  const st = s.stats, w = cur(s);
+  if (!w) return;
+  s.players.forEach((p, i) => {
+    const act = p.working ? (p.mode === 'dig' ? 'd' : 'b') : p.healing ? 'h' : p.swingT > 0 ? 'f' : p.moving ? 'm' : 'i';
+    add(st.acts[i], act, dt);
+    add(w.activity[i], act, dt);
+  });
+  if (s.t - st.sampleT < SAMPLE) return;
+  st.sampleT = s.t;
+  s.players.forEach((p, i) => {
+    const a = st.acts[i];
+    let best = 'i';
+    for (const k in a) if (a[k] > (a[best] || 0)) best = k;
+    const { tx, ty } = tileOf(s.m, p);
+    ev(s, 'pos', p.id, tx, ty, best, Math.round(p.coins));
+    st.acts[i] = {};
+  });
+}
