@@ -1857,8 +1857,8 @@ function addActor(y, kind, o) {
 }
 const byY = (a, b) => a.y - b.y;
 
-// For tools/gallery.html: flowers and cats, drawn exactly as in the game.
-export { drawFlower, drawCat };
+// For tools/gallery.html and tools/maps.html: drawn exactly as in the game.
+export { drawFlower, drawCat, getBg, drawTree, drawCottage };
 
 export function render(c, s, ui) {
   const time = performance.now() / 1000;

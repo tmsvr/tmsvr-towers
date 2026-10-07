@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Map Overview</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #141b22; --text: #e8f1f7; --muted: #8fa5b3; }
+  body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 1200px; margin: 0 auto; }
+  h1 { margin: 0 0 4px; font-size: 24px; }
+  h2 { margin: 24px 0 6px; font-size: 18px; }
+  p { color: var(--muted); margin: 0 0 12px; }
+  canvas { width: 100%; height: auto; border-radius: 10px; display: block; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Map overview</h1>
+  <p>Every map from <code>maps.json</code>, whole, drawn with the game's own code (roads, ponds, bridges, scattered trees and rocks, the cottage). Edit <code>maps.json</code> and reload.</p>
+  <div id="maps"></div>
+</main>
+<script type="module">
+import { getBg, drawTree, drawCottage } from '../src/render.js';
+import { MAPS, T } from '../src/data.js';
+
+await document.fonts.ready;
+const dpr = Math.min(2, devicePixelRatio || 1), time = 0;
+for (const m of MAPS) {
+  const h = document.createElement('h2');
+  h.textContent = `${m.name} — ${m.desc} (${m.W}×${m.H}, ${m.paths.length} road${m.paths.length > 1 ? 's' : ''}, waveSize ${m.waveSize})`;
+  const cv = document.createElement('canvas');
+  cv.width = m.worldW * dpr; cv.height = m.worldH * dpr;
+  document.getElementById('maps').append(h, cv);
+  const c = cv.getContext('2d');
+  c.scale(dpr, dpr);
+  c.drawImage(getBg(m, dpr), 0, 0, m.worldW, m.worldH);
+  const trees = m.obstacles.filter((o) => o.type === 'tree').sort((a, b) => a.y - b.y);
+  for (const o of trees) drawTree(c, o, time);
+  drawCottage(c, m.base.x, m.base.y, 1, 1, 0, time);
+  // entrances and where the cats start
+  for (const p of m.paths) {
+    c.beginPath(); c.arc(p.waypoints[0].x, p.waypoints[0].y, 12, 0, Math.PI * 2); c.fillStyle = '#8a5cff'; c.fill();
+  }
+  c.beginPath(); c.arc(m.start.x, m.start.y, 10, 0, Math.PI * 2); c.fillStyle = '#ffe27a'; c.fill();
+}
+</script>
+</body>
+</html>

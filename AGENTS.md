@@ -57,6 +57,7 @@ Claude Code users: `.claude/launch.json` defines this server as `towers`
 | `tools/bot.js` | Autopilot that plays whole games through the real sim |
 | `tools/balance-test.html` | UI for running the autopilot over many seeds and maps |
 | `tools/gallery.html` | Every flower at every level and every cat (standing and swinging), drawn with the real render code. `?zoom=5` for close-ups |
+| `tools/maps.html` | Every map from `maps.json` drawn whole with the real render code (roads, ponds, bridges, scatter, cottage, entrances) |
 | `serve.py` | No-cache local server |
 | `.nojekyll` | Tells GitHub Pages to serve files untouched |
 
@@ -107,7 +108,7 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
 | I want to… | Do this |
 |---|---|
 | Rebalance (damage, costs, HP, waves, economy) | Edit `balance.json`. The flower guide (I key) and pick cards update themselves |
-| Change a map, or add one | Edit/add an entry in `maps.json`. Roads are lists of corner points; each segment must be horizontal or vertical; every road ends at `base`. Check reachability (a scatter seed can wall off a tile; change `scatter.seed`) |
+| Change a map, or add one | Edit/add an entry in `maps.json`, then look at it whole in `/tools/maps.html`. Roads are lists of corner points; each segment must be horizontal or vertical; every road ends at `base`. Check reachability (a scatter seed can wall off a tile; change `scatter.seed`) |
 | Make a map easier or harder | `waveSize` (monster count; boss HP scales with its square root) and `startCoins` in `maps.json` |
 | Add a flower | New entry in `balance.json → flowers` (its `kind` picks the attack code in `sim.js`; a new kind needs new code there), plus its look in `render.js` (`SPEC`, `PERSONA`, `BODIES`). The pick screen, guide and network encoding pick it up automatically; bump `PROTOCOL` |
 | Add an enemy | Entry in `balance.json → enemies`, plus a `waves` entry (`fromWave`, `weight`, `cost`, `group`) so it spawns, and its drawing in `drawEnemy` (`render.js`). Bump `PROTOCOL` |
