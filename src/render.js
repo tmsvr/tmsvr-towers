@@ -1936,7 +1936,7 @@ export function render(c, s, ui) {
   if (s.phase === 'pick' && !ui.disconnected) drawPick(c, s, ui, time);
   if (ui.guide != null) drawGuide(c, time, ui.guide);
   if (ui.disconnected) drawOverlay(c, 'Disconnected', ['The connection to the host was lost', 'Esc: back to menu'], '#ff7a6a');
-  else if (ui.paused) drawOverlay(c, 'Paused', ['Press P to resume'], '#ffffff');
+  else if (ui.paused) drawOverlay(c, 'Paused', ['P: resume', 'R: restart this map  ·  Esc: back to the menu'], '#ffffff');
   else if (s.over) drawOverlay(c, 'The garden fell…', [`You reached wave ${s.wave}  ·  ${s.kills} monsters bonked`, 'Press R to try again  ·  L to download the game log'], '#ff7a6a');
   else if (s.won) drawOverlay(c, 'Victory!', [`All ${TOTAL_WAVES} waves defended  ·  ${s.kills} monsters bonked`, 'Press R to play again  ·  L to download the game log'], '#8dff9a');
   if (ui.note && performance.now() < ui.note.until) label(c, ui.note.txt, VIEW_W / 2, MAP_H - 24, 16, '#ffffff', 'center', 700);

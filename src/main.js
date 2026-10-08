@@ -15,7 +15,7 @@ import { decodeFast, PROTOCOL } from './schema.js';
 import { createHostLink } from './host.js';
 import { createGuestLink } from './guest.js';
 import { spawnEffect, spawnTrails, updateEffects, resetEffects } from './fx.js';
-import { MAPS, MAP_H, DATA_HASH, FLOWER_ORDER } from './data.js';
+import { MAPS, MAP_H, DATA_HASH, FLOWER_ORDER, LOADOUT_SIZE } from './data.js';
 
 const canvas = document.getElementById('game');
 const lobby = document.getElementById('lobby');
@@ -131,9 +131,11 @@ addEventListener('keydown', (e) => {
     if (mode === 'guest') net.send({ t: 'pause' });
     else if (mode === 'local' || mode === 'host') ui.paused = !ui.paused;
   }
-  if (code === 'KeyR' && state && (state.over || state.won)) {
+  // R after a game: back to the pick screen. R while paused: the same map,
+  // cats and flowers again, straight into the game.
+  if (code === 'KeyR' && state && (state.over || state.won || ui.paused)) {
     if (mode === 'guest') net.send({ t: 'restart' });
-    else if (mode === 'local' || mode === 'host') newGame();
+    else if (mode === 'local' || mode === 'host') newGame(ui.paused && !state.over && !state.won);
   }
 });
 addEventListener('keyup', (e) => held.delete(e.code || KEY_TO_CODE[e.key] || ''));
@@ -175,10 +177,13 @@ function flashNote(txt) { ui.note = { txt, until: performance.now() + 2500 }; }
 // ---- modes ------------------------------------------------------------------
 let lastLoadouts = [], lastCats = [];
 let lastMap = 0;
-function newGame() {
+// same: restart with the same map, cats and flowers, skipping the pick screen.
+function newGame(same = false) {
   saveGameLog('quit');
   if (state && state.players) { lastLoadouts = state.players.map((p) => p.loadout || p.pick.chosen); lastCats = state.players.map((p) => p.cat); lastMap = state.map; }
   state = createState(nPlayers, (Math.random() * 1e9) | 0, { sharedScreen: mode === 'local' && nPlayers > 1, loadouts: lastLoadouts, cats: lastCats, map: lastMap });
+  // everyone already has a full loadout, so the next tick leaves the pick screen
+  if (same && state.players.every((p) => p.pick.chosen.length === LOADOUT_SIZE)) for (const p of state.players) p.pick.ready = true;
   ui.cam.snap = true;
   ui.paused = false;
   resetEffects();
@@ -255,7 +260,7 @@ function onGuestMessage(m) {
   if (!guestOk) return;
   if (m.t === 'in') host.receiveInputs(m.inputs);
   else if (m.t === 'pause') ui.paused = !ui.paused;
-  else if (m.t === 'restart' && state && (state.over || state.won)) newGame();
+  else if (m.t === 'restart' && state && (state.over || state.won || ui.paused)) newGame(ui.paused && !state.over && !state.won);
   else if (m.t === 'ping' && Number.isFinite(m.at)) net.send({ t: 'pong', at: m.at });
 }
 
