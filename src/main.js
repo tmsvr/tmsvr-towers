@@ -119,7 +119,15 @@ addEventListener('keydown', (e) => {
   if (code === 'KeyN') toggleMute();
   if (code === 'KeyJ') toggleJuice();
   if (code === 'KeyL') downloadLogs();
-  if (code === 'Escape') { if (mode !== 'menu') backToMenu(); return; }
+  // Esc in a game pauses (and resumes); M in the pause menu leaves. After the
+  // game, before it starts online, or once disconnected, Esc leaves at once.
+  if (code === 'Escape') {
+    if (mode === 'menu') return;
+    if (state && !state.over && !state.won && !ui.disconnected) togglePause();
+    else backToMenu();
+    return;
+  }
+  if (code === 'KeyM' && ui.paused && mode !== 'menu') { backToMenu(); return; }
   if (mode === 'menu') {
     if (code === 'Digit1' || code === 'Numpad1') startLocal(1);
     if (code === 'Digit2' || code === 'Numpad2') startLocal(2);
@@ -127,10 +135,7 @@ addEventListener('keydown', (e) => {
     if (code === 'Digit4' || code === 'Numpad4') showJoin();
     return;
   }
-  if (code === 'KeyP') {
-    if (mode === 'guest') net.send({ t: 'pause' });
-    else if (mode === 'local' || mode === 'host') ui.paused = !ui.paused;
-  }
+  if (code === 'KeyP') togglePause();
   // R after a game: back to the pick screen. R while paused: the same map,
   // cats and flowers again, straight into the game.
   if (code === 'KeyR' && state && (state.over || state.won || ui.paused)) {
@@ -177,6 +182,11 @@ function flashNote(txt) { ui.note = { txt, until: performance.now() + 2500 }; }
 // ---- modes ------------------------------------------------------------------
 let lastLoadouts = [], lastCats = [];
 let lastMap = 0;
+function togglePause() {
+  if (mode === 'guest') net.send({ t: 'pause' });
+  else if (mode === 'local' || mode === 'host') ui.paused = !ui.paused;
+}
+
 // same: restart with the same map, cats and flowers, skipping the pick screen.
 function newGame(same = false) {
   saveGameLog('quit');

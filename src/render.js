@@ -1894,7 +1894,7 @@ function drawMenu(c, time, ui) {
     `Each player picks a different cat and ${LOADOUT_SIZE} of the ${FLOWER_ORDER.length} flowers. In co-op, each cat keeps the coins it picks up.`,
   ];
   tips.forEach((t, i) => label(c, t, cx, 455 + i * 24, 13.5, '#cfe0ea', 'center', 500, null));
-  label(c, 'Enter: early wave  ·  P: pause  ·  N: sound  ·  J: effects  ·  I: flower guide  ·  L: game logs  ·  Esc: menu', cx, 545, 14, '#8fa5b3', 'center', 500, null);
+  label(c, 'Enter: early wave  ·  P or Esc: pause  ·  N: sound  ·  J: effects  ·  I: flower guide  ·  L: game logs', cx, 545, 14, '#8fa5b3', 'center', 500, null);
   label(c, 'Online, both players use the P1 keys (or arrows) on their own keyboard.', cx, 570, 13, '#8fa5b3', 'center', 500, null);
 }
 
@@ -1986,8 +1986,8 @@ export function render(c, s, ui) {
   if (s.phase === 'pick' && !ui.disconnected) drawPick(c, s, ui, time);
   if (ui.guide != null) drawGuide(c, time, ui.guide);
   if (ui.disconnected) drawOverlay(c, 'Disconnected', ['The connection to the host was lost', 'Esc: back to menu'], '#ff7a6a');
-  else if (ui.paused) drawOverlay(c, 'Paused', ['P: resume', 'R: restart this map  ·  Esc: back to the menu'], '#ffffff');
-  else if (s.over) drawOverlay(c, 'The garden fell…', [`You reached wave ${s.wave}  ·  ${s.kills} monsters bonked`, 'Press R to try again  ·  L to download the game log'], '#ff7a6a');
-  else if (s.won) drawOverlay(c, 'Victory!', [`All ${TOTAL_WAVES} waves defended  ·  ${s.kills} monsters bonked`, 'Press R to play again  ·  L to download the game log'], '#8dff9a');
+  else if (ui.paused) drawOverlay(c, 'Paused', ['P or Esc: resume', 'R: restart this map  ·  M: back to the menu'], '#ffffff');
+  else if (s.over) drawOverlay(c, 'The garden fell…', [`You reached wave ${s.wave}  ·  ${s.kills} monsters bonked`, 'R: try again  ·  Esc: menu  ·  L: download the game log'], '#ff7a6a');
+  else if (s.won) drawOverlay(c, 'Victory!', [`All ${TOTAL_WAVES} waves defended  ·  ${s.kills} monsters bonked`, 'R: play again  ·  Esc: menu  ·  L: download the game log'], '#8dff9a');
   if (ui.note && performance.now() < ui.note.until) label(c, ui.note.txt, VIEW_W / 2, MAP_H - 24, 16, '#ffffff', 'center', 700);
 }
