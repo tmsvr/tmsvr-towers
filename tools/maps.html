@@ -26,16 +26,18 @@ import { getBg, drawTree, drawCottage } from '../src/render.js';
 import { MAPS, T } from '../src/data.js';
 
 await document.fonts.ready;
-const dpr = Math.min(2, devicePixelRatio || 1), time = 0;
+// Drawn at half size: ten maps at full Retina size would use several hundred
+// MB of canvas memory, enough to make the browser drop them.
+const k = 0.5, time = 0;
 for (const m of MAPS) {
   const h = document.createElement('h2');
   h.textContent = `${m.name} — ${m.desc} (${m.W}×${m.H}, ${m.paths.length} road${m.paths.length > 1 ? 's' : ''}, waveSize ${m.waveSize})`;
   const cv = document.createElement('canvas');
-  cv.width = m.worldW * dpr; cv.height = m.worldH * dpr;
+  cv.width = Math.round(m.worldW * k); cv.height = Math.round(m.worldH * k);
   document.getElementById('maps').append(h, cv);
   const c = cv.getContext('2d');
-  c.scale(dpr, dpr);
-  c.drawImage(getBg(m, dpr), 0, 0, m.worldW, m.worldH);
+  c.scale(k, k);
+  c.drawImage(getBg(m, 1), 0, 0, m.worldW, m.worldH);
   const trees = m.obstacles.filter((o) => o.type === 'tree').sort((a, b) => a.y - b.y);
   for (const o of trees) drawTree(c, o, time);
   drawCottage(c, m.base.x, m.base.y, 1, 1, 0, time);

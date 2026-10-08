@@ -13,7 +13,7 @@
     {
       "id": "fork",
       "name": "Forked Path",
-      "desc": "A road that forks",
+      "desc": "One road forks",
       "width": 33,
       "height": 23,
       "base": [29, 11],
@@ -33,7 +33,7 @@
     {
       "id": "lakeside",
       "name": "Lakeside",
-      "desc": "Opposite corners",
+      "desc": "Two corners",
       "width": 29,
       "height": 23,
       "base": [14, 11],
@@ -55,7 +55,7 @@
     {
       "id": "valleys",
       "name": "Two Valleys",
-      "desc": "Two zigzag roads",
+      "desc": "Zigzag valleys",
       "width": 31,
       "height": 24,
       "base": [15, 21],
@@ -144,7 +144,7 @@
     {
       "id": "island",
       "name": "Island Keep",
-      "desc": "Island, two bridges",
+      "desc": "Island bridges",
       "width": 31,
       "height": 27,
       "base": [15, 13],
@@ -186,6 +186,64 @@
         { "type": "bridge", "x": 16, "y": 11, "w": 1, "h": 3 }
       ],
       "scatter": { "trees": 26, "rocks": 10, "seed": 57 }
+    },
+    {
+      "id": "whirlpool",
+      "name": "Whirlpool",
+      "desc": "Four spirals",
+      "width": 31,
+      "height": 31,
+      "base": [15, 15],
+      "start": [14, 18],
+      "waveSize": 0.9,
+      "startCoins": 2.5,
+      "paths": [
+        [[20, 0], [20, 5], [5, 5], [5, 10], [11, 10], [11, 15], [15, 15]],
+        [[30, 20], [25, 20], [25, 5], [20, 5], [20, 11], [15, 11], [15, 15]],
+        [[10, 30], [10, 25], [25, 25], [25, 20], [19, 20], [19, 15], [15, 15]],
+        [[0, 10], [5, 10], [5, 25], [10, 25], [10, 19], [15, 19], [15, 15]]
+      ],
+      "obstacles": [
+        { "type": "pond", "x": 12, "y": 12, "w": 2, "h": 2 },
+        { "type": "pond", "x": 13, "y": 1, "w": 4, "h": 2 },
+        { "type": "pond", "x": 17, "y": 12, "w": 2, "h": 2 },
+        { "type": "pond", "x": 28, "y": 13, "w": 2, "h": 4 },
+        { "type": "pond", "x": 17, "y": 17, "w": 2, "h": 2 },
+        { "type": "pond", "x": 14, "y": 28, "w": 4, "h": 2 },
+        { "type": "pond", "x": 12, "y": 17, "w": 2, "h": 2 },
+        { "type": "pond", "x": 1, "y": 14, "w": 2, "h": 4 }
+      ],
+      "scatter": { "trees": 28, "rocks": 10, "seed": 91 }
+    },
+    {
+      "id": "crossfire",
+      "name": "Crossfire",
+      "desc": "Crossing roads",
+      "width": 33,
+      "height": 25,
+      "base": [16, 12],
+      "start": [21, 12],
+      "waveSize": 0.85,
+      "startCoins": 2.5,
+      "paths": [
+        [[9, 0], [9, 4], [25, 4], [25, 9], [20, 9], [20, 12], [16, 12]],
+        [[32, 16], [28, 16], [28, 6], [13, 6], [13, 8], [16, 8], [16, 12]],
+        [[23, 24], [23, 20], [7, 20], [7, 15], [12, 15], [12, 12], [16, 12]],
+        [[0, 8], [4, 8], [4, 18], [19, 18], [19, 16], [16, 16], [16, 12]]
+      ],
+      "obstacles": [
+        { "type": "pond", "x": 14, "y": 10, "w": 5, "h": 1 },
+        { "type": "pond", "x": 14, "y": 14, "w": 5, "h": 1 },
+        { "type": "pond", "x": 14, "y": 11, "w": 1, "h": 3 },
+        { "type": "pond", "x": 18, "y": 11, "w": 1, "h": 3 },
+        { "type": "pond", "x": 2, "y": 1, "w": 4, "h": 3 },
+        { "type": "pond", "x": 30, "y": 9, "w": 2, "h": 3 },
+        { "type": "pond", "x": 19, "y": 1, "w": 3, "h": 2 },
+        { "type": "pond", "x": 27, "y": 21, "w": 4, "h": 3 },
+        { "type": "pond", "x": 1, "y": 13, "w": 2, "h": 3 },
+        { "type": "pond", "x": 11, "y": 22, "w": 3, "h": 2 }
+      ],
+      "scatter": { "trees": 26, "rocks": 10, "seed": 97 }
     }
   ]
 }
