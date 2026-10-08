@@ -7,6 +7,7 @@
     "obstacles": "Hand-placed things you can't plant on: pond (x, y, w, h), tree (x, y), rock (x, y), bridge (x, y, w, h: a footbridge over a pond that cats can cross). Roads may cross ponds; they get a bridge automatically.",
     "waveSize": "Multiplies how many enemies come per wave on this map (maps with short roads or several entrances can use less than 1). Boss health is multiplied by its square root.",
     "startCoins": "Multiplies the starting coins on this map (maps with several entrances need more flowers early).",
+    "waveSet": "Optional: which monster list from balance.json -> waveSets this map sends. Without it the map uses balance.json -> waves.",
     "scatter": "Extra trees and rocks placed randomly (but the same every game) on free tiles; change seed for a different layout."
   },
   "maps": [
@@ -244,6 +245,58 @@
         { "type": "pond", "x": 11, "y": 22, "w": 3, "h": 2 }
       ],
       "scatter": { "trees": 26, "rocks": 10, "seed": 97 }
+    },
+    {
+      "id": "hourglass",
+      "name": "Hourglass",
+      "desc": "One narrow neck",
+      "width": 31,
+      "height": 27,
+      "base": [15, 23],
+      "start": [15, 20],
+      "waveSize": 0.8,
+      "startCoins": 2,
+      "waveSet": "rush",
+      "paths": [
+        [[0, 3], [7, 3], [7, 9], [15, 9], [15, 17], [8, 17], [8, 23], [15, 23]],
+        [[15, 0], [15, 17], [8, 17], [8, 23], [15, 23]],
+        [[30, 3], [23, 3], [23, 9], [15, 9], [15, 17], [22, 17], [22, 23], [15, 23]]
+      ],
+      "obstacles": [
+        { "type": "pond", "x": 10, "y": 11, "w": 4, "h": 5 },
+        { "type": "pond", "x": 17, "y": 11, "w": 4, "h": 5 },
+        { "type": "pond", "x": 2, "y": 12, "w": 3, "h": 2 },
+        { "type": "pond", "x": 26, "y": 12, "w": 3, "h": 2 },
+        { "type": "pond", "x": 19, "y": 0, "w": 2, "h": 2 },
+        { "type": "rock", "x": 11, "y": 20 },
+        { "type": "rock", "x": 19, "y": 20 }
+      ],
+      "scatter": { "trees": 26, "rocks": 10, "seed": 13 }
+    },
+    {
+      "id": "millstream",
+      "name": "Millstream",
+      "desc": "A shortcut",
+      "width": 33,
+      "height": 25,
+      "base": [28, 5],
+      "start": [26, 7],
+      "waveSize": 0.8,
+      "startCoins": 2.2,
+      "waveSet": "wild",
+      "paths": [
+        [[0, 4], [8, 4], [8, 10], [14, 10], [14, 2], [24, 2], [24, 5], [28, 5]],
+        [[0, 20], [6, 20], [6, 14], [13, 14], [13, 21], [24, 21], [24, 5], [28, 5]],
+        [[32, 23], [27, 23], [27, 19], [31, 19], [31, 14], [26, 14], [26, 9], [28, 9], [28, 5]]
+      ],
+      "obstacles": [
+        { "type": "pond", "x": 19, "y": 0, "w": 2, "h": 25 },
+        { "type": "bridge", "x": 19, "y": 12, "w": 2, "h": 1 },
+        { "type": "pond", "x": 10, "y": 6, "w": 3, "h": 2 },
+        { "type": "pond", "x": 8, "y": 16, "w": 3, "h": 3 },
+        { "type": "pond", "x": 28, "y": 20, "w": 2, "h": 2 }
+      ],
+      "scatter": { "trees": 26, "rocks": 10, "seed": 29 }
     }
   ]
 }

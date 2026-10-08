@@ -18,17 +18,18 @@
 <body>
 <main>
   <h1>Flower gallery</h1>
-  <p>Every flower at every level, drawn with the game's own code. Edit <code>src/render.js</code> and reload. Add <code>?zoom=5</code> to the address for a closer look.</p>
+  <p>Every flower at every level, every cat and every monster, drawn with the game's own code. Edit <code>src/render.js</code> and reload. Add <code>?zoom=5</code> to the address for a closer look.</p>
   <p><label><input id="fire" type="checkbox"> firing</label><label><input id="hurt" type="checkbox"> hurt (40% health)</label></p>
   <canvas id="c"></canvas>
 </main>
 <script type="module">
-import { drawFlower, drawCat } from '../src/render.js';
-import { FLOWER_ORDER, FLOWERS, MAX_LEVEL, T, CAT_ORDER, CATS, PLAYER } from '../src/data.js';
+import { drawFlower, drawCat, drawEnemy } from '../src/render.js';
+import { FLOWER_ORDER, FLOWERS, MAX_LEVEL, T, CAT_ORDER, CATS, PLAYER, ENEMIES } from '../src/data.js';
 
 const ZOOM = +new URLSearchParams(location.search).get('zoom') || 2.2, COL = T * 1.5, ROW = T * 1.9, LEFT = 110, TOP = 40;
 const cv = document.getElementById('c'), dpr = Math.min(2, devicePixelRatio || 1);
-const W = LEFT + (MAX_LEVEL + 1) * COL, H = TOP + (FLOWER_ORDER.length + CAT_ORDER.length) * ROW;
+const MONSTERS = Object.keys(ENEMIES), PER_ROW = MAX_LEVEL + 1, MROWS = Math.ceil(MONSTERS.length / PER_ROW);
+const W = LEFT + (MAX_LEVEL + 1) * COL, H = TOP + (FLOWER_ORDER.length + CAT_ORDER.length + MROWS) * ROW;
 cv.width = W * ZOOM * dpr; cv.height = H * ZOOM * dpr;
 if (ZOOM !== 2.2) { cv.style.width = W * ZOOM + 'px'; document.querySelector('main').style.maxWidth = 'none'; }
 const c = cv.getContext('2d');
@@ -59,6 +60,15 @@ function frame() {
       id: i % 2, cat, noTag: true, x: LEFT + (j + 0.5) * COL, y, dir: o.dir ?? 0, moving: false, stun: 0,
       swingT: o.swing ? PLAYER.swingTime * (1 - o.swing) : 0, swingDir: 0,
     }, time));
+  });
+  // monsters: walking, then (with 'firing' ticked) dashing or leaping; 'hurt' shows them at 40% health
+  MONSTERS.forEach((type, i) => {
+    const x = LEFT + (i % PER_ROW + 0.5) * COL, y = TOP + (FLOWER_ORDER.length + CAT_ORDER.length + Math.floor(i / PER_ROW) + 0.5) * ROW;
+    c.textAlign = 'center'; c.fillStyle = '#20301a'; c.fillText(type, x, y + ROW * 0.42);
+    drawEnemy(c, {
+      id: i, type, def: ENEMIES[type], x, y, ang: 0, wob: time * 8, hp: hurt ? 40 : 100, maxhp: 100, flash: 0,
+      psn: 0, slowT: 0, stun: 0, under: false, atBase: false, chew: null, dashing: fire && !!ENEMIES[type].dash,
+    }, time);
   });
   requestAnimationFrame(frame);
 }

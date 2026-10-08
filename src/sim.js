@@ -6,7 +6,7 @@
 import {
   T, U, VIEW_W, MAP_H, TOTAL_WAVES, MAPS, ENEMIES, INTROS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, GROW_TIME, FLOWER_HP, WEAR_PER_SEC, WEAR_MULT, HEAL_RATE, HEAL_COST,
-  POISON_TIME, START_COINS, LOADOUT_SIZE, WAVES, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER,
+  POISON_TIME, START_COINS, LOADOUT_SIZE, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER,
 } from './data.js';
 import { prune, clamp, nextSeed, randomFrom } from './util.js';
 import * as log from './stats.js';
@@ -163,6 +163,9 @@ function spawnEnemy(s, type, from, path = 0) {
 
 // Whether flowers, bombs and batons can touch this enemy right now.
 export const hittable = (e) => !e.dead && !e.under;
+// Out of reach of ground-only flowers and poison clouds: flyers, and
+// grasshoppers in the middle of a leap.
+export const airborne = (e) => e.def.flying || (e.dashing && e.def.dash.leap);
 
 // src (optional) is who did it, for the game log: a flower type, 'baton P1'...;
 // fid is the flower that did it, so the log can judge each flower's spot.
@@ -274,7 +277,9 @@ function updateEnemies(s, dt) {
       }
     }
     e.wob += dt * 8 * e.slow;
-    const sp = e.def.speed * e.slow * (e.dashing ? e.def.dash.speedMultiplier : 1) * (e.under ? e.def.burrow.speedMultiplier : 1);
+    let sp = e.def.speed * e.slow * (e.dashing ? e.def.dash.speedMultiplier : 1) * (e.under ? e.def.burrow.speedMultiplier : 1);
+    // stag beetles run faster the more they are hurt, so chip damage along the road backfires
+    if (e.def.enrage) sp *= 1 + (e.def.enrage.maxSpeedMultiplier - 1) * (1 - Math.max(0, e.hp) / e.maxhp);
     const road = s.m.paths[e.path], wps = road.waypoints;
     // On the last stretch each enemy heads for its own spot around the cottage wall.
     const final = e.def.flying || e.seg >= wps.length - 1;
@@ -314,10 +319,18 @@ function chompCottage(s, e, dt) {
 }
 
 // ---- Waves ----------------------------------------------------------------
+// The wave each monster type first turns up in. A [lo, hi] range is rolled
+// once per game, so players can't always know when the flyers are coming.
+function arrivals(s) {
+  if (!s.arrive) s.arrive = s.m.waves.map((u) => Array.isArray(u.fromWave) ? u.fromWave[0] + Math.floor(rnd(s) * (u.fromWave[1] - u.fromWave[0] + 1)) : u.fromWave);
+  return s.arrive;
+}
+
 function buildQueue(s, n) {
   const q = [];
+  const from = arrivals(s);
   let budget = (TUNE.waveBudgetBase + n * TUNE.waveBudgetPerWave + n * n * (TUNE.waveBudgetPerWaveSquared || 0)) * (s.players.length > 1 ? TUNE.coopWaveSize : TUNE.soloWaveSize) * s.m.waveSize;
-  const avail = WAVES.filter((u) => u.fromWave <= n);
+  const avail = s.m.waves.map((u, i) => ({ ...u, fromWave: from[i] })).filter((u) => u.fromWave <= n);
   const bossWave = n % TUNE.bossEvery === 0;
   if (bossWave) budget *= TUNE.bossWaveBudget;
   // Monsters that just arrived get the spotlight; older ones slowly make room.
@@ -673,7 +686,7 @@ function updateFlowers(s, dt) {
     let best = null;
     const inRange = [];
     for (const e of s.enemies) {
-      if (!hittable(e) || (st.groundOnly && e.def.flying)) continue;
+      if (!hittable(e) || (st.groundOnly && airborne(e))) continue;
       if (dist(e, f) <= st.range + e.def.r) {
         inRange.push(e);
         // 'strong' locks onto the toughest monster (by max health), so a nearly
@@ -712,7 +725,7 @@ function updateFlowers(s, dt) {
       s.fx.push({ kind: 'ring', x: f.x, y: f.y, r: st.range, col: st.color, life: 0.35 });
       for (const e of inRange) {
         if (st.dmg > 0) damage(s, e, st.dmg, false, false, f.type, f.id); // the frostbloom only slows
-        if (st.slow) { e.slow = Math.min(e.slow, st.slow); e.slowT = Math.max(e.slowT, st.slowSeconds); }
+        if (st.slow && !e.def.unslowable) { e.slow = Math.min(e.slow, st.slow); e.slowT = Math.max(e.slowT, st.slowSeconds); }
       }
     }
     ev(s, 'shoot_' + f.type);
@@ -766,7 +779,7 @@ function updateClouds(s, dt) {
     if (c.tick <= 0) {
       c.tick = 0.5;
       for (const e of s.enemies) {
-        if (!hittable(e) || e.def.flying) continue;
+        if (!hittable(e) || airborne(e)) continue;
         if (Math.hypot(e.x - c.x, e.y - c.y) > c.r + e.def.r) continue;
         e.psn = Math.min(c.stacks, e.psn + 1);
         e.psnT = POISON_TIME;

@@ -954,6 +954,7 @@ const BODY = {
   grunt: '#9b7bc8', swarm: '#e2b93b', runner: '#f08a3c', flyer: '#5f6bd6', wasp: '#ffd23f',
   shield: '#5b95dc', healer: '#5cc97f', tank: '#7b6250', boss: '#d43a3a', dasher: '#3cc6b4',
   splitter: '#c66bd8', blobling: '#ec9af0', mole: '#8a6a55', aphid: '#a6e07a', hive: '#e0a63a',
+  woolly: '#c9783a', hopper: '#8cc63f', charger: '#4a3a5c',
 };
 
 function eyes(c, r, ang, angry) {
@@ -985,10 +986,12 @@ function drawEnemy(c, e, time) {
     circle(c, e.x + Math.cos(time * 9) * r, e.y + 4, 2, '#9c7444');
     return;
   }
-  const hop = fly ? Math.sin(e.wob) * 3 - T * 0.35 : -Math.abs(Math.sin(e.wob)) * 2.5;
+  // a grasshopper mid-leap is up in the air, out of reach of ground flowers
+  const leap = e.dashing && e.def.dash?.leap;
+  const hop = fly ? Math.sin(e.wob) * 3 - T * 0.35 : leap ? -T * 0.38 : -Math.abs(Math.sin(e.wob)) * 2.5;
   const flash = e.flash > 0;
   const col = flash ? '#ffffff' : BODY[e.type];
-  ellipse(c, e.x, e.y + r * 0.75, r * (fly ? 0.7 : 0.95), r * 0.35, 'rgba(0,0,0,0.22)');
+  ellipse(c, e.x, e.y + r * 0.75, r * (fly || leap ? 0.7 : 0.95), r * 0.35, 'rgba(0,0,0,0.22)');
   c.save();
   c.translate(e.x, e.y + hop);
   const sq = (fly ? 0 : Math.sin(e.wob * 2) * (e.type === 'splitter' || e.type === 'blobling' ? 0.14 : 0.06)) + hitSquash(e.id) * 0.22;
@@ -1105,6 +1108,66 @@ function drawEnemy(c, e, time) {
       c.restore();
       eyes(c, r * 0.9, e.ang, chew);
       if (chew) label(c, 'nom', r * 0.2, -r * 1.6 - Math.abs(Math.sin(time * 7)) * 3, 9, '#ffffff', 'center', 700);
+      break;
+    }
+    case 'woolly': {
+      // a woolly bear caterpillar: rust middle, dark ends, a halo of fur
+      c.save(); c.rotate(e.ang);
+      const seg = [[-r * 0.85, '#3a2a20'], [-r * 0.3, col], [r * 0.25, col], [r * 0.8, '#3a2a20']];
+      for (const [sx, sc] of seg) {
+        const bob = Math.sin(e.wob * 2 + sx) * r * 0.08;
+        c.strokeStyle = flash ? '#fff' : sc; c.lineWidth = 1.3;
+        c.beginPath();
+        for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2; c.moveTo(sx + Math.cos(a) * r * 0.4, bob + Math.sin(a) * r * 0.4); c.lineTo(sx + Math.cos(a) * r * 0.72, bob + Math.sin(a) * r * 0.72); }
+        c.stroke();
+        circle(c, sx, bob, r * 0.48, flash ? '#fff' : sc, OUT, 1.6);
+      }
+      c.restore();
+      c.save(); c.translate(Math.cos(e.ang) * r * 0.75, Math.sin(e.ang) * r * 0.75); // eyes on the head end
+      eyes(c, r * 0.6, e.ang, true);
+      c.restore();
+      break;
+    }
+    case 'hopper': {
+      c.save(); c.rotate(e.ang);
+      // big folded back legs, kicked out straight while leaping
+      c.strokeStyle = OUT; c.lineWidth = 2; c.lineJoin = 'round'; c.lineCap = 'round';
+      for (const sy of [-1, 1]) {
+        c.beginPath(); c.moveTo(-r * 0.1, sy * r * 0.45);
+        if (leap) c.lineTo(-r * 1.9, sy * r * 0.7);
+        else { c.lineTo(r * 0.3, sy * r * 1.15); c.lineTo(-r * 1.1, sy * r * 0.75); }
+        c.stroke();
+      }
+      ellipse(c, 0, 0, r * 1.25, r * 0.62, col, OUT, 2);
+      ellipse(c, -r * 0.2, 0, r * 0.8, r * 0.3, flash ? '#fff' : '#6aa52a');
+      c.beginPath(); c.moveTo(r * 0.9, -r * 0.2); c.quadraticCurveTo(r * 1.7, -r * 0.6, r * 2, -r * 1.1);
+      c.moveTo(r * 0.9, r * 0.2); c.quadraticCurveTo(r * 1.7, r * 0.6, r * 2, r * 1.1); c.lineWidth = 1.3; c.stroke();
+      c.restore();
+      eyes(c, r * 0.85, e.ang, leap);
+      break;
+    }
+    case 'charger': {
+      // a stag beetle; the more it's hurt the angrier it glows and the more it steams
+      const rage = 1 - Math.max(0, e.hp) / e.maxhp;
+      c.save(); c.rotate(e.ang);
+      if (rage > 0.25) {
+        c.strokeStyle = `rgba(255,255,255,${Math.min(0.8, rage)})`; c.lineWidth = 2; c.lineCap = 'round';
+        for (const ly of [-0.5, 0.5]) { c.beginPath(); c.moveTo(-r * 1.2, ly * r); c.lineTo(-r * (1.6 + rage * 1.5), ly * r); c.stroke(); }
+      }
+      // two curved pincers reaching forward and in
+      c.fillStyle = flash ? '#fff' : '#8a5a3a'; c.strokeStyle = OUT; c.lineWidth = 1.6; c.lineJoin = 'round';
+      for (const sy of [-1, 1]) {
+        c.beginPath(); c.moveTo(r * 0.6, sy * r * 0.55);
+        c.quadraticCurveTo(r * 1.5, sy * r * 0.95, r * 1.95, sy * r * 0.12);
+        c.quadraticCurveTo(r * 1.4, sy * r * 0.5, r * 0.75, sy * r * 0.2);
+        c.closePath(); c.fill(); c.stroke();
+      }
+      ellipse(c, -r * 0.1, 0, r * 1.05, r * 0.9, col, OUT, 2.2);
+      c.strokeStyle = 'rgba(0,0,0,0.4)'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(-r, 0); c.lineTo(r * 0.5, 0); c.stroke();
+      ellipse(c, -r * 0.4, -r * 0.35, r * 0.35, r * 0.15, 'rgba(255,255,255,0.3)');
+      c.restore();
+      if (rage > 0) { c.globalAlpha = rage * 0.45; circle(c, 0, 0, r, '#ff3a2a'); c.globalAlpha = 1; }
+      eyes(c, r * 0.85, e.ang, true);
       break;
     }
     case 'hive': {
@@ -1909,7 +1972,7 @@ function addActor(y, kind, o) {
 const byY = (a, b) => a.y - b.y;
 
 // For tools/gallery.html and tools/maps.html: drawn exactly as in the game.
-export { drawFlower, drawCat, getBg, drawTree, drawCottage };
+export { drawFlower, drawCat, drawEnemy, getBg, drawTree, drawCottage };
 
 export function render(c, s, ui) {
   const time = performance.now() / 1000;

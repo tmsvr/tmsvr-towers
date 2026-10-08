@@ -23,6 +23,14 @@ export const TOTAL_WAVES = BAL.difficulty.totalWaves;
 
 // ---- maps ----
 
+// Which monsters a map sends: balance.json -> waves, unless the map names one
+// of the other lists in balance.json -> waveSets.
+function waveSet(def) {
+  if (!def.waveSet) return BAL.waves;
+  if (!BAL.waveSets?.[def.waveSet]) throw new Error(`map ${def.id}: no wave set '${def.waveSet}' in balance.json`);
+  return BAL.waveSets[def.waveSet];
+}
+
 function prepareMap(def, index) {
   const w = def.width, h = def.height;
   const center = ([x, y]) => ({ x: (x + 0.5) * T, y: (y + 0.5) * T });
@@ -112,7 +120,7 @@ function prepareMap(def, index) {
     for (let y = o.y; y < o.y + o.h; y++) for (let x = o.x; x < o.x + o.w; x++) addSolid(y * w + x, s);
   }
   return {
-    index, id: def.id, name: def.name, desc: def.desc, W: w, H: h, waveSize: def.waveSize ?? 1, startCoins: def.startCoins ?? 1, worldW: w * T, worldH: h * T,
+    index, id: def.id, name: def.name, desc: def.desc, W: w, H: h, waves: waveSet(def), waveSize: def.waveSize ?? 1, startCoins: def.startCoins ?? 1, worldW: w * T, worldH: h * T,
     paths, base: center(def.base), baseTile: def.base, start: center(def.start), pathTiles, blocked, yard, obstacles, solids, decks,
   };
 }
@@ -135,7 +143,6 @@ for (const [id, e] of Object.entries(BAL.enemies)) {
     eats: e.eats && { ...e.eats, reach: e.eats.reach * T },
   };
 }
-export const WAVES = BAL.waves;
 
 // ---- flowers ----
 export const FLOWER_ORDER = Object.keys(BAL.flowers);

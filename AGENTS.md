@@ -40,7 +40,7 @@ Claude Code users: `.claude/launch.json` defines this server as `towers`
 |---|---|
 | `index.html` | The page: canvas, lobby DOM for online play, CSS, PeerJS script tag |
 | `balance.json` | Every gameplay number, in tiles and seconds. `_help` explains the fields |
-| `maps.json` | Maps: roads (waypoints), cottage, start, obstacles, `waveSize`, `startCoins`, scatter. `_help` explains the fields |
+| `maps.json` | Maps: roads (waypoints), cottage, start, obstacles, `waveSize`, `startCoins`, `waveSet`, scatter. `_help` explains the fields |
 | `src/data.js` | Loads both JSON files (top-level `await fetch`), converts to pixel units, derives flower stats per level, prepares maps (decks, bridges, colliders), computes `DATA_HASH` |
 | `src/sim.js` | **The game rules.** Pure state + `step(state, inputs, dt)`. No DOM, no drawing |
 | `src/stats.js` | Game log hooks the sim calls (damage, coins, waves…). Counting only, never affects play |
@@ -56,7 +56,7 @@ Claude Code users: `.claude/launch.json` defines this server as `towers`
 | `src/util.js` | Seeded RNG, `clamp`, small helpers |
 | `tools/bot.js` | Autopilot that plays whole games through the real sim |
 | `tools/balance-test.html` | UI for running the autopilot over many seeds and maps |
-| `tools/gallery.html` | Every flower at every level and every cat (standing and swinging), drawn with the real render code. `?zoom=5` for close-ups |
+| `tools/gallery.html` | Every flower at every level, every cat (standing and swinging) and every monster, drawn with the real render code. `?zoom=5` for close-ups |
 | `tools/maps.html` | Every map from `maps.json` drawn whole with the real render code (roads, ponds, bridges, scatter, cottage, entrances) |
 | `serve.py` | No-cache local server |
 | `.nojekyll` | Tells GitHub Pages to serve files untouched |
@@ -111,7 +111,8 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
 | Change a map, or add one | Edit/add an entry in `maps.json`, then look at it whole in `/tools/maps.html`. Roads are lists of corner points; each segment must be horizontal or vertical; every road ends at `base`. Check reachability (a scatter seed can wall off a tile; change `scatter.seed`) |
 | Make a map easier or harder | `waveSize` (monster count; boss HP scales with its square root) and `startCoins` in `maps.json` |
 | Add a flower | New entry in `balance.json → flowers` (its `kind` picks the attack code in `sim.js`; a new kind needs new code there), plus its look in `render.js` (`SPEC`, `PERSONA`, `BODIES`). The pick screen, guide and network encoding pick it up automatically; bump `PROTOCOL` |
-| Add an enemy | Entry in `balance.json → enemies`, plus a `waves` entry (`fromWave`, `weight`, `cost`, `group`) so it spawns, and its drawing in `drawEnemy` (`render.js`). Bump `PROTOCOL` |
+| Add an enemy | Entry in `balance.json → enemies`, plus an entry in `waves` or a `waveSets` list (`fromWave`, `weight`, `cost`, `group`) so it spawns, an `intros` card, and its drawing in `drawEnemy` (`render.js`; check it in `/tools/gallery.html`). Bump `PROTOCOL` |
+| Give a map its own monsters | Add a list to `balance.json → waveSets` and name it with `waveSet` in the map's `maps.json` entry. Maps without one use `waves`. `fromWave: [lo, hi]` makes a type arrive in a random wave in that range (rolled once per game) |
 | Add a key | `KEYS` in `main.js` (P1 and P2 layouts); show it in the menu (`drawMenu`) and README. Online inputs are flags in `schema.js` (`INPUT_FLAGS`, bump `PROTOCOL`) |
 | Change art | `render.js`, then check `tools/gallery.html` |
 | Log more for balancing | Add a hook in `stats.js` and call it from `sim.js` |

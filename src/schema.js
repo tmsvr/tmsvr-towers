@@ -9,7 +9,7 @@ import { ENEMIES, FLOWER_ORDER, CAT_ORDER } from './data.js';
 // so small numbers take one byte and a position in tenths of a pixel three.
 // Bump whenever a message changes shape, so mismatched copies refuse to play
 // together instead of misreading each other (checked when a guest joins).
-export const PROTOCOL = 5;
+export const PROTOCOL = 6;
 
 const utf8 = new TextEncoder(), fromUtf8 = new TextDecoder();
 
