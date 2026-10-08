@@ -78,17 +78,68 @@ function mix(a, b, t) {
   return out;
 }
 
+// A canvas for pictures painted once and then stamped many times a frame
+// (flower heads, background tiles, minimap). willReadFrequently keeps it in
+// ordinary memory instead of on the GPU. In Firefox, stamping from a GPU canvas
+// cost about 0.1 ms per drawImage, over half of a busy frame; from one of these
+// it is a third faster overall. Chrome draws them just as fast either way.
+function cacheCanvas(w, h) {
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  return { cv, c: cv.getContext('2d', { willReadFrequently: true }) };
+}
+
 // ---- static background (pre-rendered once per map) -------------------------
+// Painted once into one big canvas (about 3700 x 2600 pixels at 2x), then cut
+// into tiles. Copying a screenful out of the big canvas every frame was slower
+// in Firefox, and in Chrome it cost about 8 ms whenever the browser kept that
+// canvas off the GPU. Only the ~20 tiles on screen are drawn.
+const BG_TILE = 512; // in device pixels
 let bgCache = null;
 function getBg(m, dpr) {
-  if (bgCache && bgCache.dpr === dpr && bgCache.map === m) return bgCache.cv;
-  const cv = document.createElement('canvas');
-  cv.width = m.worldW * dpr; cv.height = m.worldH * dpr;
-  const c = cv.getContext('2d');
+  if (bgCache && bgCache.dpr === dpr && bgCache.map === m && bgCache.cv) return bgCache.cv;
+  const { cv, c } = cacheCanvas(m.worldW * dpr, m.worldH * dpr);
   c.scale(dpr, dpr);
   paintBg(c, m);
-  bgCache = { dpr, cv, map: m };
+  bgCache = { dpr, cv, map: m, tiles: null };
   return cv;
+}
+
+function bgTiles(m, dpr) {
+  if (bgCache && bgCache.dpr === dpr && bgCache.map === m && bgCache.tiles) return bgCache.tiles;
+  const big = getBg(m, dpr);
+  minimapBg(m, dpr); // shrink it for the minimap while the big picture still exists
+  const tiles = [];
+  for (let y = 0; y < big.height; y += BG_TILE) {
+    for (let x = 0; x < big.width; x += BG_TILE) {
+      const { cv, c } = cacheCanvas(Math.min(BG_TILE, big.width - x), Math.min(BG_TILE, big.height - y));
+      c.drawImage(big, -x, -y);
+      tiles.push({ x, y, cv });
+    }
+  }
+  bgCache.tiles = tiles;
+  bgCache.cv = null; // tens of megabytes nobody needs any more
+  return tiles;
+}
+
+// The map area of the screen, with the camera's top-left corner at (camX, camY).
+// Tiles are drawn 1:1 in device pixels at whole-pixel offsets, so they are
+// never resampled and no seams can show between them.
+function drawBg(c, m, dpr, camX, camY) {
+  const tiles = bgTiles(m, dpr);
+  const tf = c.getTransform(); // the screen shake's offset, in device pixels
+  const ox = Math.round(tf.e), oy = Math.round(tf.f);
+  const vx = Math.round(camX * dpr), vy = Math.round(camY * dpr);
+  const vx1 = vx + Math.round(VIEW_W * dpr), vy1 = vy + Math.round(MAP_H * dpr);
+  c.save();
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  for (const t of tiles) {
+    const x0 = Math.max(vx, t.x), y0 = Math.max(vy, t.y);
+    const x1 = Math.min(vx1, t.x + t.cv.width), y1 = Math.min(vy1, t.y + t.cv.height);
+    if (x1 <= x0 || y1 <= y0) continue;
+    c.drawImage(t.cv, x0 - t.x, y0 - t.y, x1 - x0, y1 - y0, ox + x0 - vx, oy + y0 - vy, x1 - x0, y1 - y0);
+  }
+  c.restore();
 }
 
 function strokePoly(c, pts, w, col) {
@@ -334,9 +385,9 @@ const sprites = new Map();
 function sprite(key, paint) {
   let cv = sprites.get(key);
   if (!cv) {
-    cv = document.createElement('canvas');
-    cv.width = cv.height = Math.ceil(SPRITE_R * 2 * spriteScale);
-    const g = cv.getContext('2d');
+    const size = Math.ceil(SPRITE_R * 2 * spriteScale);
+    let g;
+    ({ cv, c: g } = cacheCanvas(size, size));
     g.scale(spriteScale, spriteScale);
     g.translate(SPRITE_R, SPRITE_R);
     paint(g);
@@ -1438,8 +1489,10 @@ const MM_W = 216, MM_X = VIEW_W - MM_W - 10, MM_Y = 10;
 // background once per map. Shrinking that ~4000 px image every frame was the
 // most expensive thing in the whole frame on a computer without GPU canvas.
 let mmCache = null;
-function minimapBg(m, dpr, w, h) {
+const minimapH = (m) => Math.round(MM_W * m.worldH / m.worldW);
+function minimapBg(m, dpr) {
   if (mmCache && mmCache.map === m && mmCache.dpr === dpr) return mmCache.cv;
+  const w = MM_W, h = minimapH(m);
   let src = getBg(m, dpr);
   // halve step by step; one big jump would skip pixels and look grainy
   while (src.width / 2 >= w * dpr * 1.5) {
@@ -1448,9 +1501,7 @@ function minimapBg(m, dpr, w, h) {
     half.getContext('2d').drawImage(src, 0, 0, half.width, half.height);
     src = half;
   }
-  const cv = document.createElement('canvas');
-  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
-  const c = cv.getContext('2d');
+  const { cv, c } = cacheCanvas(Math.round(w * dpr), Math.round(h * dpr));
   c.scale(dpr, dpr);
   c.globalAlpha = 0.85;
   c.drawImage(src, 0, 0, w, h);
@@ -1463,12 +1514,12 @@ function minimapBg(m, dpr, w, h) {
 
 function drawMinimap(c, s, ui) {
   const m = s.m, base = m.base;
-  const MM_H = Math.round(MM_W * m.worldH / m.worldW);
+  const MM_H = minimapH(m);
   const sx = MM_W / m.worldW, sy = MM_H / m.worldH;
   const mx = (x) => MM_X + x * sx, my = (y) => MM_Y + y * sy;
   c.save();
   rrect(c, MM_X - 3, MM_Y - 3, MM_W + 6, MM_H + 6, 8, 'rgba(20,28,36,0.8)', 'rgba(255,255,255,0.35)', 1.5);
-  c.drawImage(minimapBg(m, ui.dpr, MM_W, MM_H), MM_X, MM_Y, MM_W, MM_H);
+  c.drawImage(minimapBg(m, ui.dpr), MM_X, MM_Y, MM_W, MM_H);
   for (const f of s.flowers) {
     const r = 1.6 + f.lvl * 0.5;
     c.fillStyle = f.lvl === 0 ? '#3e8a2e' : FLOWERS[f.type].color;
@@ -1868,8 +1919,7 @@ export function render(c, s, ui) {
   c.save();
   if (ui.shake > 0) c.translate((Math.random() - 0.5) * ui.shake * 2, (Math.random() - 0.5) * ui.shake * 2);
   const m = s ? s.m : ui.menuMap; // the menu shows the last map played
-  const bg = getBg(m, ui.dpr);
-  c.drawImage(bg, camX * ui.dpr, camY * ui.dpr, VIEW_W * ui.dpr, MAP_H * ui.dpr, 0, 0, VIEW_W, MAP_H);
+  drawBg(c, m, ui.dpr, camX, camY);
   c.translate(-camX, -camY);
   for (const path of m.paths) {
     const ex = path.waypoints[0].x - Math.cos(path.dir) * T * 0.55, ey = path.waypoints[0].y - Math.sin(path.dir) * T * 0.55;
