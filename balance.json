@@ -84,7 +84,7 @@
     "oldEnemyMin": 0.6,
     "packGrowthPerWave": 0.2,
     "openingRush": 0.35,
-    "finalBossHp": 2.4,
+    "finalBossHp": 2.7,
     "soloWaveSize": 0.6,
     "soloBossHp": 0.6,
     "coopWaveSize": 1.3,
@@ -152,7 +152,7 @@
     "mole":     { "hp": 48,   "speed": 1.8,  "coins": 3,  "bite": 2, "size": 0.28, "armor": 0, "burrow": { "aboveSeconds": 2.6, "belowSeconds": 1.8, "speedMultiplier": 1.5 } },
     "aphid":    { "hp": 28,   "speed": 1.95, "coins": 2,  "bite": 2, "size": 0.23, "armor": 0, "light": true, "eats": { "damagePerSecond": 3, "chewSeconds": 2.5, "cooldown": 6, "reach": 1.25 } },
     "hive":     { "hp": 150,  "speed": 1.05, "coins": 7,  "bite": 4, "size": 0.43, "armor": 1, "spawns": { "type": "swarm", "every": 4.5, "count": 2 } },
-    "boss":     { "hp": 600,  "speed": 0.98, "coins": 40, "bite": 8,  "size": 0.6,  "armor": 1, "boss": true, "spawns": { "type": "grunt", "every": 6, "count": 2 } }
+    "boss":     { "hp": 800,  "speed": 0.98, "coins": 40, "bite": 8,  "size": 0.6,  "armor": 3, "boss": true, "spawns": { "type": "grunt", "every": 6, "count": 2 } }
   },
 
   "intros": {
@@ -167,7 +167,8 @@
     "tank":     ["Tanks!", "Slow and very tough. Snapdragon and Sunflower bite through"],
     "healer":   ["Healers!", "They mend the monsters around them. Take them out first"],
     "hive":     ["Hives!", "Tough, and they keep letting out swarm bugs"],
-    "wasp":     ["Wasps!", "Fast flyers in packs. Only Daisy, Fire Lily and Sunflower can hit them"]
+    "wasp":     ["Wasps!", "Fast flyers in packs. Only Daisy, Fire Lily and Sunflower can hit them"],
+    "boss":     ["The boss!", "Huge and armoured: small hits do little. Sunflower and Snapdragon bite through"]
   },
 
   "waves": [
