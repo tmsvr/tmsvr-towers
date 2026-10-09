@@ -1751,21 +1751,47 @@ function pips(c, x, y, name, v) {
   for (let i = 0; i < 5; i++) rrect(c, x + 40 + i * 11, y - 3.5, 9, 7, 2, i < n ? '#ffe27a' : 'rgba(255,255,255,0.12)');
 }
 
+// The maps: a sliding row of fixed-size cards with the chosen map in the
+// middle, so any number of maps fits. Left/right slides it, wrapping round;
+// cards further out fade away. ui.mapPos is where the row is now (in cards),
+// eased towards the chosen map the short way round.
+function drawMapCarousel(c, s, ui, time) {
+  const N = MAPS.length, mw = 176, mh = 96, step = mw + 12, y = 40;
+  const wrap = (d) => ((((d + N / 2) % N) + N) % N) - N / 2; // -N/2 … N/2
+  const now = performance.now();
+  const dt = Math.min(0.1, (now - (ui.mapPosT ?? now)) / 1000);
+  ui.mapPosT = now;
+  let pos = ui.mapPos ?? s.map;
+  const d = wrap(s.map - pos);
+  pos = Math.abs(d) < 0.01 ? s.map : pos + d * Math.min(1, dt * 12);
+  ui.mapPos = ((pos % N) + N) % N;
+  label(c, `Map ${s.map + 1} / ${N}`, 16, 20, 13, '#8fa5b3', 'left', 600, null);
+  for (let i = 0; i < N; i++) {
+    const k = wrap(i - ui.mapPos);
+    if (Math.abs(k) > 2.6) continue;
+    const m = MAPS[i], x = VIEW_W / 2 + k * step - mw / 2, sel = s.map === i;
+    c.globalAlpha = Math.abs(k) <= 1.5 ? 1 : Math.max(0, 1 - (Math.abs(k) - 1.5) / 1.1);
+    rrect(c, x, y, mw, mh, 12, sel ? 'rgba(255,226,122,0.16)' : 'rgba(255,255,255,0.05)', sel ? '#ffe27a' : 'rgba(255,255,255,0.18)', sel ? 3 : 1.5);
+    drawMapThumb(c, m, x + 8, y + 6, mw - 16, mh - 42);
+    label(c, fitText(c, m.name, mw - 14, 13, 700), x + mw / 2, y + mh - 27, 13, '#ffffff', 'center', 700, null);
+    label(c, fitText(c, m.desc, mw - 14, 10.5), x + mw / 2, y + mh - 11, 10.5, '#a9bccb', 'center', 500, null);
+    c.globalAlpha = 1;
+    if (sel) pickCursor(c, s, x, y, mw, mh, 15, 0, () => true, time);
+  }
+  // arrows at both ends: there are always more maps either way
+  for (const dir of [-1, 1]) {
+    const ax = dir < 0 ? 22 : VIEW_W - 22, ay = y + mh / 2;
+    circle(c, ax, ay, 15, 'rgba(20,28,36,0.9)', 'rgba(255,255,255,0.35)', 1.5);
+    c.fillStyle = '#ffe27a'; c.beginPath();
+    c.moveTo(ax + dir * 6, ay); c.lineTo(ax - dir * 4, ay - 7); c.lineTo(ax - dir * 4, ay + 7); c.closePath(); c.fill();
+  }
+}
+
 function drawPick(c, s, ui, time) {
   c.fillStyle = 'rgba(12,18,26,0.85)'; c.fillRect(0, 0, VIEW_W, MAP_H);
   label(c, `Choose a map, a cat and ${LOADOUT_SIZE} flowers`, VIEW_W / 2, 20, 22, '#ffe27a', 'center', 700, OUT);
   label(c, 'I: flower guide', VIEW_W - 16, 20, 13, '#8fa5b3', 'right', 600, null);
-  // maps
-  const mgap = 12, mw = Math.min(200, (VIEW_W - 40 - (MAPS.length - 1) * mgap) / MAPS.length), mh = 96, mx0 = (VIEW_W - (MAPS.length * mw + (MAPS.length - 1) * mgap)) / 2, my0 = 40;
-  MAPS.forEach((m, i) => {
-    const x = mx0 + i * (mw + mgap);
-    const sel = s.map === i;
-    rrect(c, x, my0, mw, mh, 12, sel ? 'rgba(255,226,122,0.16)' : 'rgba(255,255,255,0.05)', sel ? '#ffe27a' : 'rgba(255,255,255,0.18)', sel ? 3 : 1.5);
-    drawMapThumb(c, m, x + 8, my0 + 6, mw - 16, mh - 42);
-    label(c, m.name, x + mw / 2, my0 + mh - 27, 13, '#ffffff', 'center', 700, null);
-    label(c, fitText(c, m.desc, mw - 12, 10.5), x + mw / 2, my0 + mh - 11, 10.5, '#a9bccb', 'center', 500, null);
-    if (sel) pickCursor(c, s, x, my0, mw, mh, 15, 0, () => true, time);
-  });
+  drawMapCarousel(c, s, ui, time);
   // cats: each one can only be taken by one player
   const cw0 = 232, cgap = 12, ch0 = 98, cx0 = (VIEW_W - (CAT_ORDER.length * cw0 + (CAT_ORDER.length - 1) * cgap)) / 2, cy0 = 148;
   CAT_ORDER.forEach((id, i) => {
