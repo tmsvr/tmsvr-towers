@@ -127,12 +127,20 @@ export function catStats(p) {
 export const healCostPerHp = (f) => (FLOWERS[f.type].cost * HEAL_COST) / FLOWER_HP;
 export const uprootRefund = (f) => Math.floor((f.spent || 0) * ECONOMY.uprootRefund);
 
+// Coins this cat pays, which is what every price tag and HUD line shows.
+// A class's price multiplier (Fern pays less, Brick more) applies to planting,
+// upgrading and healing alike; partly paid levels only cost what's left.
+const coinsFor = (p, base) => Math.ceil(base * catStats(p).price - 1e-6);
+export const plantPrice = (p, type) => coinsFor(p, plantCost(type));
+export const upgradeLeft = (p, f) => (f.lvl >= MAX_LEVEL ? 0 : coinsFor(p, f.grow ? f.grow.cost - f.grow.paid : upgradeCost(f.type, f.lvl)));
+export const healLeft = (p, f) => coinsFor(p, (FLOWER_HP - f.hp) * healCostPerHp(f));
+
 // What the mode key cycles through while standing on a flower. Healing has
 // its own key, so the plant key only ever upgrades (or digs up).
 const FLOWER_MODES = ['grow', 'dig'];
 
 // ---- Enemies --------------------------------------------------------------
-function spawnEnemy(s, type, from, path = 0) {
+export function spawnEnemy(s, type, from, path = 0) {
   log.logSpawn(s, type);
   // the first of a new kind of monster says what it is and what stops it
   if (!s.seen[type]) {

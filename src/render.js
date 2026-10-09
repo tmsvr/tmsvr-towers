@@ -12,7 +12,7 @@ import {
   T, U, VIEW_W, MAP_H, HUD_H, TOTAL_WAVES, MAPS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, GLOBAL_RANGE, ENEMIES, INTROS,
 } from './data.js';
-import { tileOf, canBuildAt, healCostPerHp, uprootRefund, catStats } from './sim.js';
+import { tileOf, canBuildAt, uprootRefund, catStats, plantPrice, upgradeLeft, healLeft } from './sim.js';
 import { isMuted } from './audio.js';
 import { observeJuice, drawJuiceWorld, drawJuiceScreen, hitSquash, swingSquash, coinScale } from './juice.js';
 import { liveEffects } from './fx.js';
@@ -856,24 +856,25 @@ function drawFlower(c, f, time) {
 const onFlower = (s, p, f) => p.loadout && p.stun <= 0 && Math.floor(p.x / T) === f.tx && Math.floor(p.y / T) === f.ty;
 
 // What the next level (and healing) costs the cat standing on this flower,
-// shown right above it so nobody has to look down at the HUD.
+// shown right above it so nobody has to look down at the HUD. Each cat pays
+// its own price, so two cats on one flower get a row each.
 function drawCostTag(c, f, s) {
-  const p = s.players.find((q) => onFlower(s, q, f));
-  if (!p) return;
-  const price = catStats(p).price;
+  s.players.filter((q) => onFlower(s, q, f)).forEach((p, row) => drawCostRow(c, f, p, row));
+}
+
+function drawCostRow(c, f, p, row) {
   const tags = [];
   if (p.mode === 'dig') tags.push(['dig', `+${uprootRefund(f)}`, '#e0a060']);
   else if (f.lvl >= MAX_LEVEL) tags.push(['', 'MAX', '#ffd23f']);
   else {
-    const left = f.grow ? f.grow.cost - f.grow.paid : upgradeCost(f.type, f.lvl);
-    tags.push([`Lv${f.lvl + 1}`, `${Math.ceil(left * price)}`, '#ffe27a']);
-    if (f.lvl > 0 && f.hp < FLOWER_HP - 0.5) tags.push(['heal', `${Math.ceil((FLOWER_HP - f.hp) * healCostPerHp(f) * price)}`, '#8dff9a']);
+    tags.push([`Lv${f.lvl + 1}`, `${upgradeLeft(p, f)}`, '#ffe27a']);
+    if (f.lvl > 0 && f.hp < FLOWER_HP - 0.5) tags.push(['heal', `${healLeft(p, f)}`, '#8dff9a']);
   }
   c.font = `700 12px ${FONT}`;
   const parts = tags.map(([a, b, col]) => ({ a, b, col, w: (a ? c.measureText(a + ' ').width : 0) + c.measureText(b).width + (a === '' || a === 'dig' ? 0 : 16) + 14 }));
   const total = parts.reduce((t, q) => t + q.w, 0) + (parts.length - 1) * 4;
   let x = f.x - total / 2;
-  const y = f.y - T * 1.22; // above the cat's P1/P2 badge
+  const y = f.y - T * 1.22 - row * 24; // above the cat's P1/P2 badge
   for (const q of parts) {
     rrect(c, x, y - 10, q.w, 20, 10, 'rgba(20,28,36,0.85)', q.col, 1.5);
     let tx = x + 7;
@@ -1634,19 +1635,16 @@ function contextText(s, p, ui) {
     if (m.yard.has(k)) return 'Cottage yard · no planting here';
     if (m.blocked.has(k)) return "Something's in the way";
     const F = FLOWERS[p.loadout[p.sel]];
-    return `[${key}] plant ${F.name} (${plantCost(p.loadout[p.sel])}) · [${cyc}] next · ${F.desc}`;
+    return `[${key}] plant ${F.name} (${plantPrice(p, p.loadout[p.sel])}) · [${cyc}] next · ${F.desc}`;
   }
   const name = FLOWERS[f.type].name;
   const midLevel = f.lvl > 0 && f.lvl < MAX_LEVEL;
   if (p.mode === 'dig') return `Hold [${key}] dig up ${name} · get back ${uprootRefund(f)} · [${cyc}] ${midLevel ? 'upgrade' : 'back'}`;
-  if (f.lvl === 0) return `Hold [${key}] to grow ${name} · ${Math.floor(f.grow.paid)}/${f.grow.cost} · [${cyc}] dig up`;
+  if (f.lvl === 0) return `Hold [${key}] to grow ${name} (${upgradeLeft(p, f)}) · [${cyc}] dig up`;
   if (f.lvl >= MAX_LEVEL) return `${name} · max level, never wilts · [${cyc}] dig up`;
-  const price = catStats(p).price;
-  const left = Math.ceil((f.grow ? f.grow.cost - f.grow.paid : upgradeCost(f.type, f.lvl)) * price);
-  const up = `[${key}] upgrade to Lv${f.lvl + 1} (${left})`;
+  const up = `[${key}] upgrade to Lv${f.lvl + 1} (${upgradeLeft(p, f)})`;
   if (f.hp >= FLOWER_HP - 0.5) return `${up} · healthy · [${cyc}] dig up`;
-  const healCost = Math.ceil((FLOWER_HP - f.hp) * healCostPerHp(f) * price);
-  return `${up} · [${hk}] heal ${Math.floor(f.hp)}%→100 (${healCost}) · [${cyc}] dig`;
+  return `${up} · [${hk}] heal ${Math.floor(f.hp)}%→100 (${healLeft(p, f)}) · [${cyc}] dig`;
 }
 
 function drawHud(c, s, time, ui) {
@@ -1697,10 +1695,10 @@ function drawHud(c, s, time, ui) {
     (p.loadout || p.pick.chosen).forEach((t, j) => {
       const sx = x0 + 50 + j * 104, sy = y0 + 42, sw = 100, sh = 38;
       const sel = p.loadout && p.building && j === p.sel;
-      const afford = p.coins >= plantCost(t);
+      const cost = p.loadout ? plantPrice(p, t) : plantCost(t), afford = p.coins >= cost;
       rrect(c, sx, sy, sw, sh, 8, sel ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.25)', sel ? pc : 'rgba(255,255,255,0.1)', sel ? 3 : 1);
       c.save(); c.translate(sx + 19, sy + 19); c.scale(0.8, 0.8); if (!afford) c.globalAlpha = 0.45; drawHead(c, t); c.restore();
-      label(c, `${plantCost(t)}`, sx + 54, sy + 20, 14, afford ? '#ffe27a' : '#c07070', 'center', 700, null);
+      label(c, `${cost}`, sx + 54, sy + 20, 14, afford ? '#ffe27a' : '#c07070', 'center', 700, null);
     });
   });
 }
