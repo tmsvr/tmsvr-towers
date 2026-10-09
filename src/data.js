@@ -199,14 +199,18 @@ function computeStats(type, lvl) {
   };
 }
 
+// Prices are rounded to a tidy step (10 coins), never below one step.
+const STEP = LV.priceStep || 1;
+const tidy = (v) => Math.max(STEP, Math.round(v / STEP) * STEP);
+
 // Cost to go from `lvl` to `lvl + 1`.
 export function upgradeCost(type, lvl) {
-  return Math.round(FLOWERS[type].cost * LV.upgradeCostMultipliers[lvl - 1] * (LV.upgradePrice ?? 1));
+  return tidy(FLOWERS[type].cost * LV.upgradeCostMultipliers[lvl - 1] * (LV.upgradePrice ?? 1));
 }
 
 // Coins to plant a seedling and grow it to level 1.
 export function plantCost(type) {
-  return Math.round(FLOWERS[type].cost * (LV.plantPrice ?? 1));
+  return tidy(FLOWERS[type].cost * (LV.plantPrice ?? 1));
 }
 
 // Ranges at least this big mean "the whole map" (no range circle is drawn).
