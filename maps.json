@@ -87,31 +87,6 @@
       "scatter": { "trees": 28, "rocks": 10, "seed": 47 }
     },
     {
-      "id": "crossroads",
-      "name": "Crossroads",
-      "desc": "Three roads",
-      "width": 32,
-      "height": 22,
-      "base": [16, 11],
-      "start": [12, 12],
-      "waveSize": 0.81,
-      "startCoins": 2,
-      "paths": [
-        [[0, 3], [8, 3], [8, 8], [3, 8], [3, 15], [10, 15], [10, 11], [16, 11]],
-        [[22, 0], [22, 4], [28, 4], [28, 15], [22, 15], [22, 11], [16, 11]],
-        [[31, 8], [20, 8], [20, 19], [13, 19], [13, 14], [16, 14], [16, 11]]
-      ],
-      "obstacles": [
-        { "type": "pond", "x": 5, "y": 10, "w": 3, "h": 3 },
-        { "type": "pond", "x": 24, "y": 10, "w": 3, "h": 3 },
-        { "type": "rock", "x": 12, "y": 6 },
-        { "type": "rock", "x": 18, "y": 16 },
-        { "type": "tree", "x": 15, "y": 2 },
-        { "type": "tree", "x": 16, "y": 3 }
-      ],
-      "scatter": { "trees": 28, "rocks": 12, "seed": 5 }
-    },
-    {
       "id": "twin",
       "name": "Twin Gates",
       "desc": "Left and right",
