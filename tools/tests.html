@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Petal Patrol Tests</title>
+<style>
+  :root { --bg: #141b22; --panel: #1f2a33; --text: #e8f1f7; --muted: #8fa5b3; --ok: #7dff8a; --bad: #ff7a6a; }
+  body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 900px; margin: 0 auto; }
+  h1 { margin: 0 0 4px; font-size: 24px; }
+  p { color: var(--muted); margin: 0 0 16px; }
+  #summary { font-weight: 600; font-size: 18px; margin-bottom: 12px; }
+  h2 { font-size: 15px; color: var(--muted); margin: 18px 0 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .row { background: var(--panel); border-radius: 8px; padding: 6px 12px; margin: 4px 0; display: flex; gap: 10px; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+  .err { color: var(--bad); font: 13px ui-monospace, monospace; margin-left: 26px; }
+  .ms { color: var(--muted); margin-left: auto; font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Tests</h1>
+  <p>Runs the game's own code: prices, maps, monsters, whole autopilot games, the online encoding and drawing. Reload to run again. From the console: <code>(await import('/tools/tests.js')).runTests()</code></p>
+  <div id="summary">Running…</div>
+  <div id="list"></div>
+</main>
+<script type="module">
+import { runTests } from './tests.js';
+const list = document.getElementById('list'), summary = document.getElementById('summary');
+let group = null;
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const { passed, failed } = await runTests({
+  onResult(r) {
+    if (r.group !== group) { group = r.group; list.insertAdjacentHTML('beforeend', `<h2>${esc(group)}</h2>`); }
+    list.insertAdjacentHTML('beforeend', `<div class="row"><span class="${r.ok ? 'ok' : 'bad'}">${r.ok ? '✓' : '✗'}</span><span>${esc(r.name)}</span><span class="ms">${r.ms} ms</span></div>${r.error ? `<div class="err">${esc(r.error)}</div>` : ''}`);
+    summary.textContent = `Running… ${list.querySelectorAll('.row').length} done`;
+  },
+});
+summary.innerHTML = failed ? `<span class="bad">${failed} failed</span>, ${passed} passed` : `<span class="ok">All ${passed} tests passed</span>`;
+document.title = failed ? `✗ ${failed} failed · Tests` : '✓ Tests';
+</script>
+</body>
+</html>

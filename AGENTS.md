@@ -57,6 +57,7 @@ Claude Code users: `.claude/launch.json` defines this server as `towers`
 | `tools/bot.js` | Autopilot that plays whole games through the real sim |
 | `tools/balance-test.html` | UI for running the autopilot over many seeds and maps |
 | `tools/gallery.html` | Every flower at every level, every cat (standing and swinging) and every monster, drawn with the real render code. `?zoom=5` for close-ups |
+| `tools/tests.html`, `tools/tests.js` | The test suite: prices, maps, monsters, whole autopilot games, online encoding, drawing. Runs in the browser |
 | `tools/maps.html` | Every map from `maps.json` drawn whole with the real render code (roads, ponds, bridges, scatter, cottage, entrances) |
 | `serve.py` | No-cache local server |
 | `.nojekyll` | Tells GitHub Pages to serve files untouched |
@@ -119,17 +120,26 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
 
 ## Testing
 
-There is no automated test suite. Check changes like this:
+Check changes like this:
 
-1. **Run it**: `python3 serve.py`, play a few waves (solo is quickest: press 1).
+1. **Tests**: open `/tools/tests.html` (or from the console
+   `(await import('/tools/tests.js')).runTests()`). They drive the real
+   modules: every price shown matches what each cat pays (planting, upgrades,
+   half-paid levels, healing, digging), maps are well formed and every road
+   is reachable on foot, monster rules (frost-proof, leaping, enrage, ranged
+   arrival waves), the same seed gives the same game, the autopilot plays every
+   map, snapshots and inputs survive encoding, and the screens draw. Add a
+   test next to similar ones when you change a rule; a new map is covered
+   automatically.
+2. **Run it**: `python3 serve.py`, play a few waves (solo is quickest: press 1).
    Check the browser console for errors.
-2. **Balance sanity**: open `/tools/balance-test.html`, choose map and players,
+3. **Balance sanity**: open `/tools/balance-test.html`, choose map and players,
    run several games. The bot never uses bombs and plays crudely, so its
    results are a *lower bound* on what real players manage. From the console:
    `(await import('/tools/bot.js')).runBot({ players: 2, seed: 1, map: 0 })`
    returns `{ won, wave, lives, log }`.
-3. **Art**: `/tools/gallery.html` (add `?zoom=5`).
-4. **Real playtest logs**: players press **L** to download the last 20 games
+4. **Art**: `/tools/gallery.html` (add `?zoom=5`).
+5. **Real playtest logs**: players press **L** to download the last 20 games
    as JSON (per wave: monsters, cottage damage by type and by road, coins
    earned/spent per cat, time spent per activity, damage and kills per flower
    type, garden snapshot; plus a timeline of plants, level-ups, heals, digs,
@@ -137,7 +147,7 @@ There is no automated test suite. Check changes like this:
    and own damage). The format is documented at the top of `src/stats.js`.
    This is the main source for balance decisions; online, only the host has
    it. `runBot()` returns the same log as `game`.
-5. **Online**: open two browser windows; host with 3, join with 4 using the
+6. **Online**: open two browser windows; host with 3, join with 4 using the
    room code. Test with the same build in both.
 
 Useful console checks (modules can be imported directly):
