@@ -120,7 +120,7 @@ function prepareMap(def, index) {
     for (let y = o.y; y < o.y + o.h; y++) for (let x = o.x; x < o.x + o.w; x++) addSolid(y * w + x, s);
   }
   return {
-    index, id: def.id, name: def.name, desc: def.desc, W: w, H: h, waves: waveSet(def), waveSize: def.waveSize ?? 1, startCoins: def.startCoins ?? 1, worldW: w * T, worldH: h * T,
+    index, id: def.id, name: def.name, desc: def.desc, W: w, H: h, waves: waveSet(def), waveSize: def.waveSize ?? 1, startCoins: def.startCoins ?? 1, coinDrops: def.coinDrops ?? 1, worldW: w * T, worldH: h * T,
     paths, base: center(def.base), baseTile: def.base, start: center(def.start), pathTiles, blocked, yard, obstacles, solids, decks,
   };
 }
