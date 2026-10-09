@@ -694,7 +694,7 @@ function updateFlowers(s, dt) {
     let best = null;
     const inRange = [];
     for (const e of s.enemies) {
-      if (!hittable(e) || (st.groundOnly && airborne(e))) continue;
+      if (!hittable(e) || (st.groundOnly && airborne(e)) || (st.kind === 'cloud' && e.def.poisonImmune)) continue;
       if (dist(e, f) <= st.range + e.def.r) {
         inRange.push(e);
         // 'strong' locks onto the toughest monster (by max health), so a nearly
@@ -719,9 +719,11 @@ function updateFlowers(s, dt) {
       const a = Math.atan2(best.y - hy, best.x - hx);
       s.projs.push({ id: s.nextId++, kind: 'bolt', x: hx, y: hy, ang: a, speed: 420 * U, dmg: st.dmg, left: st.range * 1.25, hit: [], pierce: st.pierce ?? Infinity, color: st.color, big: f.lvl, src: f.type, fid: f.id });
     } else if (st.kind === 'chomp') {
-      // small critters get swallowed whole, everything else takes a big bite
+      // small critters get swallowed whole; everything else loses a bite plus a
+      // share of its max health, so the bigger the monster the bigger the chunk
       const gulp = best.def.light && !best.def.boss;
-      damage(s, best, gulp ? best.hp + 1 : st.dmg, gulp, false, f.type, f.id);
+      const chunk = best.maxhp * ((best.def.boss ? st.bossMaxHpBite : st.maxHpBite) || 0);
+      damage(s, best, gulp ? best.hp + 1 : st.dmg + chunk, gulp, false, f.type, f.id);
       s.fx.push({ kind: 'bite', x: best.x, y: best.y, r: best.def.r + 8 * U });
       if (gulp) text(s, best.x, best.y - T * 0.4, 'GULP!', '#ff9ac8');
     } else if (st.kind === 'cloud') {
@@ -787,7 +789,7 @@ function updateClouds(s, dt) {
     if (c.tick <= 0) {
       c.tick = 0.5;
       for (const e of s.enemies) {
-        if (!hittable(e) || airborne(e)) continue;
+        if (!hittable(e) || airborne(e) || e.def.poisonImmune) continue;
         if (Math.hypot(e.x - c.x, e.y - c.y) > c.r + e.def.r) continue;
         e.psn = Math.min(c.stacks, e.psn + 1);
         e.psnT = POISON_TIME;

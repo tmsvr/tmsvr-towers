@@ -232,6 +232,44 @@ test('Monsters', 'ground-only flowers miss flyers and leaping grasshoppers', () 
   ok(!sim.airborne({ ...def('dasher'), dashing: true }), 'a dashing dasher stays on the ground');
 });
 
+// A flower of `type` grown to level 1 next to a road, and that road tile.
+function flowerByRoad(type) {
+  const s = game({ cats: ['bomber'], loadout: [type, 'frost', 'daisy'] }), p = s.players[0], spot = tileByRoad(s);
+  const f = plant(s, p, spot.flower, type);
+  growOnce(s, p, f);
+  goTo(p, freeTile(s, [spot.flower])); // step off so the cat doesn't stand in the way
+  return { s, f, road: spot.road };
+}
+// Keep monsters pinned on a tile while the game runs for `secs`.
+function hold(s, list, [x, y], secs) {
+  for (let i = 0; i < secs * 60; i++) { for (const e of list) if (!e.dead) { e.x = (x + 0.5) * T; e.y = (y + 0.5) * T; } tick(s); }
+}
+
+test('Monsters', 'Snapdragon bites off a share of a big monster\'s max health', () => {
+  const { s, f, road } = flowerByRoad('snap');
+  const tank = monsterOn(s, 'tank', road), before = tank.hp;
+  for (let i = 0; i < 120 && tank.hp === before; i++) hold(s, [tank], road, 1 / 60);
+  const st = flowerStats('snap', f.lvl);
+  near(before - tank.hp, st.dmg + tank.maxhp * st.maxHpBite - ENEMIES.tank.armor, 0.01, 'one bite');
+});
+
+test('Monsters', 'stag beetles shrug off poison; grunts don\'t', () => {
+  const { s, road } = flowerByRoad('stink');
+  const grunt = monsterOn(s, 'grunt', road), beetle = monsterOn(s, 'charger', road);
+  grunt.hp = grunt.maxhp = beetle.hp = beetle.maxhp = 1e6; // keep both alive
+  hold(s, [grunt, beetle], road, 4);
+  ok(grunt.psn > 0, 'the grunt was not poisoned');
+  eq(beetle.psn, 0, 'stag beetle poison stacks');
+});
+
+test('Monsters', 'Thornrose hits flyers', () => {
+  const { s, road } = flowerByRoad('thorn');
+  const flyer = monsterOn(s, 'flyer', road);
+  flyer.hp = flyer.maxhp = 1e6;
+  hold(s, [flyer], road, 2);
+  ok(flyer.hp < flyer.maxhp, 'the flyer took no damage');
+});
+
 test('Monsters', 'a hurt stag beetle runs faster', () => {
   const pace = (hpShare) => {
     const s = game({ cats: ['bomber'], map: 0 }), road = s.m.paths[0].points;

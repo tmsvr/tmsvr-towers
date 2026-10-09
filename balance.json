@@ -6,6 +6,8 @@
     "flowers.kind": "single = homing seed, beam = instant hit, bolt = piercing fireball in a line, cloud = poison cloud (damage is per stack per second), pulse = hits everything in range, chomp = bite (small critters are swallowed whole).",
     "flowers.slow": "slow = speed multiplier while slowed (lower = slower), slowSeconds = how long it lasts after each pulse; perLevel.slowDuration adds that share of slowSeconds per level.",
     "flowers.pierce": "Fire Lily fireballs hit at most this many monsters each (perLevel.pierce more per level).",
+    "flowers.maxHpBite": "Snapdragon bites also take this share of the target's max health (bossMaxHpBite on bosses), so big monsters lose big chunks.",
+    "enemies.poisonImmune": "Stinkbloom poison doesn't affect it (and Stinkblooms don't aim at it).",
     "flowers.target": "first = enemy furthest along the path (default), strong = the toughest enemy (highest max health), kept until it dies.",
     "flowerLevels.prices": "A flower's cost is its base price. Planting it (seedling to level 1) costs cost x plantPrice; going from level L to L+1 costs cost x upgradeCostMultipliers[L-1] x upgradePrice. Healing is priced off the base cost (fullHealCostFraction). Planting and upgrade prices are rounded to the nearest priceStep (never below one step).",
     "flowerLevels.perLevel": "Bonus added per level above 1, e.g. damage 0.5 means +50% damage per level.",
@@ -121,7 +123,7 @@
       "pierce": 0.5,
       "slowStrength": 0.05,
       "slowDuration": 0.25,
-      "poisonStacks": 0.5,
+      "poisonStacks": 0,
       "cloudSize": 0.08
     },
     "health": 100,
@@ -138,8 +140,8 @@
     "firelily":  { "name": "Fire Lily",  "desc": "Fireball pierces a few monsters in a line", "cost": 45, "range": 3, "damage": 16, "rate": 1.5, "kind": "bolt", "pierce": 3, "color": "#ff7a2f" },
     "stink":     { "name": "Stinkbloom", "desc": "Poison clouds stack, ignore armor (ground)", "cost": 45, "range": 2.6, "damage": 2.1, "rate": 2.4, "kind": "cloud", "cloudRadius": 0.95, "cloudSeconds": 3.5, "maxStacks": 5, "groundOnly": true, "color": "#9ad14b" },
     "frost":     { "name": "Frostbloom", "desc": "Cheap. No damage, slows everything nearby", "cost": 16, "range": 2.3, "damage": 0, "rate": 2.75, "kind": "pulse", "slow": 0.45, "slowSeconds": 2.5, "color": "#8fe3ff" },
-    "thorn":     { "name": "Thornrose",  "desc": "Spiky pulse hits all close enemies (ground)", "cost": 42, "range": 1.3, "damage": 8, "rate": 1.0, "kind": "pulse", "groundOnly": true, "color": "#ff4d5e" },
-    "snap":      { "name": "Snapdragon", "desc": "Swallows small critters whole, big bite on the rest (ground)", "cost": 40, "range": 1.3, "damage": 45, "rate": 2.0, "kind": "chomp", "groundOnly": true, "color": "#e0569b" }
+    "thorn":     { "name": "Thornrose",  "desc": "Spiky pulse hits everything close, flyers too", "cost": 42, "range": 1.5, "damage": 8, "rate": 1.0, "kind": "pulse", "color": "#ff4d5e" },
+    "snap":      { "name": "Snapdragon", "desc": "Gulps critters, bites chunks off big monsters (ground)", "cost": 40, "range": 1.5, "damage": 45, "rate": 2.0, "kind": "chomp", "maxHpBite": 0.1, "bossMaxHpBite": 0.03, "groundOnly": true, "color": "#e0569b" }
   },
 
   "enemies": {
@@ -158,7 +160,7 @@
     "aphid":    { "hp": 28,   "speed": 1.95, "coins": 2,  "bite": 2, "size": 0.23, "armor": 0, "light": true, "eats": { "damagePerSecond": 3, "chewSeconds": 2.5, "cooldown": 6, "reach": 1.25 } },
     "woolly":   { "hp": 30,   "speed": 2.75, "coins": 2,  "bite": 2, "size": 0.27, "armor": 0, "unslowable": true },
     "hopper":   { "hp": 30,   "speed": 1.8,  "coins": 3,  "bite": 2, "size": 0.25, "armor": 0, "light": true, "dash": { "every": 2.2, "duration": 0.6, "speedMultiplier": 3.4, "leap": true } },
-    "charger":  { "hp": 90,   "speed": 1.3,  "coins": 5,  "bite": 3, "size": 0.34, "armor": 2, "enrage": { "maxSpeedMultiplier": 2.6 } },
+    "charger":  { "hp": 90,   "speed": 1.3,  "coins": 5,  "bite": 3, "size": 0.34, "armor": 2, "poisonImmune": true, "enrage": { "maxSpeedMultiplier": 2.6 } },
     "hive":     { "hp": 150,  "speed": 1.05, "coins": 7,  "bite": 4, "size": 0.43, "armor": 1, "spawns": { "type": "swarm", "every": 4.5, "count": 2 } },
     "boss":     { "hp": 800,  "speed": 0.98, "coins": 40, "bite": 8,  "size": 0.6,  "armor": 3, "boss": true, "spawns": { "type": "grunt", "every": 6, "count": 2 } }
   },
@@ -170,7 +172,7 @@
     "flyer":    ["Flyers!", "They fly straight to the cottage. Only Daisy, Fire Lily and Sunflower can hit them"],
     "splitter": ["Splitters!", "They burst into fast little bloblings. Keep some flowers near the cottage"],
     "aphid":    ["Aphids!", "They stop to chew your flowers. Hold heal on bitten flowers"],
-    "shield":   ["Shield beetles!", "Heavy armour. Big hits and poison get through it"],
+    "shield":   ["Shield beetles!", "Heavy armour. Snapdragon bites, Sunflower and poison get through it"],
     "mole":     ["Moles!", "They dig under the ground where flowers can't hit them"],
     "tank":     ["Tanks!", "Slow and very tough. Snapdragon and Sunflower bite through"],
     "healer":   ["Healers!", "They mend the monsters around them. Take them out first"],
@@ -178,7 +180,7 @@
     "wasp":     ["Wasps!", "Fast flyers in packs. Only Daisy, Fire Lily and Sunflower can hit them"],
     "woolly":   ["Woolly bears!", "Thick fur: Frostbloom can't slow them. Hit them hard and early"],
     "hopper":   ["Grasshoppers!", "They leap over ground flowers. Daisy and Fire Lily hit them mid-air"],
-    "charger":  ["Stag beetles!", "Armoured, and they run faster the more they're hurt. Finish them off in one spot"],
+    "charger":  ["Stag beetles!", "Poison-proof shells, and they run faster when hurt. Snapdragon, Fire Lily and Sunflower crack them"],
     "boss":     ["The boss!", "Huge and armoured: small hits do little. Sunflower and Snapdragon bite through"]
   },
 

@@ -1830,7 +1830,7 @@ function drawPick(c, s, ui, time) {
     const lines = [st.range >= GLOBAL_RANGE ? 'Range: whole map' : `Range ${(st.range / T).toFixed(1)}`];
     if (F.kind === 'cloud') lines.push(`${st.dmg} dmg/s per stack (x${st.stacks})`, `cloud every ${+st.rate.toFixed(2)}s`);
     else {
-      lines.push(F.kind === 'chomp' ? `${st.dmg} dmg bite` : F.kind === 'bolt' ? `${st.dmg} dmg, pierces ${st.pierce}` : F.kind === 'pulse' ? (st.slow ? `slows to ${Math.round(st.slow * 100)}% for ${+st.slowSeconds.toFixed(1)}s` : `${st.dmg} dmg to all near`) : `${st.dmg} dmg`);
+      lines.push(F.kind === 'chomp' ? `${st.dmg} + ${Math.round((st.maxHpBite || 0) * 100)}% max hp bite` : F.kind === 'bolt' ? `${st.dmg} dmg, pierces ${st.pierce}` : F.kind === 'pulse' ? (st.slow ? `slows to ${Math.round(st.slow * 100)}% for ${+st.slowSeconds.toFixed(1)}s` : `${st.dmg} dmg to all near`) : `${st.dmg} dmg`);
       lines.push(`every ${+st.rate.toFixed(2)}s`);
     }
     lines.forEach((t, j) => label(c, fitText(c, t, cw - 8, 11), cx, y0 + 215 - (lines.length - 1 - j) * 13, 11, j ? '#cfe0ea' : '#8fa5b3', 'center', 500, null));
@@ -1975,7 +1975,7 @@ function drawGuide(c, time, sel) {
   const tags = [];
   if (F.groundOnly) tags.push(['Ground only', '#d9a066']); else tags.push(['Hits flyers too', '#8fe3ff']);
   if (F.kind === 'cloud') tags.push(['Ignores armour', '#9ad14b']);
-  if (F.kind === 'chomp') tags.push(['Swallows small critters whole', '#e0569b']);
+  if (F.kind === 'chomp') tags.push(['Swallows small critters whole', '#e0569b'], [`Bites off ${Math.round((F.maxHpBite || 0) * 100)}% of max health`, '#e0569b']);
   if (F.kind === 'beam') tags.push(['Aims at the toughest monster', '#ffd23f']);
   if (F.kind === 'bolt') tags.push(['Hits several in a line', '#ff7a2f']);
   if (F.kind === 'pulse' && !F.slow) tags.push(['Hits everything near', '#ff4d5e']);
