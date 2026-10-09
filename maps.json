@@ -64,7 +64,7 @@
       "start": [15, 7],
       "waveSize": 0.75,
       "startCoins": 2.8,
-      "coinDrops": 1.12,
+      "coinDrops": 1.08,
       "waveSet": "rush",
       "paths": [
         [[4, 0], [4, 3], [8, 3], [8, 6], [11, 6], [11, 4], [16, 4], [16, 12]],
