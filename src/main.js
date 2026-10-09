@@ -5,7 +5,7 @@
 //   host      – this browser runs the game; player 2's inputs arrive over the network (host.js)
 //   guest     – this browser only sends inputs and draws snapshots from the host (guest.js)
 import { createState, step } from './sim.js';
-import { finishLog, currentLog } from './stats.js';
+import { finishLog, currentLog, gameSummary } from './stats.js';
 import { render, VIEW_W, VIEW_H } from './render.js';
 import { initAudio, play, toggleMute, setMusicMood } from './audio.js';
 import { juiceEvent, hitStopping, toggleJuice } from './juice.js';
@@ -161,6 +161,11 @@ function saveGameLog(how) {
   if (!state.stats.waves.length && !(state.stats.cur && state.wave > 0)) return; // nothing played yet
   const entry = finishLog(state, how);
   entry.mode = mode === 'host' ? 'online co-op (host)' : nPlayers > 1 ? 'local co-op' : 'solo';
+  // the end screen's numbers; an online guest gets the same ones
+  if (how !== 'quit') {
+    ui.summary = gameSummary(entry);
+    if (mode === 'host' && guestOk && net.connected) net.send({ t: 'summary', summary: ui.summary });
+  }
   try { localStorage.setItem(LOG_KEY, JSON.stringify([...savedLogs(), entry].slice(-LOG_KEEP))); } catch { /* storage full or blocked */ }
 }
 function downloadLogs() {
@@ -196,6 +201,7 @@ function newGame(same = false) {
   if (same && state.players.every((p) => p.pick.chosen.length === LOADOUT_SIZE)) for (const p of state.players) p.pick.ready = true;
   ui.cam.snap = true;
   ui.paused = false;
+  ui.summary = null;
   resetEffects();
   play('wave');
 }
@@ -210,6 +216,7 @@ function backToMenu() {
   state = null;
   resetEffects();
   ui.paused = false;
+  ui.summary = null;
   ui.netLabel = '';
   ui.disconnected = false;
   hideLobby();
@@ -311,6 +318,8 @@ function startJoin(code) {
         applySnapshot(state, m, performance.now());
       } else if (m.t === 'fx') {
         if (mode === 'guest') applyEffects(state, m, performance.now());
+      } else if (m.t === 'summary') {
+        if (mode === 'guest') ui.summary = m.summary;
       } else if (m.t === 'pong') {
         ui.netLabel = `Online · room ${code} · ${Math.round(performance.now() - m.at)} ms`;
       } else if (m.t === 'reject') {
@@ -447,6 +456,7 @@ function frame(now) {
   if (mode === 'guest') {
     interpolate(state, now);
     ui.paused = state.paused;
+    if (!state.over && !state.won) ui.summary = null; // the host restarted
     guest.show(state, frameDt);
   }
   const ticking = mode === 'local' || mode === 'host';

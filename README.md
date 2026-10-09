@@ -64,6 +64,11 @@ results as a lower bound on what real players can survive.
 
 ## Game logs
 
+When a game ends, the victory or defeat screen shows the highlights: damage
+and kills for each flower type, the star flower, what each cat earned and
+spent, its baton and bomb damage, and which monsters bit the cottage most.
+Online, both players see it.
+
 Every game keeps a log for balancing: per wave how long it took, which
 monsters came and died, cottage damage by monster type, each cat's coins
 (start, earned, spent on planting/upgrades/healing, end), damage and kills by

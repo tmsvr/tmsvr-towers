@@ -211,3 +211,37 @@ export function logTick(s, dt, tileOf) {
     st.acts[i] = {};
   });
 }
+
+// What the victory / defeat screen shows, made from a finished log: damage
+// and kills per flower type, the best single flower, each cat's coins and
+// damage, and what bit the cottage most. Small and plain, so the host can
+// send it to an online guest as it is.
+export function gameSummary(log) {
+  const t = log.totals, r = log.result;
+  const flowers = {};
+  for (const f of log.flowers) {
+    const o = flowers[f.type] ??= { type: f.type, dmg: 0, kills: 0, planted: 0 };
+    o.planted++;
+  }
+  for (const k in t.damage) if (flowers[k]) flowers[k].dmg = Math.round(t.damage[k]);
+  for (const k in t.kills) if (flowers[k]) flowers[k].kills = t.kills[k];
+  const topLevel = (f) => f.levels.reduce((a, l) => Math.max(a, l[1]), 0);
+  const best = log.flowers.reduce((a, f) => (!a || f.dmg > a.dmg ? f : a), null);
+  const cats = log.players.map((p, i) => {
+    const c = t.coins[i] || {};
+    const tag = `P${i + 1}`;
+    return {
+      cat: p.cat, earned: c.earned || 0, spent: (c.plant || 0) + (c.upgrade || 0) + (c.heal || 0),
+      baton: Math.round(t.damage[`baton ${tag}`] || 0), bomb: Math.round(t.damage[`bomb ${tag}`] || 0),
+      kills: (t.kills[`baton ${tag}`] || 0) + (t.kills[`bomb ${tag}`] || 0),
+      garden: Math.round(log.flowers.filter((f) => f.by === i).reduce((a, f) => a + f.dmg, 0)),
+    };
+  });
+  return {
+    won: r.won, wave: r.wave, seconds: r.seconds, kills: r.kills, cottage: Math.round(r.cottage), maxCottage: log.cottageHealth,
+    flowers: Object.values(flowers).sort((a, b) => b.dmg - a.dmg),
+    best: best && best.dmg > 0 ? { type: best.type, lvl: topLevel(best), dmg: best.dmg, kills: best.kills } : null,
+    cats,
+    bitten: Object.entries(t.cottageDamage).filter(([, v]) => v >= 1).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => [k, Math.round(v)]),
+  };
+}

@@ -43,7 +43,7 @@ Claude Code users: `.claude/launch.json` defines this server as `towers`
 | `maps.json` | Maps: roads (waypoints), cottage, start, obstacles, `waveSize`, `startCoins`, `waveSet`, scatter. `_help` explains the fields |
 | `src/data.js` | Loads both JSON files (top-level `await fetch`), converts to pixel units, derives flower stats per level, prepares maps (decks, bridges, colliders), computes `DATA_HASH` |
 | `src/sim.js` | **The game rules.** Pure state + `step(state, inputs, dt)`. No DOM, no drawing |
-| `src/stats.js` | Game log hooks the sim calls (damage, coins, waves…). Counting only, never affects play |
+| `src/stats.js` | Game log hooks the sim calls (damage, coins, waves…). Counting only, never affects play. `gameSummary` makes the end screen's numbers (the host sends them to the guest as a `summary` message) |
 | `src/render.js` | Draws everything: world, flowers, cats, enemies, HUD, menu, pick screen, flower guide |
 | `src/fx.js`, `src/juice.js` | Visual-only effects (particles, damage numbers, squash, hit-stop) |
 | `src/audio.js` | Procedural sound effects and adaptive music |

@@ -1841,6 +1841,68 @@ function drawOverlay(c, title, sub, col) {
   sub.forEach((l, i) => label(c, l, VIEW_W / 2, VIEW_H / 2 + 20 + i * 32, 20, '#fff', 'center', 500, null));
 }
 
+// The victory / defeat screen with the game's numbers (ui.summary, made by
+// gameSummary in stats.js; online the host sends it to the guest). Until it
+// is there, just the title and keys.
+const short = (v) => (v >= 1e5 ? `${Math.round(v / 1000)}k` : v >= 1e4 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`);
+const monsterName = (t) => (INTROS[t]?.[0] || t[0].toUpperCase() + t.slice(1) + 's').replace(/!$/, ''); // intro titles are already plural
+function drawEndScreen(c, s, ui, time) {
+  const won = s.won, S = ui.summary;
+  const col = won ? '#8dff9a' : '#ff7a6a', keys = `${won ? 'R: play again' : 'R: try again'}  ·  Esc: menu  ·  L: download the game log`;
+  const head = won ? `All ${TOTAL_WAVES} waves defended  ·  ${s.kills} monsters bonked` : `You reached wave ${s.wave}  ·  ${s.kills} monsters bonked`;
+  if (!S) { drawOverlay(c, won ? 'Victory!' : 'The garden fell…', [head, keys], col); return; }
+  c.fillStyle = 'rgba(12,18,26,0.86)'; c.fillRect(0, 0, VIEW_W, VIEW_H);
+  label(c, won ? 'Victory!' : 'The garden fell…', VIEW_W / 2, 50, 46, col, 'center', 700, OUT);
+  const mins = Math.floor(S.seconds / 60), secs = String(S.seconds % 60).padStart(2, '0');
+  label(c, `${won ? `All ${TOTAL_WAVES} waves` : `Wave ${S.wave}/${TOTAL_WAVES}`}  ·  ${mins}:${secs}  ·  ${S.kills} monsters bonked  ·  cottage ${S.cottage}/${S.maxCottage}`, VIEW_W / 2, 96, 18, '#e8f1f7', 'center', 500, null);
+  const top = 124, h = 444;
+
+  // flowers: damage per type, biggest first
+  const fx = 32, fw = 540;
+  rrect(c, fx, top, fw, h, 14, 'rgba(255,255,255,0.06)', 'rgba(255,255,255,0.15)', 1.5);
+  label(c, 'Flowers', fx + 18, top + 24, 20, '#ffe27a', 'left', 700, null);
+  label(c, 'damage', fx + fw - 18, top + 24, 13, '#8fa5b3', 'right', 600, null);
+  const maxDmg = Math.max(1, ...S.flowers.map((f) => f.dmg));
+  const rowH = Math.min(52, (h - 120) / Math.max(1, S.flowers.length));
+  S.flowers.forEach((f, i) => {
+    const y = top + 62 + i * rowH, F = FLOWERS[f.type];
+    c.save(); c.translate(fx + 34, y + 8); c.scale(0.5, 0.5);
+    drawFlower(c, { id: i, type: f.type, lvl: 3, x: 0, y: 0, angle: -Math.PI / 2, flash: 0, hurtT: 0, hp: 100, headIdx: 0, grow: null }, time);
+    c.restore();
+    label(c, F?.name || f.type, fx + 62, y - 6, 16, '#fff', 'left', 600, null);
+    label(c, `${f.planted} planted  ·  ${f.kills} kills`, fx + 62, y + 13, 12, '#8fa5b3', 'left', 500, null);
+    const bx = fx + 220, bw = fw - 220 - 80;
+    rrect(c, bx, y - 7, bw, 14, 7, 'rgba(255,255,255,0.08)');
+    rrect(c, bx, y - 7, Math.max(14, bw * f.dmg / maxDmg), 14, 7, F?.color || '#fff', OUT, 1.2);
+    label(c, short(f.dmg), fx + fw - 18, y, 15, '#fff', 'right', 600, null);
+  });
+  if (S.best) {
+    const F = FLOWERS[S.best.type];
+    label(c, `Star flower: ${F?.name || S.best.type} (level ${S.best.lvl})  ·  ${short(S.best.dmg)} damage  ·  ${S.best.kills} kills`, fx + 18, top + h - 22, 14, '#ffe27a', 'left', 600, null);
+  }
+
+  // cats: coins and damage each
+  const cx = fx + fw + 16, cw = VIEW_W - cx - 32;
+  rrect(c, cx, top, cw, h, 14, 'rgba(255,255,255,0.06)', 'rgba(255,255,255,0.15)', 1.5);
+  label(c, 'Cats', cx + 18, top + 24, 20, '#ffe27a', 'left', 700, null);
+  const blockH = S.cats.length > 1 ? 150 : 170;
+  S.cats.forEach((k, i) => {
+    const y = top + 50 + i * (blockH + 8), K = CATS[k.cat] || {};
+    c.save(); c.translate(cx + 40, y + 34); c.scale(1.1, 1.1);
+    drawCat(c, { id: i, cat: k.cat, noTag: true, x: 0, y: 0, dir: 0, moving: false, stun: 0, swingT: 0, swingDir: 0 }, time);
+    c.restore();
+    label(c, `P${i + 1}  ${K.name || k.cat}`, cx + 76, y + 14, 18, ['#8fc3ff', '#ff9ab8'][i], 'left', 700, null); // scarf colours, lightened
+    const rows = [['Coins earned', k.earned], ['Spent on flowers', k.spent], ['Baton damage', short(k.baton)], ['Bomb damage', short(k.bomb)], ['Monsters bonked', k.kills], ['Their flowers dealt', short(k.garden)]];
+    rows.forEach(([name, v], j) => {
+      const colX = cx + 76 + (j % 2) * ((cw - 90) / 2), ry = y + 44 + Math.floor(j / 2) * 30;
+      label(c, name, colX, ry, 12, '#8fa5b3', 'left', 500, null);
+      label(c, `${v}`, colX, ry + 15, 16, '#fff', 'left', 600, null);
+    });
+  });
+  label(c, S.bitten.length ? `Bit the cottage most: ${S.bitten.map(([t, v]) => `${monsterName(t)} ${v}`).join('  ·  ')}` : 'Nothing bit the cottage!', VIEW_W / 2, top + h + 24, 16, S.bitten.length ? '#ffb3a8' : '#8dff9a', 'center', 600, null);
+  label(c, keys, VIEW_W / 2, VIEW_H - 30, 18, '#fff', 'center', 500, null);
+}
+
 // The flower guide (I in the menu or while picking): one flower at a time,
 // what each level costs and what it improves. The numbers come straight from
 // the balance data, so the guide never goes stale.
@@ -2050,7 +2112,6 @@ export function render(c, s, ui) {
   if (ui.guide != null) drawGuide(c, time, ui.guide);
   if (ui.disconnected) drawOverlay(c, 'Disconnected', ['The connection to the host was lost', 'Esc: back to menu'], '#ff7a6a');
   else if (ui.paused) drawOverlay(c, 'Paused', ['P or Esc: resume', 'R: restart this map  ·  M: back to the menu'], '#ffffff');
-  else if (s.over) drawOverlay(c, 'The garden fell…', [`You reached wave ${s.wave}  ·  ${s.kills} monsters bonked`, 'R: try again  ·  Esc: menu  ·  L: download the game log'], '#ff7a6a');
-  else if (s.won) drawOverlay(c, 'Victory!', [`All ${TOTAL_WAVES} waves defended  ·  ${s.kills} monsters bonked`, 'R: play again  ·  Esc: menu  ·  L: download the game log'], '#8dff9a');
+  else if (s.over || s.won) drawEndScreen(c, s, ui, time);
   if (ui.note && performance.now() < ui.note.until) label(c, ui.note.txt, VIEW_W / 2, MAP_H - 24, 16, '#ffffff', 'center', 700);
 }
