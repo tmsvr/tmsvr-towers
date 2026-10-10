@@ -136,6 +136,7 @@ export function runBot({ players = 2, seed = 1, loadouts, cats, map = 0, maxMinu
         if (fd < 60) { p.dir = Math.atan2(foe.y - p.y, foe.x - p.x); inp.mx = 0; inp.my = 0; inp.atk = true; }
       } else if (coin) { [inp.mx, inp.my] = towards(m, p, coin.x, coin.y); }
     });
+    if (s.chest) for (const inp of inputs) inp.buildTap = true; // takes the first perk offered
     sim.step(s, inputs, 1 / 60);
     s.events.length = 0;
     s.fx.length = 0;

@@ -5,7 +5,7 @@
 import * as sim from '../src/sim.js';
 import {
   T, MAPS, FLOWERS, FLOWER_ORDER, MAX_LEVEL, FLOWER_HP, ENEMIES, CATS, CAT_ORDER, BALANCE, TOTAL_WAVES,
-  plantCost, upgradeCost, flowerStats, BLOOM, bloomOf, ELITES,
+  plantCost, upgradeCost, flowerStats, BLOOM, bloomOf, ELITES, SHIELD, CHEST, LOADOUT_SIZE,
 } from '../src/data.js';
 import { encodeSnapshot, encodeInputs, decodeFast } from '../src/schema.js';
 import { gameSummary } from '../src/stats.js';
@@ -679,6 +679,143 @@ test('Power-ups', 'elites and power-ups survive a snapshot', () => {
   eq(m.state.enemies.at(-1).elite, 'regenerating', 'trait');
   eq(m.state.items[0].kind, 'sun', 'item on the ground');
   eq(m.state.players[0].item, 'water', 'carried item');
+});
+
+// ---- boss shields and chests (IDEAS R3) ---------------------------------------------
+function bossGame(cats = ['gardener', 'scout'], wave = 5) {
+  const s = game({ cats });
+  s.wave = wave;
+  const boss = monsterOn(s, 'boss', tileByRoad(s).road);
+  boss.x = boss.y = T * 2; // well away from the cats, so bombs don't knock them down
+  return { s, boss };
+}
+const bombOn = (s, e, owner = 0) => {
+  s.bombs.push({ id: s.nextId++, sx: e.x, sy: e.y, tx: e.x, ty: e.y, x: e.x, y: e.y, h: 0, t: 0, dur: 0.001, r: T, dmg: 1, owner });
+  tick(s);
+};
+const hurtTo = (s, e, share) => sim.damage(s, e, e.hp - e.maxhp * share, true);
+function withSwitch(obj, on, fn) { const was = obj.enabled; obj.enabled = on; try { fn(); } finally { obj.enabled = was; } }
+
+test('Boss shields', 'a boss shields itself at 60%; only bombs break it, then it is exposed', () => {
+  const { s, boss } = bossGame();
+  hurtTo(s, boss, SHIELD.at[0] - 0.01);
+  eq(boss.shield, SHIELD.hitsCoop, 'segments in co-op');
+  let hp = boss.hp;
+  sim.damage(s, boss, 1000, true, false, 'firelily');
+  near(hp - boss.hp, 1000 * (1 - SHIELD.block), 1e-6, 'a flower hit through the shield');
+  for (let i = 1; i < SHIELD.hitsCoop; i++) bombOn(s, boss);
+  eq(boss.shield, 1, 'one segment left');
+  bombOn(s, boss);
+  eq(boss.shield, 0, 'broken');
+  ok(boss.exposedT > 0 && boss.stun > SHIELD.exposedSeconds - 0.1, 'exposed and stunned');
+  hp = boss.hp;
+  sim.damage(s, boss, 1000, true, false, 'firelily');
+  near(hp - boss.hp, 1000 * (1 + SHIELD.exposedDamage), 1e-6, 'a hit while exposed');
+  eq(s.stats.cur.shields.broken, 1, 'logged');
+});
+
+test('Boss shields', "Boom's bombs count double; alone the shield is smaller", () => {
+  const { s, boss } = bossGame(['bomber', 'gardener']);
+  hurtTo(s, boss, SHIELD.at[0] - 0.01);
+  bombOn(s, boss, 0);
+  eq(boss.shield, SHIELD.hitsCoop - SHIELD.catHits.bomber, 'after one big bomb');
+  const solo = bossGame(['scout']);
+  hurtTo(solo.s, solo.boss, SHIELD.at[0] - 0.01);
+  eq(solo.boss.shield, SHIELD.hitsSolo, 'segments alone');
+});
+
+test('Boss shields', 'the last boss and endless bosses shield twice; switched off, never', () => {
+  const { s, boss } = bossGame(undefined, TOTAL_WAVES);
+  hurtTo(s, boss, SHIELD.atBig[0] - 0.01);
+  ok(boss.shield > 0, 'first shield');
+  for (let i = 0; i < SHIELD.hitsCoop; i++) bombOn(s, boss);
+  boss.exposedT = 0;
+  hurtTo(s, boss, SHIELD.atBig[1] - 0.01);
+  ok(boss.shield > 0, 'second shield');
+  withSwitch(SHIELD, false, () => {
+    const off = bossGame();
+    hurtTo(off.s, off.boss, 0.2);
+    ok(!(off.boss.shield > 0), 'shielded while switched off');
+  });
+});
+
+// A game whose current wave is cleared after a boss died in it.
+function clearBossWave(cats = ['gardener', 'scout']) {
+  const s = game({ cats });
+  tick(s, { ready: true });
+  s.queue.length = 0;
+  for (const e of s.enemies) e.dead = true;
+  const boss = monsterOn(s, 'boss', tileByRoad(s).road);
+  sim.damage(s, boss, 1e9, true);
+  tick(s);
+  return s;
+}
+
+test('Boss chests', 'a wave with a boss kill ends with a chest; the game waits for every pick', () => {
+  const s = clearBossWave();
+  ok(s.chest, 'no chest');
+  for (const o of s.chest.offers) eq(o.length, CHEST.choices, 'offers');
+  const t0 = s.t;
+  sim.step(s, [{ buildTap: true }, {}], DT);
+  ok(s.chest && s.chest.picked[0] && s.chest.picked[1] == null, 'P1 picked, P2 not yet');
+  for (let i = 0; i < 30; i++) sim.step(s, [{}, {}], DT);
+  eq(s.t, t0, 'game time while choosing');
+  const want = s.chest.offers[1][1];
+  sim.step(s, [{}, { mx: 1 }], DT);
+  sim.step(s, [{}, { atk: true }], DT);
+  eq(s.chest, null, 'closed');
+  eq(s.stats.waves.at(-1).perks.length, 2, 'logged');
+  eq(s.stats.waves.at(-1).perks[1][1], want, "P2's perk");
+  withSwitch(CHEST, false, () => ok(!clearBossWave().chest, 'a chest while switched off'));
+});
+
+test('Boss chests', 'every perk does what it says', () => {
+  const s = game({ cats: ['gardener', 'scout'] }), [a, b] = s.players, P = CHEST.perks;
+  const lives = (s.lives = 100), max = s.maxLives;
+  sim.applyPerk(s, a, 'roof');
+  eq(s.maxLives, max + P.roof.maxCottage, 'max health'); eq(s.lives, lives + P.roof.cottage, 'health');
+  const price = sim.plantPrice(a, 'thorn'), other = sim.plantPrice(b, 'thorn'), grow = sim.catStats(a).grow;
+  sim.applyPerk(s, a, 'thumb'); sim.applyPerk(s, a, 'paws'); sim.applyPerk(s, a, 'pouch');
+  ok(sim.plantPrice(a, 'thorn') < price, 'cheaper planting');
+  near(sim.catStats(a).grow, grow * P.paws.growSpeed, 1e-9, 'grow speed');
+  eq(sim.catStats(a).bombMax, 1 + P.pouch.bombs, 'bombs');
+  eq(sim.plantPrice(b, 'thorn'), other, "the other cat's price");
+  const extra = FLOWER_ORDER.find((t) => !a.loadout.includes(t));
+  sim.applyPerk(s, a, `fourth:${extra}`);
+  eq(a.loadout.length, LOADOUT_SIZE + 1, 'loadout'); ok(a.loadout.includes(extra), 'the flower');
+  // wear and aphids
+  const f = plant(s, a, freeTile(s), 'thorn');
+  growOnce(s, a, f);
+  goTo(a, freeTile(s, [[f.tx, f.ty]]));
+  tick(s, { ready: true });
+  const wear = (n) => { f.hp = 100; for (let i = 0; i < 60; i++) tick(s); return 100 - f.hp; };
+  const before = wear();
+  sim.applyPerk(s, b, 'roots');
+  near(wear() / before, P.roots.wear, 0.02, 'wear');
+  eq(s.perks.roots, 1, 'team perk');
+});
+
+test('Boss chests', 'a perk is offered at most twice; endless opens the last boss\'s chest', () => {
+  const s = game({ cats: ['gardener', 'scout'] });
+  sim.applyPerk(s, s.players[0], 'roof'); sim.applyPerk(s, s.players[1], 'roof');
+  for (let i = 0; i < 40; i++) {
+    s.chestDue = true; s.won = true; s.chest = null;
+    sim.continueEndless(s);
+    ok(!s.chest.offers.flat().includes('roof'), 'roof offered a third time');
+  }
+  const m = decodeFast(encodeSnapshot(s, { seq: 1, at: 0, paused: false, ack: 0 }));
+  eq(m.state.game.chest.offers[0].length, CHEST.choices, 'offers in a snapshot');
+  eq(m.state.game.perks.roof, 2, 'team perks in a snapshot');
+});
+
+test('Boss chests', 'shields and perks survive a snapshot', () => {
+  const { s, boss } = bossGame();
+  hurtTo(s, boss, 0.5);
+  sim.applyPerk(s, s.players[0], 'paws');
+  const m = decodeFast(encodeSnapshot(s, { seq: 1, at: 0, paused: false, ack: 0 }));
+  const e = m.state.enemies.find((x) => x.type === 'boss');
+  eq(e.shield, SHIELD.hitsCoop, 'shield'); eq(e.shieldMax, SHIELD.hitsCoop, 'shield max');
+  eq(m.state.players[0].perks.paws, 1, 'perk');
 });
 
 // ---- saved games ------------------------------------------------------------------

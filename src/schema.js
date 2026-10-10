@@ -2,14 +2,14 @@
 // as compact binary. Encoding (sender) and decoding (receiver) both walk the
 // same field lists, so a field is added or removed in one place and the two
 // sides can't drift apart.
-import { ENEMIES, FLOWER_ORDER, CAT_ORDER, ELITE_TRAITS, ITEM_KINDS } from './data.js';
+import { ENEMIES, FLOWER_ORDER, CAT_ORDER, ELITE_TRAITS, ITEM_KINDS, PERKS } from './data.js';
 
 // ---- bytes ------------------------------------------------------------------
 // Whole numbers are written as varints (7 bits a byte), signed ones zigzagged,
 // so small numbers take one byte and a position in tenths of a pixel three.
 // Bump whenever a message changes shape, so mismatched copies refuse to play
 // together instead of misreading each other (checked when a guest joins).
-export const PROTOCOL = 9;
+export const PROTOCOL = 10;
 
 const utf8 = new TextEncoder(), fromUtf8 = new TextDecoder();
 
@@ -83,6 +83,11 @@ const maybe = (c) => ({
 // fields: [name, codec, when?]. A `when` field must be a maybe(): while
 // when(state) is false it is sent as empty and reads back as null, for data
 // only needed in some phases. All bool fields share one bit field.
+// A count for each of `keys` (an object like { roots: 1 }), in that order.
+const counts = (keys) => ({
+  write: (w, o) => { for (const k of keys) w.uint(o?.[k] || 0); },
+  read: (r) => Object.fromEntries(keys.map((k) => [k, r.uint()]).filter(([, v]) => v)),
+});
 const struct = (fields) => {
   const flags = fields.filter(([, c]) => c.bool).map(([k]) => k);
   const rest = fields.filter(([, c]) => !c.bool);
@@ -110,9 +115,12 @@ const flowerType = oneOf(FLOWER_ORDER);
 const itemKind = oneOf([null, ...ITEM_KINDS]);
 
 // ---- the snapshot -------------------------------------------------------------
+// A boss chest being opened: each cat's offers, where its cursor is, what it took.
+const CHEST = struct([['offers', listOf(listOf(text))], ['cursor', listOf(int)], ['picked', listOf(maybe(text))]]);
+
 const GAME = struct([
   ['lives', r1], ['wave', int], ['phase', oneOf(PHASES)], ['timer', r1], ['queue', count], ['over', bool], ['won', bool],
-  ['kills', int], ['map', int], ['baseHitT', r2], ['maxLives', int], ['endless', bool],
+  ['kills', int], ['map', int], ['baseHitT', r2], ['maxLives', int], ['endless', bool], ['chest', maybe(CHEST)], ['perks', counts(PERKS)],
 ]);
 
 const PICK = struct([['cursor', int], ['chosen', listOf(flowerType)], ['ready', bool], ['row', int]]);
@@ -123,7 +131,7 @@ const PLAYER = struct([
   ['pick', maybe(PICK), (s) => s.phase === 'pick'], ['building', bool], ['healing', bool], ['dig', r2], ['cat', oneOf(CAT_ORDER)], ['stam', r3], ['tired', bool], ['sprinting', bool],
   // only the guest's prediction needs these two (see predict.js)
   ['restT', r3], ['atkCd', r3],
-  ['item', itemKind],
+  ['item', itemKind], ['perks', counts(PERKS)],
 ]);
 
 const GROW = struct([['to', int], ['cost', int], ['paid', r1]]);
@@ -138,6 +146,7 @@ const ENEMY = struct([
   // the drawing only uses wob through sines of 1, 1.5, 2, 2.2, 4 and 0.3 times it, all of which repeat every 20π
   ['wob', cycle(20 * Math.PI, 2)], ['ang', r2], ['slowT', r2], ['stun', r2], ['under', bool], ['dashing', bool], ['chew', bool], ['psn', int],
   ['atBase', bool], ['burnT', r1], ['vulnT', r1], ['elite', oneOf([null, ...ELITE_TRAITS])], ['mini', bool],
+  ['shield', int], ['shieldMax', int], ['exposedT', r1],
 ]);
 
 const DROP = struct([['id', int], ['x', r1], ['y', r1], ['big', bool], ['age', r1]]);

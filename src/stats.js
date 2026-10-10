@@ -28,6 +28,10 @@
 //  - items: { dropped, picked, used, expired } each {kind: n}  their power-ups
 //  timeline: [t, 'elite', type, trait, item]  an elite arrives (and what it carries)
 //            [t, 'item', p, kind, 'picked' | 'used' | 'expired']  (p = -1: nobody)
+//  - shields: { raised, broken, bombHits }  boss shields
+//  - perks: [[p, perk]]  boss chest picks after this wave ('fourth:<flower>' names the flower);
+//    in totals [[p, perk, wave]]
+//  timeline: [t, 'shield', 'up' | 'broken', bossId], [t, 'perk', p, perk]
 import { DATA_HASH, CATS } from './data.js';
 
 const add = (o, k, v = 1) => { o[k] = (o[k] || 0) + v; };
@@ -76,6 +80,8 @@ function openPeriod(s) {
     bloom: { damage: {}, triggers: {} }, // level-5 abilities (IDEAS R1): damage they added, times they went off
     elites: { spawned: {}, killed: 0 }, // elite monsters (IDEAS R2) by trait
     items: { dropped: {}, picked: {}, used: {}, expired: {} }, // their power-ups by kind
+    shields: { raised: 0, broken: 0, bombHits: 0 }, // boss shields (IDEAS R3)
+    perks: [], // [player, perk] picked from boss chests at the end of this wave
   };
 }
 
@@ -118,13 +124,16 @@ export function finishLog(s, how) {
   const st = s.stats;
   st.result = { how, wave: s.wave, won: !!s.won, cottage: r1(s.lives), kills: s.kills, seconds: Math.round(s.t) };
   const totals = { damage: {}, kills: {}, cottageDamage: {}, cottageDamageByRoad: {}, coins: s.players.map(() => ({ earned: 0, plant: 0, upgrade: 0, heal: 0, refund: 0 })), bloom: { damage: {}, triggers: {} },
-    elites: { spawned: {}, killed: 0 }, items: { dropped: {}, picked: {}, used: {}, expired: {} } };
+    elites: { spawned: {}, killed: 0 }, items: { dropped: {}, picked: {}, used: {}, expired: {} },
+    shields: { raised: 0, broken: 0, bombHits: 0 }, perks: [] };
   for (const w of st.waves) {
     for (const k in w.bloom?.damage) add(totals.bloom.damage, k, w.bloom.damage[k]);
     for (const k in w.bloom?.triggers) add(totals.bloom.triggers, k, w.bloom.triggers[k]);
     for (const k in w.elites?.spawned) add(totals.elites.spawned, k, w.elites.spawned[k]);
     totals.elites.killed += w.elites?.killed || 0;
     for (const what in w.items) for (const k in w.items[what]) add(totals.items[what], k, w.items[what][k]);
+    for (const k in w.shields) totals.shields[k] += w.shields[k];
+    totals.perks.push(...(w.perks || []).map(([p, perk]) => [p, perk, w.wave]));
     for (const k in w.damage) add(totals.damage, k, w.damage[k]);
     for (const k in w.kills) add(totals.kills, k, w.kills[k]);
     for (const k in w.cottageDamage) add(totals.cottageDamage, k, w.cottageDamage[k]);
@@ -173,6 +182,20 @@ export function logBloom(s, type) { if (cur(s)) add(cur(s).bloom.triggers, type)
 // Elites and power-ups. what: 'dropped' | 'picked' | 'used' | 'expired';
 // p is the cat that picked it up or used it (null otherwise).
 export function logElite(s, e) { if (!cur(s)) return; add(cur(s).elites.spawned, e.elite); ev(s, 'elite', e.type, e.elite, e.carry); }
+// Boss shields: what: 'up' | 'hit' | 'broken'.
+export function logShield(s, e, what) {
+  const w = cur(s);
+  if (!w) return;
+  if (what === 'hit') { w.shields.bombHits++; return; }
+  w.shields[what === 'up' ? 'raised' : 'broken']++;
+  ev(s, 'shield', what, e.id);
+}
+// Picked when the wave is already logged, so it goes on the last wave.
+export function logPerk(s, p, offer) {
+  if (!s.stats) return;
+  (s.stats.waves[s.stats.waves.length - 1] || cur(s))?.perks?.push([p.id, offer]);
+  ev(s, 'perk', p.id, offer);
+}
 export function logEliteKilled(s) { if (cur(s)) cur(s).elites.killed++; }
 export function logItem(s, p, kind, what) {
   if (!cur(s)) return;

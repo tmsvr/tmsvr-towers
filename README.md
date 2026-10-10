@@ -48,6 +48,15 @@ them.
   flowers heal and stop wearing for the wave), sun orb (the flower you stand
   on fires twice as fast for 20 s) or snow globe (every monster but bosses
   freezes for 2 s). Unclaimed power-ups vanish after 10 s.
+- **Bosses raise a shield** at 60% health (the last boss and endless bosses at
+  70% and 35%). It blocks 90% of all damage except bombs: 5 bomb hits break it
+  in co-op, 3 alone, and Boom's bombs count double. A broken shield leaves the
+  boss stunned and taking 50% more damage for 3 s.
+- A wave in which a boss died ends with a **boss chest**: each cat picks one
+  of 3 perks for the rest of the run (cottage repair, slower wear, softer
+  aphids, an extra flower type, cheaper flowers, faster growing, a bigger bomb
+  pouch). Left/right to choose, plant or baton key to take it. Each perk can
+  be taken twice.
 - In co-op, each cat keeps the coins it picks up (`economy.coopCoinShare` in
   `balance.json` can split a share of every pickup with the other cat).
 - P1: WASD move · Shift sprint · F baton · G bomb · V use power-up · E plant/upgrade (hold) · R heal (hold) · Q next flower / dig-up mode

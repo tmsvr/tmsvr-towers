@@ -29,7 +29,9 @@
     "enemies.dash.leap": "During each dash it is in the air: ground-only flowers and poison clouds can't touch it.",
     "enemies.enrage": "Speed grows as it loses health, up to maxSpeedMultiplier when nearly dead.",
     "bloom": "Bloom abilities (IDEAS R1): flowers at bloom.level get one special ability each. enabled = false switches them all off (and the price bump). upgradePrice multiplies the cost of the upgrade that reaches bloom.level. daisy: every Nth seed splits into `pieces` more seeds at `damage` share, aimed at monsters within `reach` tiles. sunflower: the beam also takes maxHp of the target's max health. firelily: every monster hit burns for `seconds`, taking `share` of the hit's damage per second (ignores armour). stink: monsters in its clouds take `vulnerable` more damage from everything, for `seconds` after leaving. frost: every Nth pulse freezes non-boss monsters for `freeze` seconds. thorn: every Nth pulse reaches `range` times as far and knocks small monsters back `knock` tiles per second. snap: swallows any non-boss monster below `below` of its health.",
-    "elites": "Elite monsters (IDEAS R2). enabled = false switches them off. Only `types` can be elite, from wave `fromWave`: the chance is `chance` + `chancePerWave` per wave after that (+ `chanceEndlessPerWave` per endless wave), at most `maxChance`. Elites have `hp` times the health and one trait (picked by weight): armoured adds `armor`; swift multiplies speed by `speed`; regenerating heals `perSecond` of its max health a second while not poisoned or burning; frostproof can't be slowed or frozen; splitting breaks into `count` copies with `hp` of a normal one's health. Each elite carries one power-up (by weight), dropped when it dies and gone after `itemSeconds` if nobody picks it up. fertiliser: the flower you stand on gains a level for free. water: flowers within `radius` tiles heal to full and stop wearing for the rest of the wave. sun: the flower you stand on fires `fireRate` times as fast for `seconds`. snow: every non-boss monster freezes for `seconds`."
+    "elites": "Elite monsters (IDEAS R2). enabled = false switches them off. Only `types` can be elite, from wave `fromWave`: the chance is `chance` + `chancePerWave` per wave after that (+ `chanceEndlessPerWave` per endless wave), at most `maxChance`. Elites have `hp` times the health and one trait (picked by weight): armoured adds `armor`; swift multiplies speed by `speed`; regenerating heals `perSecond` of its max health a second while not poisoned or burning; frostproof can't be slowed or frozen; splitting breaks into `count` copies with `hp` of a normal one's health. Each elite carries one power-up (by weight), dropped when it dies and gone after `itemSeconds` if nobody picks it up. fertiliser: the flower you stand on gains a level for free. water: flowers within `radius` tiles heal to full and stop wearing for the rest of the wave. sun: the flower you stand on fires `fireRate` times as fast for `seconds`. snow: every non-boss monster freezes for `seconds`.",
+    "bossShield": "Boss shields (IDEAS R3). enabled = false switches them off. A boss raises a shield when its health falls to each share in `at` (`atBig` for the last wave's boss and endless bosses). While it is up the boss takes `block` less damage from everything but bombs. Each bomb that hits it takes one segment off (`catHits` gives some cats more per bomb); it has `hitsCoop` segments in co-op, `hitsSolo` alone. Broken, the boss is stunned and takes `exposedDamage` more damage for `exposedSeconds`.",
+    "bossChest": "Boss chests (IDEAS R3). enabled = false switches them off. A wave in which a boss died ends with a chest: the game pauses and each cat picks one of `choices` random perks. A perk can be taken at most `maxEach` times (team perks by the whole team, the others by each cat). roof: the cottage gains `cottage` health and `maxCottage` max health. roots: flowers wear `wear` times as fast. stems: aphids chew `aphids` times as hard. fourth: one more flower type in your loadout. thumb: your planting, upgrades and healing cost `price` times as much. paws: you grow and heal `growSpeed` times as fast. pouch: you carry `bombs` more bombs and they recharge `recharge` times as long."
   },
 
   "player": {
@@ -162,6 +164,33 @@
       "water": { "name": "Watering can", "weight": 1, "radius": 3 },
       "sun": { "name": "Sun orb", "weight": 1, "seconds": 20, "fireRate": 2 },
       "snow": { "name": "Snow globe", "weight": 1, "seconds": 2 }
+    }
+  },
+
+  "bossShield": {
+    "enabled": true,
+    "at": [0.6],
+    "atBig": [0.7, 0.35],
+    "block": 0.9,
+    "hitsCoop": 5,
+    "hitsSolo": 3,
+    "catHits": { "bomber": 2 },
+    "exposedSeconds": 3,
+    "exposedDamage": 0.5
+  },
+
+  "bossChest": {
+    "enabled": true,
+    "choices": 3,
+    "maxEach": 2,
+    "perks": {
+      "roof": { "name": "Patch the roof", "icon": "🏠", "desc": "Cottage +30 health and +10 max health", "team": true, "cottage": 30, "maxCottage": 10 },
+      "roots": { "name": "Deep roots", "icon": "🌿", "desc": "All flowers wear 30% slower", "team": true, "wear": 0.7 },
+      "stems": { "name": "Hardy stems", "icon": "🪴", "desc": "Aphids chew half as hard", "team": true, "aphids": 0.5 },
+      "fourth": { "name": "Another flower", "icon": "🌸", "desc": "One more flower type in your loadout" },
+      "thumb": { "name": "Green thumb", "icon": "💰", "desc": "Your planting, upgrades and healing cost 15% less", "price": 0.85 },
+      "paws": { "name": "Quick paws", "icon": "🐾", "desc": "You grow and heal 40% faster", "growSpeed": 1.4 },
+      "pouch": { "name": "Bomb pouch", "icon": "💣", "desc": "One more bomb, and they recharge 25% faster", "bombs": 1, "recharge": 0.75 }
     }
   },
 

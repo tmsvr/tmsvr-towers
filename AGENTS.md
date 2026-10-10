@@ -144,7 +144,8 @@ Check changes like this:
    half-paid levels, healing, digging), maps are well formed and every road
    is reachable on foot, monster rules (frost-proof, leaping, enrage, ranged
    arrival waves, Snapdragon bites), endless mode (breather, wave size, extra
-   health and bosses, retrying a wave), the same seed gives the same game, the
+   health and bosses, retrying a wave), every Bloom ability, elite traits and
+   each power-up, boss shields and chest perks (each with its switch off too), the same seed gives the same game, the
    autopilot plays every map, a game saved mid-wave and loaded plays on exactly
    like the original, snapshots and inputs survive encoding, and the screens
    draw. The online menu flow lives in `main.js` (DOM), so check it by hand
@@ -191,6 +192,8 @@ the game log, so any of them can be switched off, or removed, on its own.
 |---|---|---|---|
 | R1 Bloom abilities (level 5) | `bloom.enabled` | `data.js` (`BLOOM`, `bloomOf`, the price bump in `upgradeCost`); `sim.js`: every `bl`/`burst` in `updateFlowers`, `splitSeed`, burning and `vulnT` in `updateEnemies`/`damage`/`updateClouds`; `render.js`: sparkles in `drawFlower`, flames and the purple ring in `drawEnemy`, `bloomText` in the guide; `schema.js` `burnT`, `vulnT` | `bloom` per wave and in totals |
 | R2 Elites and power-ups | `elites.enabled` | `data.js` (`ELITES`, `ELITE_TRAITS`, `ITEM_KINDS`); `sim.js`: the "Elite monsters and power-ups" section (`maybeElite`, `makeElite`, `frostproof`, `dropItem`, `updateItems`, `useItem`), plus `armorPlus` in `damage`, `speedMul`/regeneration in `updateEnemies`, splitting and drops in `killEnemy`, `wet`/`sunT` in `updateFlowers`, `inp.use`; `render.js`: `ELITE_COLOR`, `drawItemIcon`, `drawItem`, the HUD slot, the menu column; the `use` key in `main.js`, `host.js` `TAPS`, `schema.js` (`use` flag, `item`, `elite`, `mini`, `sunT`, `items`); `save.js` `items` default; sounds `pickup`, `powerup`, `freeze`, `elite` | `elites`, `items` per wave and in totals; `elite` and `item` on the timeline |
+| R3 Boss shields | `bossShield.enabled` | `data.js` `SHIELD`; `sim.js`: "Boss shields" section (`raiseShield`, `bombShield`), `shieldAt` in `spawnEnemy`, the shield/exposed lines in `damage`, `exposedT` in `updateEnemies`, the call in `explode`; `render.js` `drawShield`; `schema.js` `shield`, `shieldMax`, `exposedT`; sounds `shieldUp`, `shieldHit`, `shieldBreak` | `shields` per wave and in totals; `shield` on the timeline |
+| R3 Boss chests | `bossChest.enabled` | `data.js` `CHEST`, `PERKS`; `sim.js`: "Boss chests" section (`rollOffers`, `openChest`, `updateChest`, `applyPerk`), `chestDue` in `killEnemy`/`updateWaves`/`continueEndless`, the `s.chest` early return in `step`, perks in `catStats` and `teamPerk` (wear, aphids), `bombMax`; `render.js` `drawChest`, the bomb count in the HUD; `schema.js` `chest`, `perks`; `guest.js` (no prediction while a chest is open); `tools/bot.js` takes the first perk; sound `chest` | `perks` per wave (`[player, perk]`) and in totals; `perk` on the timeline |
 
 To remove one for good: set its switch to false and play, then delete the
 code listed (and its tests, `_help` entry and log fields), and bump

@@ -205,6 +205,11 @@ export const ELITES = { ...BAL.elites, enabled: !!BAL.elites?.enabled };
 export const ELITE_TRAITS = Object.keys(BAL.elites?.traits || {});
 export const ITEM_KINDS = Object.keys(BAL.elites?.items || {});
 
+// Boss shields and boss chests (IDEAS R3); each `enabled` can be flipped at runtime.
+export const SHIELD = { ...BAL.bossShield, enabled: !!BAL.bossShield?.enabled };
+export const CHEST = { ...BAL.bossChest, enabled: !!BAL.bossChest?.enabled };
+export const PERKS = Object.keys(BAL.bossChest?.perks || {});
+
 // Bloom abilities (IDEAS R1): what a flower of `type` can do at `lvl`
 // beyond its usual attack, or null. BLOOM.enabled can be flipped at runtime
 // (the tests do) to play without them.

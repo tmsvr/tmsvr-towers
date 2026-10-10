@@ -6,7 +6,7 @@
 import {
   T, U, VIEW_W, MAP_H, TOTAL_WAVES, MAPS, ENEMIES, INTROS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, GROW_TIME, FLOWER_HP, WEAR_PER_SEC, WEAR_MULT, HEAL_RATE, HEAL_COST,
-  POISON_TIME, START_COINS, LOADOUT_SIZE, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, bloomOf, ELITES,
+  POISON_TIME, START_COINS, LOADOUT_SIZE, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, bloomOf, ELITES, SHIELD, CHEST, PERKS,
 } from './data.js';
 import { prune, clamp, nextSeed, randomFrom } from './util.js';
 import * as log from './stats.js';
@@ -40,6 +40,7 @@ export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, l
     lives: DIFFICULTY.cottageHealth, maxLives: DIFFICULTY.cottageHealth, baseHitT: 0, lastAlarm: -99, players: [], flowers: [], enemies: [], drops: [], bombs: [], projs: [], clouds: [],
     fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, sharedScreen, map: m.index,
     items: [], // power-ups dropped by elites, waiting to be picked up
+    perks: {}, chest: null, chestDue: false, // boss chests: the team's perks, the open chest, one is owed
     seen: {}, // monster types met so far (each gets one warning banner)
   };
   const coins = startCoins(m, nPlayers);
@@ -53,6 +54,7 @@ export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, l
       loadout: null, pick: { row: 1, cursor: 0, chosen: (loadouts[i] || []).filter((t) => FLOWERS[t]).slice(0, LOADOUT_SIZE), ready: false },
       prevMx: 0, prevMy: 0, prevAtk: false,
       item: null, // the power-up this cat carries
+      perks: {}, // this cat's own perks from boss chests
     });
   }
   return s;
@@ -109,22 +111,26 @@ export function collideCat(m, p) {
   p.y = clamp(p.y, EDGE, m.worldH - EDGE);
 }
 
-// A cat's stats with its class applied.
+// A cat's stats with its class (and its perks from boss chests) applied.
 export function catStats(p) {
   const k = CATS[p.cat] || CATS[CAT_ORDER[0]];
+  const has = (id) => p.perks?.[id] || 0, perk = (id, key) => (CHEST.perks?.[id]?.[key] ?? 1) ** has(id);
   return {
     speed: PLAYER.speed * k.speed,
     atkDmg: PLAYER.atkDmg * k.batonDamage,
     atkCd: PLAYER.atkCd * k.batonCooldown,
     atkRange: PLAYER.atkRange * k.batonRange,
-    bombRecharge: PLAYER.bombRecharge * k.bombRecharge,
+    bombRecharge: PLAYER.bombRecharge * k.bombRecharge * perk('pouch', 'recharge'),
+    bombMax: PLAYER.bombMax + (CHEST.perks?.pouch?.bombs ?? 0) * has('pouch'),
     bombRadius: PLAYER.bombRadius * k.bombRadius,
     sprintSeconds: PLAYER.sprintSeconds * k.sprintSeconds,
     bombDmg: PLAYER.bombDmg * (k.bombDamage ?? 1),
-    grow: k.growSpeed,
-    price: k.upgradeCost ?? 1, // coins this cat pays per coin of upgrade or healing
+    grow: k.growSpeed * perk('paws', 'growSpeed'),
+    price: (k.upgradeCost ?? 1) * perk('thumb', 'price'), // coins this cat pays per coin of upgrade or healing
   };
 }
+// Team perks from boss chests: how much slower flowers wear, how much softer aphids bite.
+const teamPerk = (s, id, key) => (CHEST.perks?.[id]?.[key] ?? 1) ** (s.perks?.[id] || 0);
 
 export const healCostPerHp = (f) => (FLOWERS[f.type].cost * HEAL_COST) / FLOWER_HP;
 export const uprootRefund = (f) => Math.floor((f.spent || 0) * ECONOMY.uprootRefund);
@@ -172,7 +178,10 @@ export function spawnEnemy(s, type, from, path = 0) {
     psn: 0, psnT: 0, psnDps: 0, atBase: false, baseAng: rnd(s) * Math.PI * 2,
     burnT: 0, burnDps: 0, vulnT: 0, vuln: 0, // Bloom: Fire Lily's burning, Stinkbloom's weak spot
   });
-  if (!from) maybeElite(s, s.enemies[s.enemies.length - 1]);
+  const e = s.enemies[s.enemies.length - 1];
+  // boss shields (IDEAS R3): the health shares at which this boss will raise one
+  if (d.boss && SHIELD.enabled) { e.shieldAt = [...(s.wave >= TOTAL_WAVES ? SHIELD.atBig : SHIELD.at)]; e.shield = 0; e.shieldMax = 0; e.exposedT = 0; }
+  if (!from) maybeElite(s, e);
 }
 
 // ---- Elite monsters and power-ups (IDEAS R2) ----------------------------------
@@ -288,12 +297,41 @@ export function damage(s, e, amt, ignoreArmor = false, quiet = false, src = null
   // Stinkbloom's Bloom: monsters in its clouds take extra damage from everything
   const weak = e.vulnT > 0 ? hit * e.vuln : 0;
   hit += weak;
+  // a boss's shield soaks up everything but bombs; a broken one leaves it exposed
+  if (e.shield > 0 && !src?.startsWith('bomb')) hit *= 1 - SHIELD.block;
+  if (e.exposedT > 0) hit *= 1 + SHIELD.exposedDamage;
   const dealt = Math.min(hit, Math.max(0, e.hp));
   e.hp -= hit;
   if (!quiet) e.flash = 0.1;
   if (e.hp <= 0) killEnemy(s, e);
+  else if (e.shieldAt?.length && !(e.shield > 0) && e.hp <= e.maxhp * e.shieldAt[0]) raiseShield(s, e);
   log.logDamage(s, src, e, dealt, e.dead, fid, bloom);
   if (weak > 0) log.logBloomDamage(s, 'stink', Math.min(weak, dealt));
+}
+
+// ---- Boss shields (IDEAS R3) ------------------------------------------------------
+function raiseShield(s, e) {
+  e.shieldAt.shift();
+  e.shield = e.shieldMax = s.players.length > 1 ? SHIELD.hitsCoop : SHIELD.hitsSolo;
+  e.exposedT = 0;
+  banner(s, 'The boss raised a shield! Bomb it');
+  ev(s, 'shieldUp');
+  log.logShield(s, e, 'up');
+}
+
+// A bomb that hits a shielded boss knocks segments off (Boom's big ones more).
+function bombShield(s, e, b) {
+  const p = s.players[b.owner ?? 0];
+  e.shield = Math.max(0, e.shield - (SHIELD.catHits?.[p?.cat] ?? 1));
+  log.logShield(s, e, 'hit');
+  if (e.shield > 0) { ev(s, 'shieldHit'); return; }
+  e.exposedT = SHIELD.exposedSeconds;
+  e.stun = Math.max(e.stun, SHIELD.exposedSeconds); // the full stun, unlike other hits on a boss
+  e.chew = null;
+  banner(s, 'Shield broken! Hit it now!');
+  ev(s, 'shieldBreak');
+  ev(s, 'shake', { amt: 8 });
+  log.logShield(s, e, 'broken');
 }
 
 function killEnemy(s, e) {
@@ -318,6 +356,7 @@ function killEnemy(s, e) {
     ev(s, 'split');
   }
   if (e.elite) log.logEliteKilled(s);
+  if (e.def.boss && CHEST.enabled) s.chestDue = true; // the chest opens when the wave is over
   if (e.carry) { dropItem(s, e.carry, e.x, e.y); log.logItem(s, null, e.carry, 'dropped'); }
   // Drops shrink a little each wave, so bigger waves don't pay out ever more;
   // fractions round up by chance, so even 1-coin monsters drop less on average.
@@ -360,6 +399,7 @@ function updateEnemies(s, dt) {
       if (e.dead) continue;
     }
     if (e.vulnT > 0) e.vulnT -= dt;
+    if (e.exposedT > 0) e.exposedT -= dt;
     if (e.elite === 'regenerating' && !(e.psnT > 0) && !(e.burnT > 0)) e.hp = Math.min(e.maxhp, e.hp + e.maxhp * ELITES.traits.regenerating.perSecond * dt);
     if (e.kx || e.ky) {
       e.x += e.kx * dt; e.y += e.ky * dt;
@@ -402,7 +442,7 @@ function updateEnemies(s, dt) {
         else {
           e.chewT -= dt;
           e.wob += dt * 14;
-          hurtFlower(s, e.chew, e.def.eats.damagePerSecond * WEAR_MULT[e.chew.lvl] * dt, false, 'aphid'); // sturdier flowers shrug off bites
+          hurtFlower(s, e.chew, e.def.eats.damagePerSecond * WEAR_MULT[e.chew.lvl] * teamPerk(s, 'stems', 'aphids') * dt, false, 'aphid'); // sturdier flowers shrug off bites
           ev(s, 'chomp');
           if (e.chewT <= 0) { e.chew = null; e.chewCd = e.def.eats.cooldown; }
           continue;
@@ -543,6 +583,7 @@ function updateWaves(s, dt, ready) {
     log.logWaveEnd(s, 'cleared');
     banner(s, bonus > 0 ? `Wave cleared!  +${bonus} each` : 'Wave cleared!');
     ev(s, 'clear');
+    if (s.chestDue) openChest(s);
     if (s.endless) saveCheckpoint(s);
   }
 }
@@ -561,6 +602,7 @@ export function continueEndless(s) {
   log.resumeLog(s);
   banner(s, 'Endless mode: how far can you go?');
   ev(s, 'wave');
+  if (s.chestDue) openChest(s); // the last boss's chest
   saveCheckpoint(s);
 }
 
@@ -576,6 +618,62 @@ export function retryWave(s) {
   Object.assign(s, structuredClone(checkpoint), { m, checkpoint });
   banner(s, `Try wave ${s.wave + 1} again!`);
   ev(s, 'wave');
+}
+
+// ---- Boss chests (IDEAS R3) ---------------------------------------------------------
+// The game waits while each cat picks one of a few random perks.
+const perkCount = (s, p, id) => (CHEST.perks[id].team ? s.perks[id] : p.perks?.[id]) || 0;
+
+function rollOffers(s, p) {
+  const pool = PERKS.filter((id) => perkCount(s, p, id) < CHEST.maxEach && (id !== 'fourth' || p.loadout.length < FLOWER_ORDER.length));
+  const out = [];
+  while (out.length < CHEST.choices && pool.length) {
+    const id = pool.splice(Math.floor(rnd(s) * pool.length), 1)[0];
+    if (id !== 'fourth') { out.push(id); continue; }
+    const left = FLOWER_ORDER.filter((t) => !p.loadout.includes(t)); // the offer names the flower it adds
+    out.push(`fourth:${left[Math.floor(rnd(s) * left.length)]}`);
+  }
+  return out;
+}
+
+function openChest(s) {
+  s.chestDue = false;
+  const offers = s.players.map((p) => rollOffers(s, p));
+  if (offers.every((o) => !o.length)) return; // every perk taken as often as it can be
+  s.chest = { offers, cursor: s.players.map(() => 0), picked: offers.map((o) => (o.length ? null : '')) };
+  for (const p of s.players) { p.prevAtk = true; p.prevMx = 0; } // a baton held as the wave ends doesn't pick
+  ev(s, 'chest');
+}
+
+// Left/right moves along the cards; the plant or baton key takes one.
+function updateChest(s, inputs) {
+  const ch = s.chest;
+  for (const p of s.players) {
+    const i = p.id, inp = inputs[i] || {}, n = ch.offers[i].length;
+    const mx = Math.sign(inp.mx || 0), atkTap = inp.atk && !p.prevAtk;
+    p.prevAtk = !!inp.atk;
+    if (ch.picked[i] == null) {
+      if (mx && mx !== p.prevMx) { ch.cursor[i] = (ch.cursor[i] + mx + n) % n; ev(s, 'cycle'); }
+      if (inp.buildTap || atkTap) { ch.picked[i] = ch.offers[i][ch.cursor[i]]; ev(s, 'grown'); }
+    }
+    p.prevMx = mx;
+  }
+  if (ch.picked.some((x) => x == null)) return;
+  s.players.forEach((p, i) => { if (ch.picked[i]) applyPerk(s, p, ch.picked[i]); });
+  s.chest = null;
+  if (s.endless) saveCheckpoint(s); // a retried wave starts with the perks taken
+}
+
+// offer: a perk id, or 'fourth:<flower>'.
+export function applyPerk(s, p, offer) {
+  const [id, arg] = offer.split(':');
+  const P = CHEST.perks[id];
+  if (P.team) s.perks[id] = (s.perks[id] || 0) + 1;
+  else { p.perks ??= {}; p.perks[id] = (p.perks[id] || 0) + 1; }
+  if (id === 'roof') { s.maxLives += P.maxCottage; s.lives = Math.min(s.maxLives, s.lives + P.cottage); }
+  if (id === 'fourth' && FLOWERS[arg] && !p.loadout.includes(arg)) p.loadout.push(arg);
+  text(s, p.x, p.y - T * 0.8, `${P.name}!`, '#ffe27a');
+  log.logPerk(s, p, offer);
 }
 
 // ---- Players --------------------------------------------------------------
@@ -629,6 +727,7 @@ function explode(s, b) {
   for (const e of s.enemies) {
     if (!hittable(e)) continue;
     if (Math.hypot(e.x - b.tx, e.y - b.ty) <= R + e.def.r) {
+      if (e.shield > 0) bombShield(s, e, b);
       damage(s, e, b.dmg ?? PLAYER.bombDmg, true, false, `bomb P${(b.owner ?? 0) + 1}`);
       applyStun(e, PLAYER.bombStun);
       hits++;
@@ -804,7 +903,7 @@ function updatePlayers(s, dt, inputs) {
     p.working = null;
     p.healing = false;
     const had = p.bombs;
-    p.bombs = Math.min(PLAYER.bombMax, p.bombs + dt / catStats(p).bombRecharge);
+    p.bombs = Math.min(catStats(p).bombMax, p.bombs + dt / catStats(p).bombRecharge);
     if (had < 1 && p.bombs >= 1) ev(s, 'bombReady');
     if (inp.ready) ready = true;
     if (!moveCat(s, p, inp, dt)) continue;
@@ -861,7 +960,7 @@ function updateFlowers(s, dt) {
     if (f.lvl === 0) continue; // seedlings don't fight
     // Every flower wears out at the same steady pace while a wave is on,
     // whatever its range or fire rate; higher levels wear slower, max never.
-    if (s.phase === 'wave' && f.wet !== s.wave) hurtFlower(s, f, WEAR_PER_SEC * WEAR_MULT[f.lvl] * dt, true, 'wear'); // a watering can stops it for a wave
+    if (s.phase === 'wave' && f.wet !== s.wave) hurtFlower(s, f, WEAR_PER_SEC * WEAR_MULT[f.lvl] * teamPerk(s, 'roots', 'wear') * dt, true, 'wear'); // a watering can stops it for a wave
     if (f.sunT > 0) f.sunT -= dt;
     if (f.dead) continue;
     f.cd -= dt;
@@ -1125,6 +1224,7 @@ function updatePick(s, inputs) {
 export function step(s, inputs, dt) {
   if (s.phase === 'pick') { updatePick(s, inputs); return; }
   if (s.over || s.won) return;
+  if (s.chest) { updateChest(s, inputs); return; } // everything waits for the picks
   s.t += dt;
   s.baseHitT = Math.max(0, s.baseHitT - dt);
   const ready = updatePlayers(s, dt, inputs);

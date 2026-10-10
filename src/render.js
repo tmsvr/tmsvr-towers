@@ -11,7 +11,7 @@
 import {
   T, U, VIEW_W, MAP_H, HUD_H, TOTAL_WAVES, MAPS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, GLOBAL_RANGE, ENEMIES, INTROS,
-  BLOOM, bloomOf, ELITES,
+  BLOOM, bloomOf, ELITES, CHEST,
 } from './data.js';
 import { tileOf, canBuildAt, uprootRefund, catStats, plantPrice, upgradeLeft, healLeft } from './sim.js';
 import { isMuted } from './audio.js';
@@ -1248,7 +1248,24 @@ function drawEnemy(c, e, time) {
     rrect(c, bx - 1.5, by - 1.5, w + 3, 7, 3, OUT);
     rrect(c, bx, by, Math.max(0, w * (e.hp / e.maxhp)), 4, 2, e.psn > 0 ? '#a6e04a' : e.hp / e.maxhp > 0.4 ? '#6be06b' : '#ff6a5a');
   }
+  if (e.shield > 0 || e.exposedT > 0) drawShield(c, e, e.x, e.y + hop, r, time);
   if (e.elite) label(c, `★ ${ELITE_WORD[e.elite] || e.elite}`, e.x, e.y + hop - r - (e.type === 'boss' ? r * 0.85 : 12) - 10, 10, ELITE_COLOR[e.elite] || '#ffe27a', 'center', 700);
+}
+
+// A boss's shield (IDEAS R3): a bubble ringed with one segment per bomb hit
+// it can still take; once broken, a red flicker while it's exposed.
+function drawShield(c, e, x, y, r, time) {
+  const R = r + 12;
+  if (e.shield > 0) {
+    circle(c, x, y, R, `rgba(140,200,255,${0.18 + Math.sin(time * 4) * 0.05})`, `rgba(190,230,255,0.7)`, 2);
+    const n = e.shieldMax || 1, gap = 0.12;
+    for (let i = 0; i < n; i++) {
+      const a0 = -Math.PI / 2 + (i * Math.PI * 2) / n + gap, a1 = -Math.PI / 2 + ((i + 1) * Math.PI * 2) / n - gap;
+      c.beginPath(); c.arc(x, y, R + 5, a0, a1);
+      c.strokeStyle = OUT; c.lineWidth = 7; c.stroke();
+      c.strokeStyle = i < e.shield ? '#9fd8ff' : 'rgba(255,255,255,0.15)'; c.lineWidth = 4; c.stroke();
+    }
+  } else if (Math.floor(time * 10) % 2) circle(c, x, y, R - 4, null, '#ff5a4a', 3);
 }
 
 // ---- power-ups (IDEAS R2) ----------------------------------------------------------
@@ -1749,6 +1766,7 @@ function drawHud(c, s, time, ui) {
       circle(c, bx, by, 13, `rgba(255,179,71,${0.5 + Math.sin(time * 5) * 0.2})`);
     }
     circle(c, bx, by + 1, 7, '#2b2b33', OUT, 1.5);
+    if (catStats(p).bombMax > 1) label(c, `${Math.floor(p.bombs)}`, bx + 12, by - 11, 11, '#ffe27a', 'center', 700); // a bomb pouch holds more
     c.strokeStyle = '#c9a26b'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(bx + 3, by - 4); c.lineTo(bx + 6, by - 8); c.stroke();
     // stamina bar under the bomb
     rrect(c, bx - 16, by + 18, 32, 6, 3, 'rgba(0,0,0,0.45)');
@@ -1927,6 +1945,41 @@ function drawPick(c, s, ui, time) {
     label(c, `P${p.id + 1}`, VIEW_W / 2 - 344, y + 0.5, 12, '#fff', 'center', 700, null);
     label(c, fitText(c, msg, 700, 14, 600), VIEW_W / 2 - 318, y + 1, 14, p.pick.ready ? '#8dff9a' : '#e8f1f7', 'left', 600, null);
   });
+}
+
+// The boss chest (IDEAS R3): each cat's perk cards side by side.
+function drawChest(c, s, ui, time) {
+  const ch = s.chest;
+  c.fillStyle = 'rgba(12,18,26,0.72)'; c.fillRect(0, 0, VIEW_W, MAP_H);
+  label(c, 'Boss chest!', VIEW_W / 2, 52, 36, '#ffe27a', 'center', 700, OUT);
+  label(c, 'Each cat takes one perk for the rest of the run', VIEW_W / 2, 86, 15, '#cfe0ea', 'center', 500, null);
+  const n = s.players.length, colW = VIEW_W / n;
+  s.players.forEach((p, i) => {
+    const offers = ch.offers[i] || [], picked = ch.picked[i], cx = colW * (i + 0.5), pc = PLAYER.scarves[i];
+    label(c, `P${i + 1}`, cx, 122, 16, pc, 'center', 700, OUT);
+    if (!offers.length) { label(c, 'Nothing left to take', cx, 230, 15, '#8fa5b3', 'center', 500, null); return; }
+    const cw = Math.min(150, (colW - 40) / offers.length - 10), x0 = cx - (offers.length * (cw + 10) - 10) / 2;
+    offers.forEach((offer, j) => {
+      const [id, arg] = offer.split(':'), P = CHEST.perks[id] || {};
+      const x = x0 + j * (cw + 10), y = 140, h = 190, on = ch.cursor[i] === j, took = picked === offer;
+      const dim = picked != null && !took;
+      c.globalAlpha = dim ? 0.35 : 1;
+      rrect(c, x, y, cw, h, 14, took ? 'rgba(141,255,154,0.16)' : on ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.06)', took ? '#8dff9a' : on ? pc : 'rgba(255,255,255,0.18)', on || took ? 3 : 1.5);
+      if (id === 'fourth' && FLOWERS[arg]) { c.save(); c.translate(x + cw / 2, y + 38); c.scale(1.2, 1.2); drawHead(c, arg); c.restore(); }
+      else label(c, P.icon || '★', x + cw / 2, y + 40, 30, '#fff', 'center', 600, null);
+      const name = id === 'fourth' && FLOWERS[arg] ? `+ ${FLOWERS[arg].name}` : P.name || id;
+      label(c, fitText(c, name, cw - 12, 14, 700), x + cw / 2, y + 82, 14, '#ffe27a', 'center', 700, null);
+      wrapText(c, P.desc || '', cw - 16, 11.5).slice(0, 4).forEach((l, k) => label(c, l, x + cw / 2, y + 106 + k * 15, 11.5, '#dce7ef', 'center', 500, null));
+      const have = (P.team ? s.perks?.[id] : p.perks?.[id]) || 0;
+      if (have) label(c, `have ${have}${P.team ? ' (team)' : ''}`, x + cw / 2, y + h - 14, 11, '#8fa5b3', 'center', 500, null);
+      c.globalAlpha = 1;
+    });
+    if (picked != null) label(c, 'Picked!', cx, 352, 15, '#8dff9a', 'center', 700, null);
+  });
+  const k = (id) => ui.keyLabel(ui.keysFor(id).build), a = (id) => ui.keyLabel(ui.keysFor(id).atk);
+  const keys = ui.mode() === 'local' && n > 1 ? `P1: A/D, ${k(0)} or ${a(0)} · P2: ←/→, ${k(1)} or ${a(1)}` : `←/→ to choose · ${k(0)} or ${a(0)} to take it`;
+  label(c, keys, VIEW_W / 2, MAP_H - 40, 15, '#fff', 'center', 600, null);
+  if (ch.picked.some((x) => x != null) && ch.picked.some((x) => x == null)) label(c, 'Waiting for the other cat…', VIEW_W / 2, MAP_H - 18, 13, '#a9bccb', 'center', 500, null);
 }
 
 function drawOverlay(c, title, sub, col) {
@@ -2227,6 +2280,7 @@ export function render(c, s, ui) {
     label(c, txt, 32, 20.5, 13, '#e8f1f7', 'left', 600, null);
   }
   if (s.phase === 'pick' && !ui.disconnected) drawPick(c, s, ui, time);
+  if (s.chest && !ui.disconnected) drawChest(c, s, ui, time);
   if (ui.guide != null) drawGuide(c, time, ui.guide);
   if (ui.disconnected) drawOverlay(c, 'Disconnected', ['The connection to the host was lost', 'Esc: back to menu'], '#ff7a6a');
   else if (ui.paused) drawOverlay(c, 'Paused', ['P or Esc: resume', 'R: restart this map  ·  M: back to the menu  ·  S: save the game'], '#ffffff');

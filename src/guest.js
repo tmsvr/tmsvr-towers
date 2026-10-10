@@ -21,7 +21,7 @@ export function createGuestLink({ sample, dropTaps }) {
       const fr = newestFrame(s);
       if (!fr) return;
       const g = fr.game, m = MAPS[g.map];
-      const canMove = g.phase !== 'pick' && !g.over && !g.won && !fr.paused;
+      const canMove = g.phase !== 'pick' && !g.over && !g.won && !fr.paused && !g.chest; // the host's game waits during a boss chest
       if (fr.seq !== pred.baseSeq) {
         pred.baseSeq = fr.seq;
         const me = fr.byId.players.get(1);
