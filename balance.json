@@ -63,7 +63,7 @@
   "economy": {
     "startCoinsSolo": 70,
     "startCoinsCoop": 50,
-    "coinDropMultiplier": 1.2,
+    "coinDropMultiplier": 1.0,
     "coinFadePerWave": 0.07,
     "coinFadeMin": 0.4,
     "waveBonusBase": 0,
@@ -233,7 +233,7 @@
     "aphid":    { "hp": 28,   "speed": 1.95, "coins": 2,  "bite": 2, "size": 0.23, "armor": 0, "light": true, "eats": { "damagePerSecond": 3, "chewSeconds": 2.5, "cooldown": 6, "reach": 1.25 } },
     "woolly":   { "hp": 30,   "speed": 2.75, "coins": 2,  "bite": 2, "size": 0.27, "armor": 0, "unslowable": true },
     "hopper":   { "hp": 30,   "speed": 1.8,  "coins": 3,  "bite": 2, "size": 0.25, "armor": 0, "light": true, "dash": { "every": 2.2, "duration": 0.6, "speedMultiplier": 3.4, "leap": true } },
-    "charger":  { "hp": 90,   "speed": 1.3,  "coins": 5,  "bite": 3, "size": 0.34, "armor": 2, "poisonImmune": true, "enrage": { "maxSpeedMultiplier": 2.6 } },
+    "charger":  { "hp": 90,   "speed": 1.3,  "coins": 5,  "bite": 3, "size": 0.34, "armor": 2, "enrage": { "maxSpeedMultiplier": 2.6 } },
     "hive":     { "hp": 150,  "speed": 1.05, "coins": 7,  "bite": 4, "size": 0.43, "armor": 1, "spawns": { "type": "swarm", "every": 4.5, "count": 2 } },
     "boss":     { "hp": 800,  "speed": 0.98, "coins": 40, "bite": 8,  "size": 0.6,  "armor": 3, "boss": true, "spawns": { "type": "grunt", "every": 6, "count": 2 } }
   },
@@ -253,7 +253,7 @@
     "wasp":     ["Wasps!", "Fast flyers in packs. Only Daisy, Fire Lily and Sunflower can hit them"],
     "woolly":   ["Woolly bears!", "Thick fur: Frostbloom can't slow them. Hit them hard and early"],
     "hopper":   ["Grasshoppers!", "They leap over ground flowers. Daisy and Fire Lily hit them mid-air"],
-    "charger":  ["Stag beetles!", "Poison-proof shells, and they run faster when hurt. Snapdragon, Fire Lily and Sunflower crack them"],
+    "charger":  ["Stag beetles!", "Armoured, and they run faster when hurt. Stinkbloom poison seeps through; Snapdragon, Fire Lily and Sunflower crack them"],
     "boss":     ["The boss!", "Huge and armoured: small hits do little. Sunflower and Snapdragon bite through"]
   },
 

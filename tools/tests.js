@@ -263,13 +263,14 @@ test('Monsters', 'Snapdragon bites only a small share off a boss', () => {
   near(before - boss.hp, st.dmg + boss.maxhp * st.bossMaxHpBite - ENEMIES.boss.armor, 0.01, 'one bite');
 });
 
-test('Monsters', 'stag beetles shrug off poison; grunts don\'t', () => {
+test('Monsters', 'poison gets through armour; poison-immune monsters shrug it off', () => {
   const { s, road } = flowerByRoad('stink');
   const grunt = monsterOn(s, 'grunt', road), beetle = monsterOn(s, 'charger', road);
   grunt.hp = grunt.maxhp = beetle.hp = beetle.maxhp = 1e6; // keep both alive
-  hold(s, [grunt, beetle], road, 4);
-  ok(grunt.psn > 0, 'the grunt was not poisoned');
-  eq(beetle.psn, 0, 'stag beetle poison stacks');
+  ENEMIES.grunt.poisonImmune = true; // no monster is immune right now, so borrow the grunt
+  try { hold(s, [grunt, beetle], road, 4); } finally { delete ENEMIES.grunt.poisonImmune; }
+  ok(beetle.psn > 0, 'the armoured stag beetle was not poisoned');
+  eq(grunt.psn, 0, 'poison stacks on an immune monster');
 });
 
 test('Monsters', 'Thornrose hits flyers', () => {
