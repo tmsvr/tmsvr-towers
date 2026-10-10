@@ -53,11 +53,12 @@ Claude Code users: `.claude/launch.json` defines this server as `towers`
 | `src/host.js` / `src/guest.js` | Each side of an online game (host-authoritative) |
 | `src/snapshot.js` | Host builds snapshots; guest interpolates between them |
 | `src/predict.js` | Guest-side prediction of its own cat, reconciled with the host |
+| `src/save.js` | Saved games (S on the pause screen, O on the menu): the whole state as JSON, keeping shared references (`$id`/`$ref`) and naming shared data (monster types, maps) |
 | `src/util.js` | Seeded RNG, `clamp`, small helpers |
 | `tools/bot.js` | Autopilot that plays whole games through the real sim |
 | `tools/balance-test.html` | UI for running the autopilot over many seeds and maps |
 | `tools/gallery.html` | Every flower at every level, every cat (standing and swinging) and every monster, drawn with the real render code. `?zoom=5` for close-ups |
-| `tools/tests.html`, `tools/tests.js` | The test suite: prices, maps, monsters, whole autopilot games, online encoding, drawing. Runs in the browser |
+| `tools/tests.html`, `tools/tests.js` | The test suite: prices, maps, monsters, endless mode, whole autopilot games, saved games, online encoding, drawing. Runs in the browser |
 | `tools/maps.html` | Every map from `maps.json` drawn whole with the real render code (roads, ponds, bridges, scatter, cottage, entrances) |
 | `serve.py` | No-cache local server |
 | `.nojekyll` | Tells GitHub Pages to serve files untouched |
@@ -88,7 +89,13 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
   slow). Online, the top-left label shows ping and frame rate. Caches (map background,
   sprite heads) are keyed by that scale (`ui.dpr`).
 - **Game phases.** Menu → pick screen (`s.phase === 'pick'`: map, cat, 3
-  flowers per player) → waves → won/over overlay.
+  flowers per player) → waves → won/over overlay. After a win, C carries on
+  into endless mode (`continueEndless`): wave 11 is a smaller breather, then
+  waves barely grow in number while health and boss count climb
+  (`breatherWaveSize`, `endless*` in `balance.json → difficulty`).
+- **Saved games.** S on the pause screen downloads the whole state
+  (`save.js`); O on the menu loads it, paused. A loaded game is just a state,
+  so it carries on exactly as it would have (the tests check this).
 
 ### Online play
 
@@ -103,6 +110,15 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
   run the same deploy** (hard reload after an update).
 - **If you change what a snapshot or input contains** (`schema.js` field
   lists), **bump `PROTOCOL`**.
+- **Back to the menu together.** Leaving a game (pause → M, or Esc on the
+  end screen) sends `{t: 'menu'}` and both sides go to the main menu still
+  connected (`ui.online`). There 3 or Enter starts a new game (the guest sends
+  `again`, the host answers `start` and the guest makes a fresh input link);
+  Esc or another mode leaves. The guest ignores snapshots until `start`, since
+  the old game's may still be arriving.
+- **Saves online** are made and loaded by the host. A loaded online save
+  either resumes at once (partner still connected) or opens a room and
+  resumes when P2 joins (`pendingSave`).
 
 ## Common changes
 
@@ -127,8 +143,12 @@ Check changes like this:
    modules: every price shown matches what each cat pays (planting, upgrades,
    half-paid levels, healing, digging), maps are well formed and every road
    is reachable on foot, monster rules (frost-proof, leaping, enrage, ranged
-   arrival waves), the same seed gives the same game, the autopilot plays every
-   map, snapshots and inputs survive encoding, and the screens draw. Add a
+   arrival waves, Snapdragon bites), endless mode (breather, wave size, extra
+   health and bosses, retrying a wave), the same seed gives the same game, the
+   autopilot plays every map, a game saved mid-wave and loaded plays on exactly
+   like the original, snapshots and inputs survive encoding, and the screens
+   draw. The online menu flow lives in `main.js` (DOM), so check it by hand
+   (step 6). Add a
    test next to similar ones when you change a rule; a new map is covered
    automatically.
 2. **Run it**: `python3 serve.py`, play a few waves (solo is quickest: press 1).
@@ -148,7 +168,10 @@ Check changes like this:
    This is the main source for balance decisions; online, only the host has
    it. `runBot()` returns the same log as `game`.
 6. **Online**: open two browser windows; host with 3, join with 4 using the
-   room code. Test with the same build in both.
+   room code. Test with the same build in both. When touching the menu or
+   saves, also check: pause → M takes both to the menu still connected, 3
+   there starts a new game for both, and an online save loaded by the host
+   brings the guest back in.
 
 Useful console checks (modules can be imported directly):
 
@@ -172,7 +195,7 @@ d.plantCost('thorn'); d.upgradeCost('thorn', 4);
 - **Code style**: modern JS (ES2022, top-level await), 2-space indent, single
   quotes, semicolons, compact one-line helpers. Comments explain *why* and
   game intent in plain language; match the density of the surrounding code.
-- **Keep the sim pure**: no DOM, canvas, audio or `Math.random()` in `sim.js`.
+- **Keep the sim pure**: no DOM, canvas, audio or `Math.random()` in `sim.js`. Keep the state plain data (objects, arrays, Maps, Sets, numbers, strings) so saved games work; a new kind of shared game data the state points at needs a name in `save.js` (`constants`).
 - **Numbers belong in JSON**, not in code, whenever someone might want to tune
   them; document new fields in the JSON `_help` section.
 - **Commits**: one meaningful change per commit, imperative summary line

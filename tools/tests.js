@@ -11,6 +11,7 @@ import { encodeSnapshot, encodeInputs, decodeFast } from '../src/schema.js';
 import { gameSummary } from '../src/stats.js';
 import { render } from '../src/render.js';
 import { runBot } from './bot.js';
+import { saveGame, loadGame } from '../src/save.js';
 
 const DT = 1 / 60;
 const tests = [];
@@ -253,6 +254,15 @@ test('Monsters', 'Snapdragon bites off a share of a big monster\'s max health', 
   near(before - tank.hp, st.dmg + tank.maxhp * st.maxHpBite - ENEMIES.tank.armor, 0.01, 'one bite');
 });
 
+test('Monsters', 'Snapdragon bites only a small share off a boss', () => {
+  const { s, f, road } = flowerByRoad('snap');
+  const boss = monsterOn(s, 'boss', road), before = boss.hp;
+  for (let i = 0; i < 120 && boss.hp === before; i++) hold(s, [boss], road, 1 / 60);
+  const st = flowerStats('snap', f.lvl);
+  ok(st.bossMaxHpBite < st.maxHpBite, 'bosses lose a smaller share');
+  near(before - boss.hp, st.dmg + boss.maxhp * st.bossMaxHpBite - ENEMIES.boss.armor, 0.01, 'one bite');
+});
+
 test('Monsters', 'stag beetles shrug off poison; grunts don\'t', () => {
   const { s, road } = flowerByRoad('stink');
   const grunt = monsterOn(s, 'grunt', road), beetle = monsterOn(s, 'charger', road);
@@ -361,6 +371,14 @@ test('Endless', 'later endless waves stay small but bring more bosses', () => {
   ok(w20.size < w12.size * 1.6, `wave 20 has ${w20.size} monsters, wave 12 ${w12.size}`);
 });
 
+test('Endless', 'monsters after the breather get extra health each wave', () => {
+  const s = wonGame(), D = BALANCE.difficulty;
+  const gruntIn = (n) => { s.wave = n; sim.spawnEnemy(s, 'grunt', null, 0); return s.enemies.at(-1).maxhp; };
+  const base = (n) => 1 + (n - 1) * D.hpPerWave + (n - 1) ** 2 * D.hpPerWaveSquared;
+  const n = TOTAL_WAVES + 10, extra = 1 + D.endlessHpPerWave * (n - TOTAL_WAVES - 1);
+  near(gruntIn(n) / gruntIn(TOTAL_WAVES + 1), (base(n) / base(TOTAL_WAVES + 1)) * extra, 1e-9, 'wave 20 grunt vs wave 11 grunt');
+});
+
 test('Endless', 'a lost endless wave can be retried from the break before it', () => {
   const s = wonGame();
   sim.continueEndless(s);
@@ -406,6 +424,34 @@ test('Games', 'the end screen summary adds up', () => {
   for (const f of S.flowers) eq(f.dmg, Math.round(r.game.totals.damage[f.type] || 0), `${f.type} damage`);
   const fromFlowers = r.game.flowers.reduce((a, f) => a + f.dmg, 0);
   near(S.cats.reduce((a, c) => a + c.garden, 0), fromFlowers, 2, 'flower damage split between the cats');
+});
+
+// ---- saved games ------------------------------------------------------------------
+test('Saves', 'a game saved mid-wave and loaded plays on exactly like the original', () => {
+  const s = game({ cats: ['bomber', 'gardener'], loadout: ['daisy', 'thorn', 'frost'] });
+  const [boom, fern] = s.players;
+  const spots = [...s.m.pathTiles].flatMap((k) => [[1, 0], [0, 1], [-1, 0], [0, -1]].map(([dx, dy]) => [k % s.m.W + dx, Math.floor(k / s.m.W) + dy]))
+    .filter(([x, y]) => sim.canBuildAt(s, x, y)).filter((v, i, all) => all.findIndex((w) => w[0] === v[0] && w[1] === v[1]) === i);
+  for (let i = 0; i < 6; i++) growOnce(s, boom, plant(s, boom, spots[i * 5], i % 2 ? 'thorn' : 'daisy'));
+  const f = plant(s, fern, spots[31], 'daisy');
+  tick(s, { ready: true });
+  for (let i = 0; i < 900; i++) tick(s, { build: true }, fern.id); // Fern is mid-grow, monsters and seeds are about
+  ok(s.enemies.length && s.projs.length, 'no monsters or seeds in flight to save');
+  const json = JSON.stringify(saveGame(s, 'local'));
+  const { state: c, mode, sameVersion } = loadGame(JSON.parse(json));
+  ok(mode === 'local' && sameVersion, 'mode and version');
+  ok(c.m === s.m && c.enemies.every((e) => e.def === ENEMIES[e.type]), 'map and monster types are the shared ones');
+  ok(c.flowers.every((g) => c.grid.get(g.ty * c.m.W + g.tx) === g), 'the grid points at the loaded flowers');
+  ok(c.projs.every((pr) => !pr.target || c.enemies.includes(pr.target)), 'seeds chase the loaded monsters');
+  for (const g of [s, c]) for (let i = 0; i < 1800; i++) tick(g, i < 200 ? { build: true } : {}, fern.id);
+  ok(f.lvl > 0, 'growing went on');
+  eq(JSON.stringify(saveGame(c, 'local').state), JSON.stringify(saveGame(s, 'local').state), 'the two games');
+});
+
+test('Saves', 'other files are refused', () => {
+  let msg = '';
+  try { loadGame({ games: [] }); } catch (e) { msg = e.message; }
+  ok(/not a Petal Patrol save/.test(msg), `got "${msg}"`);
 });
 
 // ---- online -----------------------------------------------------------------------

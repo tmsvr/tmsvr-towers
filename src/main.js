@@ -14,6 +14,7 @@ import { applySnapshot, applyEffects, interpolate, newGuestState } from './snaps
 import { decodeFast, PROTOCOL } from './schema.js';
 import { createHostLink } from './host.js';
 import { createGuestLink } from './guest.js';
+import { saveGame, loadGame } from './save.js';
 import { spawnEffect, spawnTrails, updateEffects, resetEffects } from './fx.js';
 import { MAPS, MAP_H, DATA_HASH, FLOWER_ORDER, LOADOUT_SIZE } from './data.js';
 
@@ -55,7 +56,7 @@ let roomCode = '';
 const ui = {
   cam: { x: 0, y: 0, snap: true },
   menuMap: MAPS[0], // the map behind the menu: the last one played
-  paused: false, shake: 0, dpr: 0, fps: 60, keys: KEYS, netLabel: '', disconnected: false, guide: null,
+  paused: false, shake: 0, dpr: 0, fps: 60, keys: KEYS, netLabel: '', disconnected: false, guide: null, online: null,
   // Online, each person plays with the P1 layout on their own keyboard.
   keysFor: (pid) => (mode === 'local' ? KEYS[pid] : KEYS[0]),
   keyLabel: (code) => DEFAULT_LABELS[code] || code.replace(/^Key|^Digit/, ''),
@@ -122,13 +123,18 @@ addEventListener('keydown', (e) => {
   // Esc in a game pauses (and resumes); M in the pause menu leaves. After the
   // game, before it starts online, or once disconnected, Esc leaves at once.
   if (code === 'Escape') {
-    if (mode === 'menu') return;
+    if (mode === 'menu') { if (ui.online) { leaveOnline(); flashNote('Left the online game'); } return; }
     if (state && !state.over && !state.won && !ui.disconnected) togglePause();
     else backToMenu();
     return;
   }
   if (code === 'KeyM' && ui.paused && mode !== 'menu') { backToMenu(); return; }
+  if (code === 'KeyS' && ui.paused && mode !== 'menu') { saveToFile(); return; }
   if (mode === 'menu') {
+    // still connected after a game: 3 or Enter plays again together, any other mode leaves
+    if (ui.online && (code === 'Digit3' || code === 'Numpad3' || code === 'Enter')) { playAgainOnline(); return; }
+    if (ui.online && /^(Digit|Numpad)[124]$/.test(code)) leaveOnline();
+    if (code === 'KeyO') openSaveFile();
     if (code === 'Digit1' || code === 'Numpad1') startLocal(1);
     if (code === 'Digit2' || code === 'Numpad2') startLocal(2);
     if (code === 'Digit3' || code === 'Numpad3') startHost();
@@ -184,12 +190,16 @@ function downloadLogs() {
     logs.push({ ...currentLog(state), result: { how: 'in progress', wave: state.wave, cottage: Math.round(state.lives), kills: state.kills, seconds: Math.round(state.t) } });
   }
   if (!logs.length) { flashNote(mode === 'guest' ? 'The host has the game log' : 'No games logged yet'); return; }
+  downloadJson(JSON.stringify({ games: logs }, null, 1), 'log');
+  flashNote(`Downloaded ${logs.length} game log${logs.length > 1 ? 's' : ''}`);
+}
+const fileStamp = () => new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+function downloadJson(text, what) {
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify({ games: logs }, null, 1)], { type: 'application/json' }));
-  a.download = `petal-patrol-log-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.json`;
+  a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  a.download = `petal-patrol-${what}-${fileStamp()}.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  flashNote(`Downloaded ${logs.length} game log${logs.length > 1 ? 's' : ''}`);
 }
 function flashNote(txt) { ui.note = { txt, until: performance.now() + 2500 }; }
 
@@ -226,12 +236,73 @@ function retry() {
   resetEffects();
 }
 
+// ---- saved games ---------------------------------------------------------------
+// S on the pause screen downloads the whole game as a file; O on the main menu
+// loads one and carries on paused. Online games are saved and loaded by the
+// host, and a loaded online game starts once P2 is connected.
+let pendingSave = null; // an online save waiting for P2 to join
+function saveToFile() {
+  if (mode === 'guest') { flashNote('The host can save the game'); return; }
+  const how = mode === 'host' ? 'online' : nPlayers > 1 ? 'local' : 'solo';
+  downloadJson(JSON.stringify(saveGame(state, how)), `save-${state.m.id}-wave${state.wave}`);
+  flashNote('Game saved: load it from the main menu with O');
+}
+
+function openSaveFile() {
+  if (ui.online === 'guest') { flashNote('The host can load a saved game'); return; }
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,application/json';
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    let save;
+    try { save = loadGame(JSON.parse(await file.text())); } catch (e) { flashNote(`Couldn't load that file: ${e.message}`); return; }
+    if (mode === 'menu') startSaved(save);
+  };
+  input.click();
+}
+
+function startSaved({ state: s, mode: how, sameVersion }) {
+  if (how === 'online' && ui.online === 'host') { // P2 is still here: straight back in
+    ui.online = null;
+    mode = 'host';
+    nPlayers = 2;
+    host.reset();
+    net.send({ t: 'start' });
+    resumeGame(s);
+  } else if (how === 'online') {
+    if (ui.online) leaveOnline();
+    pendingSave = s;
+    startHost();
+  } else {
+    if (ui.online) leaveOnline();
+    mode = 'local';
+    nPlayers = s.players.length;
+    resumeGame(s);
+  }
+  if (!sameVersion) flashNote('Saved with another version of the game: some numbers may have changed');
+}
+
+function resumeGame(s) {
+  state = s;
+  lastLoadouts = s.players.map((p) => p.loadout || p.pick.chosen); lastCats = s.players.map((p) => p.cat); lastMap = s.map;
+  ui.cam.snap = true;
+  ui.paused = true; // everyone gets their hands on the keys first
+  ui.summary = null;
+  resetEffects();
+  flashNote('Game loaded: P or Esc to carry on');
+}
+
 function startLocal(n) { mode = 'local'; nPlayers = n; newGame(); }
 
+// Leaving a game online keeps the connection: both players go back to the
+// main menu together and can start another game from there.
 function backToMenu() {
+  const together = net?.connected && ((mode === 'host' && guestOk) || (mode === 'guest' && !ui.disconnected));
+  if (together) { net.send({ t: 'menu' }); menuTogether(); return; }
   saveGameLog('quit');
-  if (net) net.close();
-  net = null;
+  leaveOnline();
   mode = 'menu';
   state = null;
   resetEffects();
@@ -241,6 +312,42 @@ function backToMenu() {
   ui.disconnected = false;
   hideLobby();
   canvas.focus();
+}
+
+function menuTogether(note) {
+  saveGameLog('quit');
+  if (mode === 'host' && state?.players) { lastLoadouts = state.players.map((p) => p.loadout || p.pick.chosen); lastCats = state.players.map((p) => p.cat); lastMap = state.map; }
+  ui.online = mode === 'host' ? 'host' : 'guest';
+  awaitingStart = ui.online === 'guest'; // snapshots of the old game may still be on the way
+  mode = 'menu';
+  state = null;
+  resetEffects();
+  ui.paused = false;
+  ui.summary = null;
+  hideLobby();
+  canvas.focus();
+  if (note) flashNote(note);
+}
+
+// From the menu together: the host starts the next game; the guest asks it to.
+function playAgainOnline() {
+  if (ui.online === 'guest') { net.send({ t: 'again' }); flashNote('Starting…'); return; }
+  ui.online = null;
+  mode = 'host';
+  nPlayers = 2;
+  host.reset();
+  net.send({ t: 'start' });
+  newGame();
+}
+
+function leaveOnline() {
+  if (net) net.close();
+  net = null;
+  ui.online = null;
+  ui.netLabel = '';
+  guestOk = false;
+  awaitingStart = false;
+  pendingSave = null;
 }
 
 function showLobby(html) { lobby.innerHTML = html; lobby.hidden = false; }
@@ -259,14 +366,19 @@ function startHost() {
       const share = isLocalhost
         ? '<p class="hint">Your friend needs their own copy of the game (or put it online, e.g. GitHub Pages), then presses <b>4</b> and enters the code.</p>'
         : `<p><button id="copy">Copy invite link</button></p><p class="hint">…or they open the game, press <b>4</b> and enter the code.</p>`;
-      showLobby(`<h2>Waiting for player 2…</h2><p>Room code</p><div class="code">${code}</div>${share}<p class="hint">Esc to cancel</p>`);
+      const resume = pendingSave ? `<p>Your saved game (${esc(pendingSave.m.name)}, wave ${pendingSave.wave}) carries on once they join.</p>` : '';
+      showLobby(`<h2>Waiting for player 2…</h2><p>Room code</p><div class="code">${code}</div>${resume}${share}<p class="hint">Esc to cancel</p>`);
       const btn = document.getElementById('copy');
       if (btn) btn.onclick = () => navigator.clipboard.writeText(link).then(() => { btn.textContent = 'Copied!'; });
     },
     // The guest introduces itself first (see onGuestMessage); nothing starts until then.
     onConnect: () => { guestOk = false; },
     onData: (m) => onGuestMessage(m instanceof ArrayBuffer ? decodeFast(m) : m),
-    onClose: () => { if (!guestOk) return; guestOk = false; host.reset(); ui.netLabel = `P2 disconnected — they can rejoin with code ${roomCode}`; play('leak'); },
+    onClose: () => {
+      if (!guestOk) return;
+      if (ui.online) { leaveOnline(); flashNote('P2 left the online game'); return; }
+      guestOk = false; host.reset(); ui.netLabel = `P2 disconnected — they can rejoin with code ${roomCode}`; play('leak');
+    },
     onError: (msg) => showLobby(`<h2>Couldn't host</h2><p>${esc(msg)}</p><p class="hint">Esc to go back</p>`),
   });
 }
@@ -287,7 +399,11 @@ function welcomeGuest(m) {
   hideLobby();
   host.reset(); // also drops sounds and effects queued while nobody was connected
   ui.netLabel = `Online · room ${roomCode} · P2 connected`;
-  if (mode === 'hostWait') { mode = 'host'; nPlayers = 2; newGame(); }
+  if (mode === 'hostWait') {
+    mode = 'host';
+    nPlayers = 2;
+    if (pendingSave) { resumeGame(pendingSave); pendingSave = null; } else newGame();
+  }
   play('grown');
 }
 
@@ -301,6 +417,8 @@ function onGuestMessage(m) {
   else if (m.t === 'continue' && state?.won) keepGoing();
   else if (m.t === 'retry' && state?.endless && state.over) retry();
   else if (m.t === 'ping' && Number.isFinite(m.at)) net.send({ t: 'pong', at: m.at });
+  else if (m.t === 'menu' && mode === 'host') menuTogether('P2 went back to the menu');
+  else if (m.t === 'again' && mode === 'menu' && ui.online === 'host') playAgainOnline();
 }
 
 function showJoin(prefill = '') {
@@ -318,14 +436,15 @@ function showJoin(prefill = '') {
   };
 }
 
-let rejected = false;
+let rejected = false, awaitingStart = false;
+const newGuestLink = () => createGuestLink({
+  sample: () => { const k = readKeys(KEYS[0], true); pressed.clear(); return k; },
+  dropTaps: () => pressed.clear(),
+});
 function startJoin(code) {
   mode = 'joining';
   rejected = false;
-  guest = createGuestLink({
-    sample: () => { const k = readKeys(KEYS[0], true); pressed.clear(); return k; },
-    dropTaps: () => pressed.clear(),
-  });
+  guest = newGuestLink();
   showLobby(`<h2>Joining room ${esc(code)}…</h2><p>Connecting</p><p class="hint">Esc to cancel</p>`);
   net = joinGame(code, {
     onOpen: () => {
@@ -336,12 +455,17 @@ function startJoin(code) {
       const m = raw instanceof ArrayBuffer ? decodeFast(raw) : raw;
       if (!m) return;
       if (m.t === 'snap') {
+        if (awaitingStart) return;
         if (mode !== 'guest') { mode = 'guest'; nPlayers = 2; state = newGuestState(); resetEffects(); ui.cam.snap = true; hideLobby(); canvas.focus(); }
         applySnapshot(state, m, performance.now());
       } else if (m.t === 'fx') {
         if (mode === 'guest') applyEffects(state, m, performance.now());
       } else if (m.t === 'summary') {
         if (mode === 'guest') ui.summary = m.summary;
+      } else if (m.t === 'menu') {
+        if (mode === 'guest') menuTogether('The host went back to the menu');
+      } else if (m.t === 'start') {
+        if (awaitingStart) { awaitingStart = false; ui.online = null; guest = newGuestLink(); } // fresh input numbering, like a new join
       } else if (m.t === 'pong') {
         ui.netLabel = `Online · room ${code} · ${Math.round(performance.now() - m.at)} ms`;
       } else if (m.t === 'reject') {
@@ -349,7 +473,11 @@ function startJoin(code) {
         showLobby(`<h2>Different game versions</h2><p>The host has a different version of the game${m.protocol !== VERSION.protocol ? '' : ' (different balance or maps)'}. You both need the same files.</p><p class="hint">Esc to go back</p>`);
       }
     },
-    onClose: () => { if (rejected) return; ui.disconnected = true; ui.netLabel = ''; },
+    onClose: () => {
+      if (rejected) return;
+      if (ui.online) { leaveOnline(); flashNote('The host left the online game'); return; }
+      ui.disconnected = true; ui.netLabel = '';
+    },
     onError: (msg) => showLobby(`<h2>Couldn't join</h2><p>${esc(msg)}</p><p class="hint">Esc to go back</p>`),
   });
   ui.netLabel = `Online · room ${code}`;

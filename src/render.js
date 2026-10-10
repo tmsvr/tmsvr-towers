@@ -2032,7 +2032,8 @@ function drawMenu(c, time, ui) {
   });
   const pulse = 0.75 + Math.sin(time * 4) * 0.25;
   c.globalAlpha = pulse;
-  label(c, '1  Solo     2  Local co-op     3  Host online     4  Join online', cx, 318, 22, '#ffffff', 'center', 600, null);
+  if (ui.online) label(c, `Still online with ${ui.online === 'host' ? 'P2' : 'the host'}  ·  3 or Enter: play again together  ·  Esc: leave`, cx, 318, 19, '#8dff9a', 'center', 600, null);
+  else label(c, '1 Solo    2 Local co-op    3 Host online    4 Join online    O Load game', cx, 318, 22, '#ffffff', 'center', 600, null);
   c.globalAlpha = 1;
   const rows = [
     ['', 'Move', 'Sprint', 'Baton', 'Bomb', 'Plant / upgrade', 'Heal', 'Next / mode'],
@@ -2139,7 +2140,7 @@ export function render(c, s, ui) {
   if (s.phase === 'pick' && !ui.disconnected) drawPick(c, s, ui, time);
   if (ui.guide != null) drawGuide(c, time, ui.guide);
   if (ui.disconnected) drawOverlay(c, 'Disconnected', ['The connection to the host was lost', 'Esc: back to menu'], '#ff7a6a');
-  else if (ui.paused) drawOverlay(c, 'Paused', ['P or Esc: resume', 'R: restart this map  ·  M: back to the menu'], '#ffffff');
+  else if (ui.paused) drawOverlay(c, 'Paused', ['P or Esc: resume', 'R: restart this map  ·  M: back to the menu  ·  S: save the game'], '#ffffff');
   else if (s.over || s.won) drawEndScreen(c, s, ui, time);
   if (ui.note && performance.now() < ui.note.until) label(c, ui.note.txt, VIEW_W / 2, MAP_H - 24, 16, '#ffffff', 'center', 700);
 }
