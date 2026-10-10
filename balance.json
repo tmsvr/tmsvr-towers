@@ -145,7 +145,7 @@
     "stink":     { "name": "Stinkbloom", "desc": "Poison clouds stack, ignore armor (ground)", "cost": 45, "range": 2.6, "damage": 2.1, "rate": 2.4, "kind": "cloud", "cloudRadius": 0.95, "cloudSeconds": 3.5, "maxStacks": 5, "groundOnly": true, "color": "#9ad14b" },
     "frost":     { "name": "Frostbloom", "desc": "Cheap. No damage, slows everything nearby", "cost": 16, "range": 2.3, "damage": 0, "rate": 2.75, "kind": "pulse", "slow": 0.45, "slowSeconds": 2.5, "color": "#8fe3ff" },
     "thorn":     { "name": "Thornrose",  "desc": "Spiky pulse hits everything close, flyers too", "cost": 42, "range": 1.5, "damage": 8, "rate": 1.0, "kind": "pulse", "color": "#ff4d5e" },
-    "snap":      { "name": "Snapdragon", "desc": "Gulps critters, bites chunks off big monsters (ground)", "cost": 40, "range": 1.5, "damage": 45, "rate": 2.0, "kind": "chomp", "maxHpBite": 0.1, "bossMaxHpBite": 0.03, "groundOnly": true, "color": "#e0569b" }
+    "snap":      { "name": "Snapdragon", "desc": "Gulps critters, bites chunks off big monsters (ground)", "cost": 40, "range": 1.5, "damage": 45, "rate": 2.0, "kind": "chomp", "maxHpBite": 0.05, "bossMaxHpBite": 0.015, "groundOnly": true, "color": "#e0569b" }
   },
 
   "enemies": {

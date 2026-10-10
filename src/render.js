@@ -1979,7 +1979,7 @@ function drawGuide(c, time, sel) {
   const tags = [];
   if (F.groundOnly) tags.push(['Ground only', '#d9a066']); else tags.push(['Hits flyers too', '#8fe3ff']);
   if (F.kind === 'cloud') tags.push(['Ignores armour', '#9ad14b']);
-  if (F.kind === 'chomp') tags.push(['Swallows small critters whole', '#e0569b'], [`Bites off ${Math.round((F.maxHpBite || 0) * 100)}% of max health`, '#e0569b']);
+  if (F.kind === 'chomp') tags.push(['Swallows small critters whole', '#e0569b'], [`Bites off ${Math.round((F.maxHpBite || 0) * 100)}% of max health (${+((F.bossMaxHpBite || 0) * 100).toFixed(1)}% on bosses)`, '#e0569b']);
   if (F.kind === 'beam') tags.push(['Aims at the toughest monster', '#ffd23f']);
   if (F.kind === 'bolt') tags.push(['Hits several in a line', '#ff7a2f']);
   if (F.kind === 'pulse' && !F.slow) tags.push(['Hits everything near', '#ff4d5e']);
