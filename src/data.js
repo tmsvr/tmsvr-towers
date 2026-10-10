@@ -199,6 +199,12 @@ function computeStats(type, lvl) {
   };
 }
 
+// Elite monsters and the power-ups they carry (IDEAS R2). ELITES.enabled can
+// be flipped at runtime (the tests do) to play without them.
+export const ELITES = { ...BAL.elites, enabled: !!BAL.elites?.enabled };
+export const ELITE_TRAITS = Object.keys(BAL.elites?.traits || {});
+export const ITEM_KINDS = Object.keys(BAL.elites?.items || {});
+
 // Bloom abilities (IDEAS R1): what a flower of `type` can do at `lvl`
 // beyond its usual attack, or null. BLOOM.enabled can be flipped at runtime
 // (the tests do) to play without them.

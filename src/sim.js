@@ -6,7 +6,7 @@
 import {
   T, U, VIEW_W, MAP_H, TOTAL_WAVES, MAPS, ENEMIES, INTROS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, GROW_TIME, FLOWER_HP, WEAR_PER_SEC, WEAR_MULT, HEAL_RATE, HEAL_COST,
-  POISON_TIME, START_COINS, LOADOUT_SIZE, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, bloomOf,
+  POISON_TIME, START_COINS, LOADOUT_SIZE, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, bloomOf, ELITES,
 } from './data.js';
 import { prune, clamp, nextSeed, randomFrom } from './util.js';
 import * as log from './stats.js';
@@ -39,6 +39,7 @@ export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, l
     t: 0, nextId: 1, rng: seed, wave: 0, phase: 'pick', timer: DIFFICULTY.firstWaveDelay, queue: [], spawnWait: 0,
     lives: DIFFICULTY.cottageHealth, maxLives: DIFFICULTY.cottageHealth, baseHitT: 0, lastAlarm: -99, players: [], flowers: [], enemies: [], drops: [], bombs: [], projs: [], clouds: [],
     fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, sharedScreen, map: m.index,
+    items: [], // power-ups dropped by elites, waiting to be picked up
     seen: {}, // monster types met so far (each gets one warning banner)
   };
   const coins = startCoins(m, nPlayers);
@@ -51,6 +52,7 @@ export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, l
       bombs: PLAYER.bombMax, sel: 0, building: false, moving: false, mode: 'grow', onFlowerId: null, working: null, msgCd: 0,
       loadout: null, pick: { row: 1, cursor: 0, chosen: (loadouts[i] || []).filter((t) => FLOWERS[t]).slice(0, LOADOUT_SIZE), ready: false },
       prevMx: 0, prevMy: 0, prevAtk: false,
+      item: null, // the power-up this cat carries
     });
   }
   return s;
@@ -170,6 +172,105 @@ export function spawnEnemy(s, type, from, path = 0) {
     psn: 0, psnT: 0, psnDps: 0, atBase: false, baseAng: rnd(s) * Math.PI * 2,
     burnT: 0, burnDps: 0, vulnT: 0, vuln: 0, // Bloom: Fire Lily's burning, Stinkbloom's weak spot
   });
+  if (!from) maybeElite(s, s.enemies[s.enemies.length - 1]);
+}
+
+// ---- Elite monsters and power-ups (IDEAS R2) ----------------------------------
+function pickWeighted(s, table) {
+  const keys = Object.keys(table);
+  let r = rnd(s) * keys.reduce((a, k) => a + (table[k].weight ?? 1), 0);
+  for (const k of keys) if ((r -= table[k].weight ?? 1) <= 0) return k;
+  return keys[keys.length - 1];
+}
+
+// The share of eligible monsters that arrive as elites in the current wave.
+export function eliteChance(s) {
+  const E = ELITES;
+  if (!E.enabled || s.wave < E.fromWave) return 0;
+  const endless = Math.max(0, s.wave - TOTAL_WAVES);
+  return Math.min(E.maxChance, E.chance + E.chancePerWave * (s.wave - E.fromWave) + (E.chanceEndlessPerWave ?? 0) * endless);
+}
+
+function maybeElite(s, e) {
+  const chance = eliteChance(s);
+  if (chance > 0 && ELITES.types.includes(e.type) && rnd(s) < chance) makeElite(s, e, pickWeighted(s, ELITES.traits), pickWeighted(s, ELITES.items));
+}
+
+// What it carries stays a surprise until it drops.
+export function makeElite(s, e, trait, item) {
+  const tr = ELITES.traits[trait] || {};
+  e.elite = trait;
+  e.carry = item;
+  e.hp = e.maxhp = e.maxhp * ELITES.hp;
+  if (tr.armor) e.armorPlus = tr.armor;
+  if (tr.speed) e.speedMul = tr.speed;
+  if (!s.seen.elite) { s.seen.elite = true; banner(s, 'An elite monster! Beat it for a power-up'); }
+  ev(s, 'elite');
+  log.logElite(s, e);
+}
+
+// Frostbloom (and the snow globe) can't hold these.
+const frostproof = (e) => e.def.unslowable || e.elite === 'frostproof';
+
+// by: the cat that put it down in a swap, who can't take it back until it
+// has stepped away (otherwise standing still would swap back and forth).
+function dropItem(s, kind, x, y, by = null) {
+  s.items.push({ id: s.nextId++, kind, x, y, age: 0, by });
+}
+
+// Walk over a power-up to take it. A cat already carrying one swaps.
+function updateItems(s, dt) {
+  for (const it of s.items) {
+    it.age += dt;
+    if (it.age >= ELITES.itemSeconds) { it.done = true; log.logItem(s, null, it.kind, 'expired'); continue; }
+    for (const p of s.players) {
+      const d = dist(p, it);
+      if (it.by === p.id) { if (d > T * 0.9) it.by = null; continue; }
+      if (p.stun > 0 || !p.loadout || d > T * 0.6) continue;
+      it.done = true;
+      if (p.item) dropItem(s, p.item, p.x, p.y, p.id);
+      p.item = it.kind;
+      text(s, it.x, it.y - T * 0.5, `${ELITES.items[it.kind].name}!`, '#bff7ff');
+      ev(s, 'pickup');
+      log.logItem(s, p, it.kind, 'picked');
+      break;
+    }
+  }
+  prune(s.items, isDone);
+}
+
+function useItem(s, p) {
+  const kind = p.item, cfg = ELITES.items[kind] || {};
+  const { tx, ty } = tileOf(s.m, p);
+  const f = s.grid.get(ty * s.m.W + tx);
+  const say = (msg) => deny(s, p, p.x, p.y - T * 0.6, msg);
+  if (kind === 'fertiliser') {
+    if (!f) return say('Stand on a flower');
+    if (f.lvl >= MAX_LEVEL) return say('Already max level');
+    f.lvl = f.grow ? f.grow.to : f.lvl + 1; // a half-grown level finishes, coins already in it stay spent
+    f.grow = null;
+    f.hp = FLOWER_HP;
+    f.flash = 0.5;
+    log.logLevel(s, p, f);
+    puff(s, f.x, f.y, '#8dff9a', 18, 140);
+    text(s, f.x, f.y - T * 0.7, f.lvl === 1 ? `${FLOWERS[f.type].name}!` : `Level ${f.lvl}!`, '#8dff9a');
+  } else if (kind === 'sun') {
+    if (!f || f.lvl === 0) return say('Stand on a grown flower');
+    f.sunT = cfg.seconds;
+    puff(s, f.x, f.y, '#ffd23f', 16, 120);
+  } else if (kind === 'water') {
+    const wave = s.phase === 'wave' ? s.wave : s.wave + 1; // used in a break, it covers the coming wave
+    for (const g of s.flowers) if (!g.dead && g.lvl > 0 && dist(g, p) <= cfg.radius * T) { g.hp = FLOWER_HP; g.wet = wave; }
+    s.fx.push({ kind: 'ring', x: p.x, y: p.y, r: cfg.radius * T, col: '#6fc3ff', life: 0.6 });
+    puff(s, p.x, p.y, '#6fc3ff', 16, 120);
+  } else if (kind === 'snow') {
+    for (const e of s.enemies) if (!e.dead && !e.def.boss && !frostproof(e)) { e.stun = Math.max(e.stun, cfg.seconds); e.chew = null; }
+    s.fx.push({ kind: 'flash', x: p.x, y: p.y, r: T * 4 });
+    banner(s, 'Snow globe! Everything freezes');
+  }
+  p.item = null;
+  ev(s, kind === 'snow' ? 'freeze' : 'powerup');
+  log.logItem(s, p, kind, 'used');
 }
 
 // Whether flowers, bombs and batons can touch this enemy right now.
@@ -183,7 +284,7 @@ export const airborne = (e) => e.def.flying || (e.dashing && e.def.dash.leap);
 // bloom marks damage from a level-5 Bloom ability.
 export function damage(s, e, amt, ignoreArmor = false, quiet = false, src = null, fid = null, bloom = false) {
   if (e.dead) return;
-  let hit = ignoreArmor ? amt : Math.max(1, amt - e.def.armor);
+  let hit = ignoreArmor ? amt : Math.max(1, amt - e.def.armor - (e.armorPlus || 0));
   // Stinkbloom's Bloom: monsters in its clouds take extra damage from everything
   const weak = e.vulnT > 0 ? hit * e.vuln : 0;
   hit += weak;
@@ -206,6 +307,18 @@ function killEnemy(s, e) {
     puff(s, e.x, e.y, '#e08ae8', 12, 120);
     ev(s, 'split');
   }
+  if (e.elite === 'splitting') { // smaller copies of itself, no longer elite
+    const tr = ELITES.traits.splitting;
+    for (let i = 0; i < tr.count; i++) {
+      spawnEnemy(s, e.type, e);
+      const c = s.enemies[s.enemies.length - 1];
+      c.hp = c.maxhp = (e.maxhp / ELITES.hp) * tr.hp;
+      c.mini = true;
+    }
+    ev(s, 'split');
+  }
+  if (e.elite) log.logEliteKilled(s);
+  if (e.carry) { dropItem(s, e.carry, e.x, e.y); log.logItem(s, null, e.carry, 'dropped'); }
   // Drops shrink a little each wave, so bigger waves don't pay out ever more;
   // fractions round up by chance, so even 1-coin monsters drop less on average.
   const fade = Math.max(ECONOMY.coinFadeMin ?? 0, 1 - (ECONOMY.coinFadePerWave ?? 0) * Math.max(0, s.wave - 1));
@@ -247,6 +360,7 @@ function updateEnemies(s, dt) {
       if (e.dead) continue;
     }
     if (e.vulnT > 0) e.vulnT -= dt;
+    if (e.elite === 'regenerating' && !(e.psnT > 0) && !(e.burnT > 0)) e.hp = Math.min(e.maxhp, e.hp + e.maxhp * ELITES.traits.regenerating.perSecond * dt);
     if (e.kx || e.ky) {
       e.x += e.kx * dt; e.y += e.ky * dt;
       const f = Math.pow(0.002, dt);
@@ -300,7 +414,7 @@ function updateEnemies(s, dt) {
       }
     }
     e.wob += dt * 8 * e.slow;
-    let sp = e.def.speed * e.slow * (e.dashing ? e.def.dash.speedMultiplier : 1) * (e.under ? e.def.burrow.speedMultiplier : 1);
+    let sp = e.def.speed * e.slow * (e.speedMul || 1) * (e.dashing ? e.def.dash.speedMultiplier : 1) * (e.under ? e.def.burrow.speedMultiplier : 1);
     // stag beetles run faster the more they are hurt, so chip damage along the road backfires
     if (e.def.enrage) sp *= 1 + (e.def.enrage.maxSpeedMultiplier - 1) * (1 - Math.max(0, e.hp) / e.maxhp);
     const road = s.m.paths[e.path], wps = road.waypoints;
@@ -697,6 +811,7 @@ function updatePlayers(s, dt, inputs) {
     // Fighting cancels build mode.
     if (inp.atk && p.atkCd <= 0) { swing(s, p); p.building = false; }
     if (inp.bomb && p.bombs >= 1) { throwBomb(s, p); p.building = false; }
+    if (inp.use && p.item) useItem(s, p);
 
     const { tx, ty } = tileOf(s.m, p);
     let f = s.grid.get(ty * s.m.W + tx);
@@ -746,7 +861,8 @@ function updateFlowers(s, dt) {
     if (f.lvl === 0) continue; // seedlings don't fight
     // Every flower wears out at the same steady pace while a wave is on,
     // whatever its range or fire rate; higher levels wear slower, max never.
-    if (s.phase === 'wave') hurtFlower(s, f, WEAR_PER_SEC * WEAR_MULT[f.lvl] * dt, true, 'wear');
+    if (s.phase === 'wave' && f.wet !== s.wave) hurtFlower(s, f, WEAR_PER_SEC * WEAR_MULT[f.lvl] * dt, true, 'wear'); // a watering can stops it for a wave
+    if (f.sunT > 0) f.sunT -= dt;
     if (f.dead) continue;
     f.cd -= dt;
     if (f.cd > 0) continue;
@@ -764,7 +880,7 @@ function updateFlowers(s, dt) {
       }
     }
     if (!best) continue;
-    f.cd = st.rate;
+    f.cd = st.rate / (f.sunT > 0 ? ELITES.items.sun.fireRate : 1); // a sun orb speeds it up
     f.shots = (f.shots || 0) + 1;
     const burst = !!bl?.every && f.shots % bl.every === 0; // this attack is the Bloom one
     f.angle = Math.atan2(best.y - f.y, best.x - f.x);
@@ -807,12 +923,12 @@ function updateFlowers(s, dt) {
       s.fx.push({ kind: 'ring', x: f.x, y: f.y, r, col: st.color, life: burst ? 0.5 : 0.35 });
       for (const e of hits) {
         if (st.dmg > 0) damage(s, e, st.dmg, false, false, f.type, f.id); // the frostbloom only slows
-        if (st.slow && !e.def.unslowable) { e.slow = Math.min(e.slow, st.slow); e.slowT = Math.max(e.slowT, st.slowSeconds); }
+        if (st.slow && !frostproof(e)) { e.slow = Math.min(e.slow, st.slow); e.slowT = Math.max(e.slowT, st.slowSeconds); }
         if (!burst || e.dead || e.def.boss) continue;
         // Bloom: Thornrose shoves small monsters away, Frostbloom freezes them solid
         const dx = e.x - f.x, dy = e.y - f.y, d = Math.hypot(dx, dy);
         if (bl.knock && e.def.light && d > 0) { e.kx += (dx / d) * bl.knock * T; e.ky += (dy / d) * bl.knock * T; }
-        if (bl.freeze && !e.def.unslowable) { e.stun = Math.max(e.stun, bl.freeze); e.chew = null; }
+        if (bl.freeze && !frostproof(e)) { e.stun = Math.max(e.stun, bl.freeze); e.chew = null; }
       }
       if (burst) log.logBloom(s, f.type);
     }
@@ -1021,4 +1137,5 @@ export function step(s, inputs, dt) {
   updateBombs(s, dt);
   prune(s.enemies, isDead);
   updateDrops(s, dt);
+  updateItems(s, dt);
 }

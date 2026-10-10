@@ -11,7 +11,7 @@
 import {
   T, U, VIEW_W, MAP_H, HUD_H, TOTAL_WAVES, MAPS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, GLOBAL_RANGE, ENEMIES, INTROS,
-  BLOOM, bloomOf,
+  BLOOM, bloomOf, ELITES,
 } from './data.js';
 import { tileOf, canBuildAt, uprootRefund, catStats, plantPrice, upgradeLeft, healLeft } from './sim.js';
 import { isMuted } from './audio.js';
@@ -845,6 +845,7 @@ function drawFlower(c, f, time) {
   const fire = f.flash > 0 ? 0.08 : 0;
   const hurt = f.hurtT > 0 ? Math.sin(time * 80) * 1.2 : 0;
   c.translate(hurt, 12); c.scale(k * (1 + fire * 0.6), k * (1 + breathe - fire)); c.translate(0, -12);
+  if (f.sunT > 0) circle(c, 0, -12, 32 + Math.sin(time * 9) * 2, `rgba(255,210,63,${0.35 + Math.sin(time * 9) * 0.1})`); // a sun orb
   if (lvl === MAX_LEVEL) circle(c, 0, -12, 28, `rgba(255,232,120,${0.2 + Math.sin(time * 3 + f.id) * 0.07})`);
   else if (lvl === 4) circle(c, 0, -10, 24, `rgba(220,240,255,${0.12 + Math.sin(time * 3 + f.id) * 0.05})`);
   const body = wither ? mix(sp.body, '#8c7a4a', wither * 0.8) : sp.body;
@@ -984,6 +985,9 @@ function dart(c, r, col) {
   c.fillStyle = col; c.fill(); c.strokeStyle = OUT; c.lineWidth = 2; c.stroke();
 }
 
+const ELITE_COLOR = { armoured: '#c8d2e0', swift: '#7fffd4', regenerating: '#8dff9a', frostproof: '#9be8ff', splitting: '#e08ae8' };
+const ELITE_WORD = { armoured: 'Armoured', swift: 'Swift', regenerating: 'Regenerating', frostproof: 'Frost-proof', splitting: 'Splitting' };
+
 function drawEnemy(c, e, time) {
   const r = e.def.r;
   const fly = e.def.flying;
@@ -1002,6 +1006,12 @@ function drawEnemy(c, e, time) {
   ellipse(c, e.x, e.y + r * 0.75, r * (fly || leap ? 0.7 : 0.95), r * 0.35, 'rgba(0,0,0,0.22)');
   c.save();
   c.translate(e.x, e.y + hop);
+  if (e.mini) c.scale(0.7, 0.7); // a splitting elite's smaller copies
+  if (e.elite) { // elites glow in their trait's colour
+    const col = ELITE_COLOR[e.elite] || '#ffe27a', k = (time * 1.4) % 1;
+    circle(c, 0, 0, r + 5 + Math.sin(time * 5) * 1.5, null, col, 3);
+    circle(c, 0, 0, r + 6 + k * 12, null, `${col}${Math.round((1 - k) * 160).toString(16).padStart(2, '0')}`, 2);
+  }
   const sq = (fly ? 0 : Math.sin(e.wob * 2) * (e.type === 'splitter' || e.type === 'blobling' ? 0.14 : 0.06)) + hitSquash(e.id) * 0.22;
   c.scale(1 + sq, 1 - sq);
   if (e.def.heals) {
@@ -1238,6 +1248,43 @@ function drawEnemy(c, e, time) {
     rrect(c, bx - 1.5, by - 1.5, w + 3, 7, 3, OUT);
     rrect(c, bx, by, Math.max(0, w * (e.hp / e.maxhp)), 4, 2, e.psn > 0 ? '#a6e04a' : e.hp / e.maxhp > 0.4 ? '#6be06b' : '#ff6a5a');
   }
+  if (e.elite) label(c, `★ ${ELITE_WORD[e.elite] || e.elite}`, e.x, e.y + hop - r - (e.type === 'boss' ? r * 0.85 : 12) - 10, 10, ELITE_COLOR[e.elite] || '#ffe27a', 'center', 700);
+}
+
+// ---- power-ups (IDEAS R2) ----------------------------------------------------------
+// One icon per kind, centred on x, y and about 2r across.
+function drawItemIcon(c, kind, x, y, r) {
+  c.save(); c.translate(x, y);
+  if (kind === 'fertiliser') { // a sack with a sprout
+    rrect(c, -r * 0.7, -r * 0.35, r * 1.4, r * 1.2, r * 0.3, '#b98a52', OUT, 1.5);
+    rrect(c, -r * 0.45, -r * 0.5, r * 0.9, r * 0.3, r * 0.12, '#9a6e3a', OUT, 1.2);
+    stem(c, 0, -r * 0.5, 0, -r * 0.8, 0, -r * 1.0, 2, '#3e8e3a');
+    leaf(c, 0, -r * 0.9, r * 0.5, -0.6, '#6fd36a'); leaf(c, 0, -r * 0.85, r * 0.45, Math.PI + 0.6, '#6fd36a');
+  } else if (kind === 'water') { // a watering can
+    ellipse(c, -r * 0.1, r * 0.1, r * 0.65, r * 0.55, '#5fb4ff', OUT, 1.5);
+    c.strokeStyle = OUT; c.lineWidth = 3; c.beginPath(); c.moveTo(r * 0.45, r * 0.05); c.lineTo(r * 1.0, -r * 0.45); c.stroke();
+    c.strokeStyle = '#5fb4ff'; c.lineWidth = 1.6; c.stroke();
+    c.strokeStyle = OUT; c.lineWidth = 1.5; c.beginPath(); c.arc(-r * 0.15, -r * 0.45, r * 0.38, Math.PI, 0); c.stroke();
+    circle(c, r * 1.05, -r * 0.5, r * 0.16, '#bfe3ff', OUT, 1);
+  } else if (kind === 'sun') { // a glowing orb with rays
+    for (let i = 0; i < 8; i++) { const a = (i * Math.PI) / 4; c.strokeStyle = '#ffb320'; c.lineWidth = 2; c.beginPath(); c.moveTo(Math.cos(a) * r * 0.7, Math.sin(a) * r * 0.7); c.lineTo(Math.cos(a) * r * 1.05, Math.sin(a) * r * 1.05); c.stroke(); }
+    circle(c, 0, 0, r * 0.62, '#ffd23f', OUT, 1.5);
+    circle(c, -r * 0.18, -r * 0.18, r * 0.2, '#fff6c0');
+  } else { // a snow globe
+    rrect(c, -r * 0.6, r * 0.45, r * 1.2, r * 0.42, r * 0.12, '#8a5a3a', OUT, 1.5);
+    circle(c, 0, -r * 0.05, r * 0.68, 'rgba(190,235,255,0.9)', OUT, 1.5);
+    for (let i = 0; i < 5; i++) circle(c, Math.cos(i * 2.4) * r * 0.38, Math.sin(i * 1.7) * r * 0.32 - r * 0.05, 1.3, '#ffffff');
+  }
+  c.restore();
+}
+
+function drawItem(c, it, time) {
+  const left = ELITES.itemSeconds - it.age;
+  if (left < 3 && Math.floor(time * 8) % 2) return; // blinks before it's gone
+  const bob = Math.sin(time * 4 + it.id) * 3;
+  ellipse(c, it.x, it.y + 10, 9, 3.5, 'rgba(0,0,0,0.25)');
+  circle(c, it.x, it.y - 6 + bob, 15 + Math.sin(time * 6) * 1.5, 'rgba(255,255,220,0.28)');
+  drawItemIcon(c, it.kind, it.x, it.y - 6 + bob, 10);
 }
 
 // ---- cats ------------------------------------------------------------------
@@ -1706,13 +1753,22 @@ function drawHud(c, s, time, ui) {
     // stamina bar under the bomb
     rrect(c, bx - 16, by + 18, 32, 6, 3, 'rgba(0,0,0,0.45)');
     if (p.stam > 0.01) rrect(c, bx - 15, by + 19, 30 * p.stam, 4, 2, p.tired ? '#ff8a5a' : p.sprinting ? '#ffffff' : '#7fd4ff');
+    // the power-up slot (IDEAS R2), then the flowers, narrower when there are more of them
+    let lx = x0 + 50;
+    if (ELITES.enabled) {
+      rrect(c, lx, y0 + 42, 38, 38, 8, p.item ? 'rgba(191,247,255,0.16)' : 'rgba(0,0,0,0.25)', p.item ? '#bff7ff' : 'rgba(255,255,255,0.1)', p.item ? 2 : 1);
+      if (p.item) drawItemIcon(c, p.item, lx + 19, y0 + 63, 10);
+      label(c, ui.keyLabel(ui.keysFor(p.id).use), lx + 31, y0 + 49, 9, p.item ? '#bff7ff' : '#6f8291', 'center', 700, null);
+      lx += 42;
+    }
+    const slots = (p.loadout || p.pick.chosen).length || LOADOUT_SIZE, step = Math.min(104, Math.floor((x0 + pw - 6 - lx) / slots));
     (p.loadout || p.pick.chosen).forEach((t, j) => {
-      const sx = x0 + 50 + j * 104, sy = y0 + 42, sw = 100, sh = 38;
+      const sx = lx + j * step, sy = y0 + 42, sw = step - 4, sh = 38;
       const sel = p.loadout && p.building && j === p.sel;
       const cost = p.loadout ? plantPrice(p, t) : plantCost(t), afford = p.coins >= cost;
       rrect(c, sx, sy, sw, sh, 8, sel ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.25)', sel ? pc : 'rgba(255,255,255,0.1)', sel ? 3 : 1);
       c.save(); c.translate(sx + 19, sy + 19); c.scale(0.8, 0.8); if (!afford) c.globalAlpha = 0.45; drawHead(c, t); c.restore();
-      label(c, `${cost}`, sx + 54, sy + 20, 14, afford ? '#ffe27a' : '#c07070', 'center', 700, null);
+      label(c, `${cost}`, sx + 19 + (sw - 19) / 2, sy + 20, 14, afford ? '#ffe27a' : '#c07070', 'center', 700, null);
     });
   });
 }
@@ -2068,11 +2124,11 @@ function drawMenu(c, time, ui) {
   else label(c, '1 Solo    2 Local co-op    3 Host online    4 Join online    O Load game', cx, 318, 22, '#ffffff', 'center', 600, null);
   c.globalAlpha = 1;
   const rows = [
-    ['', 'Move', 'Sprint', 'Baton', 'Bomb', 'Plant / upgrade', 'Heal', 'Next / mode'],
+    ['', 'Move', 'Sprint', 'Baton', 'Bomb', 'Power-up', 'Plant / upgrade', 'Heal', 'Next / mode'],
     ...ui.keys.map((k, i) => [`P${i + 1}`, i === 0 ? [k.up, k.left, k.down, k.right].map(ui.keyLabel).join('') : 'Arrows',
-      ui.keyLabel(k.sprint), ui.keyLabel(k.atk), ui.keyLabel(k.bomb), ui.keyLabel(k.build), ui.keyLabel(k.heal), ui.keyLabel(k.cycle)]),
+      ui.keyLabel(k.sprint), ui.keyLabel(k.atk), ui.keyLabel(k.bomb), ui.keyLabel(k.use), ui.keyLabel(k.build), ui.keyLabel(k.heal), ui.keyLabel(k.cycle)]),
   ];
-  const cols = [cx - 300, cx - 228, cx - 158, cx - 98, cx - 42, cx + 48, cx + 140, cx + 230];
+  const cols = [cx - 310, cx - 245, cx - 182, cx - 128, cx - 78, cx - 18, cx + 70, cx + 152, cx + 238];
   rows.forEach((r, ri) => r.forEach((t, ci) => label(c, t, cols[ci], 358 + ri * 28, ri ? 16 : 13, ri ? '#fff' : '#8fa5b3', 'center', ri ? 600 : 500, null)));
   const tips = [
     'Plant key: build mode, again to plant a seedling, then HOLD to pour coins in. Next-flower key cycles.',
@@ -2130,6 +2186,7 @@ export function render(c, s, ui) {
   drawCottage(c, m.base.x, m.base.y, s.lives, s.maxLives, s.baseHitT, time);
   for (const cl of s.clouds) if (vis(cl)) drawCloud(c, cl, time);
   for (const d of s.drops) if (vis(d)) drawDrop(c, d, time);
+  for (const it of s.items || []) if (vis(it)) drawItem(c, it, time);
   // things standing on the ground, drawn back to front
   actors.length = 0;
   for (const f of s.flowers) if (vis(f)) addActor(f.y + T * 0.2, FLOWER, f);

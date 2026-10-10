@@ -5,7 +5,7 @@
 import * as sim from '../src/sim.js';
 import {
   T, MAPS, FLOWERS, FLOWER_ORDER, MAX_LEVEL, FLOWER_HP, ENEMIES, CATS, CAT_ORDER, BALANCE, TOTAL_WAVES,
-  plantCost, upgradeCost, flowerStats, BLOOM, bloomOf,
+  plantCost, upgradeCost, flowerStats, BLOOM, bloomOf, ELITES,
 } from '../src/data.js';
 import { encodeSnapshot, encodeInputs, decodeFast } from '../src/schema.js';
 import { gameSummary } from '../src/stats.js';
@@ -537,6 +537,150 @@ test('Bloom', 'switched off, a level-5 flower has no ability', () => {
   });
 });
 
+// ---- elites and power-ups (IDEAS R2) -------------------------------------------------
+// Runs fn with some ELITES numbers changed, then puts them back.
+function withElites(changes, fn) {
+  const old = Object.fromEntries(Object.keys(changes).map((k) => [k, ELITES[k]]));
+  Object.assign(ELITES, changes);
+  try { fn(); } finally { Object.assign(ELITES, old); }
+}
+const eliteOn = (s, type, road, trait, item = 'water') => { const e = monsterOn(s, type, road); sim.makeElite(s, e, trait, item); return e; };
+const loose = (s, kind, x, y) => s.items.push({ id: s.nextId++, kind, x, y, age: 0, by: null });
+
+test('Elites', 'elites only come from their wave on, and only of the listed types', () => {
+  const s = game(), road = tileByRoad(s).road;
+  withElites({ chance: 1, maxChance: 1 }, () => {
+    s.wave = ELITES.fromWave - 1;
+    ok(!monsterOn(s, ELITES.types[0], road).elite, 'an elite before its wave');
+    s.wave = ELITES.fromWave;
+    ok(monsterOn(s, ELITES.types[0], road).elite, `no elite ${ELITES.types[0]} at chance 1`);
+    ok(!monsterOn(s, 'grunt', road).elite, 'an elite grunt');
+  });
+  s.wave = 30;
+  near(sim.eliteChance(s), ELITES.maxChance, 1e-9, 'the chance stops growing');
+  withElites({ enabled: false }, () => eq(sim.eliteChance(s), 0, 'chance when switched off'));
+});
+
+test('Elites', 'an elite is tougher and drops its power-up when it dies', () => {
+  const s = game(), road = tileByRoad(s).road;
+  const plain = monsterOn(s, 'tank', road), e = eliteOn(s, 'tank', road, 'swift', 'sun');
+  near(e.maxhp, plain.maxhp * ELITES.hp, 1e-6, 'health');
+  sim.damage(s, e, 1e9, true);
+  eq(s.items.map((it) => it.kind).join(), 'sun', 'dropped');
+  eq(s.stats.cur.items.dropped.sun, 1, 'logged drop');
+  eq(s.stats.cur.elites.killed, 1, 'logged kill');
+});
+
+test('Elites', 'traits: armoured, swift, regenerating, frost-proof, splitting', () => {
+  const s = game(), road = tileByRoad(s).road;
+  const plain = monsterOn(s, 'tank', road), armoured = eliteOn(s, 'tank', road, 'armoured');
+  const a = plain.hp, b = armoured.hp;
+  sim.damage(s, plain, 20); sim.damage(s, armoured, 20);
+  eq((a - plain.hp) - (b - armoured.hp), ELITES.traits.armoured.armor, 'armour soaks more');
+
+  const s2 = game(), r2 = tileByRoad(s2).road;
+  const slow = monsterOn(s2, 'tank', r2), fast = eliteOn(s2, 'tank', r2, 'swift');
+  slow.x = fast.x = s2.m.paths[0].spawn.x; slow.y = fast.y = s2.m.paths[0].spawn.y;
+  for (let i = 0; i < 60; i++) tick(s2);
+  near(fast.dist / slow.dist, ELITES.traits.swift.speed, 0.05, 'speed ratio');
+
+  const s3 = game(), r3 = tileByRoad(s3).road;
+  const regen = eliteOn(s3, 'tank', r3, 'regenerating');
+  regen.hp = regen.maxhp / 2;
+  pin(s3, [[regen, ...at(r3)]], 1);
+  ok(regen.hp > regen.maxhp / 2, 'it did not heal');
+  const h = regen.hp;
+  regen.psnT = 5; regen.psn = 0;
+  pin(s3, [[regen, ...at(r3)]], 1);
+  near(regen.hp, h, 1e-6, 'healed while poisoned');
+
+  const { s: s4, road: r4 } = flowerByRoad('frost');
+  const proof = eliteOn(s4, 'tank', r4, 'frostproof');
+  pin(s4, [[proof, ...at(r4)]], 3);
+  eq(proof.slowT, 0, 'slowed');
+
+  const s5 = game(), r5 = tileByRoad(s5).road;
+  const splitter = eliteOn(s5, 'tank', r5, 'splitting'), base = splitter.maxhp / ELITES.hp;
+  sim.damage(s5, splitter, 1e9, true);
+  const kids = s5.enemies.filter((e) => e.mini);
+  eq(kids.length, ELITES.traits.splitting.count, 'copies');
+  for (const k of kids) { eq(k.type, 'tank', 'copy type'); near(k.maxhp, base * ELITES.traits.splitting.hp, 1e-6, 'copy health'); ok(!k.elite && !k.carry, 'copies are plain'); }
+});
+
+test('Power-ups', 'walk over one to carry it; a second one swaps; unclaimed ones vanish', () => {
+  const s = game(), p = s.players[0];
+  loose(s, 'water', p.x, p.y);
+  tick(s);
+  eq(p.item, 'water', 'carried');
+  loose(s, 'snow', p.x, p.y);
+  for (let i = 0; i < 30; i++) tick(s);
+  eq(p.item, 'snow', 'swapped');
+  eq(s.items.map((it) => it.kind).join(), 'water', 'the old one waits on the ground');
+  eq(p.item, 'snow', 'standing still doesn\'t swap back');
+  loose(s, 'sun', p.x + T * 6, p.y);
+  for (let i = 0; i < ELITES.itemSeconds * 60 + 5; i++) tick(s);
+  eq(s.items.length, 0, 'items left after their time');
+  eq(s.stats.cur.items.expired.sun, 1, 'logged');
+});
+
+test('Power-ups', 'fertiliser: a free level for the flower you stand on', () => {
+  const s = game(), p = s.players[0], spot = freeTile(s);
+  const f = plant(s, p, spot, 'thorn');
+  growOnce(s, p, f);
+  p.item = 'fertiliser';
+  const coins = p.coins;
+  tick(s, { use: true });
+  eq(f.lvl, 2, 'level'); eq(p.coins, coins, 'coins'); eq(p.item, null, 'used up');
+  f.lvl = MAX_LEVEL; p.item = 'fertiliser';
+  tick(s, { use: true });
+  eq(p.item, 'fertiliser', 'kept when it can\'t help');
+});
+
+test('Power-ups', 'watering can: nearby flowers heal and stop wearing for the wave', () => {
+  const s = game(), p = s.players[0], spot = freeTile(s);
+  const f = plant(s, p, spot, 'thorn');
+  growOnce(s, p, f);
+  f.hp = 30; p.item = 'water';
+  tick(s, { use: true });
+  eq(f.hp, FLOWER_HP, 'healed');
+  tick(s, { ready: true });
+  for (let i = 0; i < 300; i++) tick(s);
+  eq(f.hp, FLOWER_HP, 'wore during the watered wave');
+});
+
+test('Power-ups', 'sun orb: the flower fires twice as fast', () => {
+  const shots = (sun) => {
+    const { s, f, road } = flowerByRoad('thorn');
+    const g = monsterOn(s, 'grunt', road);
+    g.hp = g.maxhp = 1e6;
+    if (sun) { const p = s.players[0]; goTo(p, [f.tx, f.ty]); p.item = 'sun'; tick(s, { use: true }); goTo(p, freeTile(s, [[f.tx, f.ty]])); }
+    f.shots = 0;
+    pin(s, [[g, ...at(road)]], 6);
+    return f.shots;
+  };
+  near(shots(true) / shots(false), ELITES.items.sun.fireRate, 0.35, 'shots with and without');
+});
+
+test('Power-ups', 'snow globe: monsters freeze, but not bosses or frost-proof elites', () => {
+  const s = game(), p = s.players[0], road = tileByRoad(s).road;
+  const grunt = monsterOn(s, 'grunt', road), boss = monsterOn(s, 'boss', road), proof = eliteOn(s, 'tank', road, 'frostproof');
+  p.item = 'snow';
+  tick(s, { use: true });
+  ok(grunt.stun > 0, 'the grunt is free'); eq(boss.stun, 0, 'boss stun'); eq(proof.stun, 0, 'frost-proof stun');
+  eq(s.stats.cur.items.used.snow, 1, 'logged');
+});
+
+test('Power-ups', 'elites and power-ups survive a snapshot', () => {
+  const s = game(), road = tileByRoad(s).road, p = s.players[0];
+  eliteOn(s, 'tank', road, 'regenerating');
+  loose(s, 'sun', 100, 100);
+  p.item = 'water';
+  const m = decodeFast(encodeSnapshot(s, { seq: 1, at: 0, paused: false, ack: 0 }));
+  eq(m.state.enemies.at(-1).elite, 'regenerating', 'trait');
+  eq(m.state.items[0].kind, 'sun', 'item on the ground');
+  eq(m.state.players[0].item, 'water', 'carried item');
+});
+
 // ---- saved games ------------------------------------------------------------------
 test('Saves', 'a game saved mid-wave and loaded plays on exactly like the original', () => {
   const s = game({ cats: ['bomber', 'gardener'], loadout: ['daisy', 'thorn', 'frost'] });
@@ -584,12 +728,12 @@ test('Online', 'a snapshot decodes back to the same game', () => {
 test('Online', 'guest inputs survive the trip', () => {
   const list = [
     { seq: 1, mx: 1, my: 0, build: true }, { seq: 2, mx: 1, my: 0, build: true },
-    { seq: 3, mx: 0, my: -1, atk: true, heal: true }, { seq: 4, mx: -1, my: 1, bomb: true, cycle: true, buildTap: true, ready: true, sprint: true },
+    { seq: 3, mx: 0, my: -1, atk: true, heal: true }, { seq: 4, mx: -1, my: 1, bomb: true, cycle: true, buildTap: true, ready: true, sprint: true, use: true },
   ];
   const m = decodeFast(encodeInputs(list));
   ok(m && m.t === 'in', 'decodes as inputs');
   eq(m.inputs.length, list.length, 'input count');
-  const keys = ['atk', 'build', 'sprint', 'bomb', 'cycle', 'buildTap', 'ready', 'heal'];
+  const keys = ['atk', 'build', 'sprint', 'bomb', 'cycle', 'buildTap', 'ready', 'heal', 'use'];
   m.inputs.forEach((got, i) => {
     eq(got.seq, list[i].seq, 'seq'); eq(got.mx, list[i].mx, 'mx'); eq(got.my, list[i].my, 'my');
     for (const k of keys) eq(!!got[k], !!list[i][k], `input ${i} ${k}`);

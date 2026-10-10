@@ -40,10 +40,18 @@ them.
 - At level 5 every flower **blooms**: it sparkles and gains a special ability
   (Daisy seeds split, Fire Lily sets monsters alight, Frostbloom freezes…).
   The flower guide (I) says what each one does.
+- From wave 4 some big monsters arrive as **elites**: they glow, are much
+  tougher and have a trait (armoured, swift, regenerating, frost-proof or
+  splitting). Each one drops a surprise power-up; walk over it to carry it
+  (one per cat, shown in your HUD panel) and press V (P2: `;`) to use it:
+  fertiliser (free level for the flower you stand on), watering can (nearby
+  flowers heal and stop wearing for the wave), sun orb (the flower you stand
+  on fires twice as fast for 20 s) or snow globe (every monster but bosses
+  freezes for 2 s). Unclaimed power-ups vanish after 10 s.
 - In co-op, each cat keeps the coins it picks up (`economy.coopCoinShare` in
   `balance.json` can split a share of every pickup with the other cat).
-- P1: WASD move · Shift sprint · F baton · G bomb · E plant/upgrade (hold) · R heal (hold) · Q next flower / dig-up mode
-- P2 (local): arrows · Right Shift sprint · `,` baton · `.` bomb · `/` plant/upgrade · `'` heal · M next flower
+- P1: WASD move · Shift sprint · F baton · G bomb · V use power-up · E plant/upgrade (hold) · R heal (hold) · Q next flower / dig-up mode
+- P2 (local): arrows · Right Shift sprint · `,` baton · `.` bomb · `;` use power-up · `/` plant/upgrade · `'` heal · M next flower
 - P or Esc pauses (either player, online too). From the pause screen R restarts the same map with the same cats and flowers, M goes back to the menu, and S saves the game as a file.
 - **O** on the main menu loads a saved game (solo, local co-op or online) and carries on from the moment it was saved, paused. Online, the host saves and loads; a loaded online game starts once P2 joins.
 - Beat all 10 waves and press C on the victory screen to keep going in **endless mode**: wave after wave, each tougher than the last. Wave 11, right after the big boss, is a smaller one to catch your breath; after that the monsters come in about the same numbers but get much tougher, and every 5 waves brings one more boss (wave 15 has two, waves 16–19 one each, wave 20 three…). Lose an endless wave and R retries it from the break before it (same garden, same coins); Esc goes back to the menu.

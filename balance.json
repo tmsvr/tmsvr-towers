@@ -28,7 +28,8 @@
     "enemies.unslowable": "Frostbloom can't slow it.",
     "enemies.dash.leap": "During each dash it is in the air: ground-only flowers and poison clouds can't touch it.",
     "enemies.enrage": "Speed grows as it loses health, up to maxSpeedMultiplier when nearly dead.",
-    "bloom": "Bloom abilities (IDEAS R1): flowers at bloom.level get one special ability each. enabled = false switches them all off (and the price bump). upgradePrice multiplies the cost of the upgrade that reaches bloom.level. daisy: every Nth seed splits into `pieces` more seeds at `damage` share, aimed at monsters within `reach` tiles. sunflower: the beam also takes maxHp of the target's max health. firelily: every monster hit burns for `seconds`, taking `share` of the hit's damage per second (ignores armour). stink: monsters in its clouds take `vulnerable` more damage from everything, for `seconds` after leaving. frost: every Nth pulse freezes non-boss monsters for `freeze` seconds. thorn: every Nth pulse reaches `range` times as far and knocks small monsters back `knock` tiles per second. snap: swallows any non-boss monster below `below` of its health."
+    "bloom": "Bloom abilities (IDEAS R1): flowers at bloom.level get one special ability each. enabled = false switches them all off (and the price bump). upgradePrice multiplies the cost of the upgrade that reaches bloom.level. daisy: every Nth seed splits into `pieces` more seeds at `damage` share, aimed at monsters within `reach` tiles. sunflower: the beam also takes maxHp of the target's max health. firelily: every monster hit burns for `seconds`, taking `share` of the hit's damage per second (ignores armour). stink: monsters in its clouds take `vulnerable` more damage from everything, for `seconds` after leaving. frost: every Nth pulse freezes non-boss monsters for `freeze` seconds. thorn: every Nth pulse reaches `range` times as far and knocks small monsters back `knock` tiles per second. snap: swallows any non-boss monster below `below` of its health.",
+    "elites": "Elite monsters (IDEAS R2). enabled = false switches them off. Only `types` can be elite, from wave `fromWave`: the chance is `chance` + `chancePerWave` per wave after that (+ `chanceEndlessPerWave` per endless wave), at most `maxChance`. Elites have `hp` times the health and one trait (picked by weight): armoured adds `armor`; swift multiplies speed by `speed`; regenerating heals `perSecond` of its max health a second while not poisoned or burning; frostproof can't be slowed or frozen; splitting breaks into `count` copies with `hp` of a normal one's health. Each elite carries one power-up (by weight), dropped when it dies and gone after `itemSeconds` if nobody picks it up. fertiliser: the flower you stand on gains a level for free. water: flowers within `radius` tiles heal to full and stop wearing for the rest of the wave. sun: the flower you stand on fires `fireRate` times as fast for `seconds`. snow: every non-boss monster freezes for `seconds`."
   },
 
   "player": {
@@ -137,6 +138,31 @@
     "healPerSecond": 40,
     "fullHealCostFraction": 0.3,
     "poisonSeconds": 3
+  },
+
+  "elites": {
+    "enabled": true,
+    "types": ["tank", "charger", "hive", "shield"],
+    "fromWave": 4,
+    "chance": 0.05,
+    "chancePerWave": 0.02,
+    "chanceEndlessPerWave": 0.03,
+    "maxChance": 0.4,
+    "hp": 2.5,
+    "traits": {
+      "armoured": { "weight": 1, "armor": 3 },
+      "swift": { "weight": 1, "speed": 1.4 },
+      "regenerating": { "weight": 1, "perSecond": 0.03 },
+      "frostproof": { "weight": 1 },
+      "splitting": { "weight": 1, "count": 3, "hp": 0.25 }
+    },
+    "itemSeconds": 10,
+    "items": {
+      "fertiliser": { "name": "Fertiliser", "weight": 1 },
+      "water": { "name": "Watering can", "weight": 1, "radius": 3 },
+      "sun": { "name": "Sun orb", "weight": 1, "seconds": 20, "fireRate": 2 },
+      "snow": { "name": "Snow globe", "weight": 1, "seconds": 2 }
+    }
   },
 
   "bloom": {

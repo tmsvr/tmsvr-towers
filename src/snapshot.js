@@ -38,7 +38,7 @@ export function makeSnapshot(s, seq, at, paused, ack) {
 // reads it (see the top of that file); the _ fields are the guest's own.
 export function newGuestState() {
   return {
-    players: [], flowers: [], enemies: [], drops: [], projs: [], bombs: [], clouds: [], events: [],
+    players: [], flowers: [], enemies: [], drops: [], projs: [], bombs: [], clouds: [], items: [], events: [],
     m: MAPS[0], grid: new Map(), queue: [], lives: 20, maxLives: 20, baseHitT: 0, wave: 0, phase: 'prep', timer: 0,
     over: false, won: false, kills: 0, paused: false,
     _frames: [], _shown: null, _offset: null, _waiting: [],
@@ -63,7 +63,7 @@ function decode(m) {
   for (const e of u.enemies) e.def = ENEMIES[e.type];
   u.enemies = u.enemies.filter((e) => e.def);
   u.flowers = u.flowers.filter((f) => f.type);
-  const fr = { seq: m.seq, at: m.at, paused: m.paused, ack: m.ack, game: u.game, clouds: u.clouds, flowers: u.flowers, byId: {} };
+  const fr = { seq: m.seq, at: m.at, paused: m.paused, ack: m.ack, game: u.game, clouds: u.clouds, flowers: u.flowers, items: u.items.filter((it) => it.kind), byId: {} };
   for (const f of u.flowers) { f.x = (f.tx + 0.5) * T; f.y = (f.ty + 0.5) * T; }
   const W = (MAPS[u.game.map] || MAPS[0]).W;
   fr.grid = new Map(u.flowers.map((f) => [f.ty * W + f.tx, f]));
@@ -126,7 +126,7 @@ export function interpolate(gs, now) {
   if (gs._shown !== b) {
     gs._shown = b;
     gs.m = MAPS[b.game.map] || MAPS[0]; // the host may have picked another map
-    Object.assign(gs, b.game, { paused: b.paused, grid: b.grid, flowers: b.flowers, clouds: b.clouds });
+    Object.assign(gs, b.game, { paused: b.paused, grid: b.grid, flowers: b.flowers, clouds: b.clouds, items: b.items });
     for (const key of MOVING) gs[key] = b[key];
   }
   for (const key of MOVING) {

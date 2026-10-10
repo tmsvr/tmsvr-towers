@@ -40,11 +40,11 @@ function fitCanvas() {
 }
 
 const KEYS = [
-  { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', atk: 'KeyF', bomb: 'KeyG', build: 'KeyE', heal: 'KeyR', cycle: 'KeyQ', sprint: 'ShiftLeft' },
-  { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', atk: 'Comma', bomb: 'Period', build: 'Slash', heal: 'Quote', cycle: 'KeyM', sprint: 'ShiftRight' },
+  { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', atk: 'KeyF', bomb: 'KeyG', build: 'KeyE', heal: 'KeyR', cycle: 'KeyQ', sprint: 'ShiftLeft', use: 'KeyV' },
+  { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', atk: 'Comma', bomb: 'Period', build: 'Slash', heal: 'Quote', cycle: 'KeyM', sprint: 'ShiftRight', use: 'Semicolon' },
 ];
-const DEFAULT_LABELS = { ShiftLeft: 'Shift', ShiftRight: 'R-Shift', Comma: ',', Period: '.', Slash: '/', Quote: "'", ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' };
-const KEY_TO_CODE = { '/': 'Slash', ',': 'Comma', '.': 'Period', "'": 'Quote' };
+const DEFAULT_LABELS = { ShiftLeft: 'Shift', ShiftRight: 'R-Shift', Comma: ',', Period: '.', Slash: '/', Quote: "'", ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Semicolon: ';' };
+const KEY_TO_CODE = { '/': 'Slash', ',': 'Comma', '.': 'Period', "'": 'Quote', ';': 'Semicolon' };
 
 const held = new Set();
 const pressed = new Set(); // edge-triggered keys, consumed by the next sim tick (or network send)
@@ -84,6 +84,7 @@ function readKeys(k, withArrows) {
     heal: h(k.heal),
     buildTap: pressed.has(k.build),
     bomb: pressed.has(k.bomb),
+    use: pressed.has(k.use),
     cycle: pressed.has(k.cycle),
     ready: pressed.has('Enter'),
   };

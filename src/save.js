@@ -75,6 +75,7 @@ export function loadGame(data) {
     return o;
   };
   const s = back(data.state);
+  s.items ??= []; // saved before elites dropped power-ups
   if (s.m !== MAPS[s.map]) throw new Error('the map in this save no longer exists');
   return { state: s, mode: data.mode, sameVersion: data.version === DATA_HASH };
 }

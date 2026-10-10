@@ -190,6 +190,7 @@ the game log, so any of them can be switched off, or removed, on its own.
 | Feature | Switch | Where the code is | Log |
 |---|---|---|---|
 | R1 Bloom abilities (level 5) | `bloom.enabled` | `data.js` (`BLOOM`, `bloomOf`, the price bump in `upgradeCost`); `sim.js`: every `bl`/`burst` in `updateFlowers`, `splitSeed`, burning and `vulnT` in `updateEnemies`/`damage`/`updateClouds`; `render.js`: sparkles in `drawFlower`, flames and the purple ring in `drawEnemy`, `bloomText` in the guide; `schema.js` `burnT`, `vulnT` | `bloom` per wave and in totals |
+| R2 Elites and power-ups | `elites.enabled` | `data.js` (`ELITES`, `ELITE_TRAITS`, `ITEM_KINDS`); `sim.js`: the "Elite monsters and power-ups" section (`maybeElite`, `makeElite`, `frostproof`, `dropItem`, `updateItems`, `useItem`), plus `armorPlus` in `damage`, `speedMul`/regeneration in `updateEnemies`, splitting and drops in `killEnemy`, `wet`/`sunT` in `updateFlowers`, `inp.use`; `render.js`: `ELITE_COLOR`, `drawItemIcon`, `drawItem`, the HUD slot, the menu column; the `use` key in `main.js`, `host.js` `TAPS`, `schema.js` (`use` flag, `item`, `elite`, `mini`, `sunT`, `items`); `save.js` `items` default; sounds `pickup`, `powerup`, `freeze`, `elite` | `elites`, `items` per wave and in totals; `elite` and `item` on the timeline |
 
 To remove one for good: set its switch to false and play, then delete the
 code listed (and its tests, `_help` entry and log fields), and bump

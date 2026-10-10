@@ -24,6 +24,10 @@
 // Per wave (and in totals) for the features being playtested (IDEAS R1-R3):
 //  - bloom: { damage: {type: n}, triggers: {type: n} }  level-5 abilities; the
 //    damage is also inside `damage`, this is the share the ability added.
+//  - elites: { spawned: {trait: n}, killed }  elite monsters
+//  - items: { dropped, picked, used, expired } each {kind: n}  their power-ups
+//  timeline: [t, 'elite', type, trait, item]  an elite arrives (and what it carries)
+//            [t, 'item', p, kind, 'picked' | 'used' | 'expired']  (p = -1: nobody)
 import { DATA_HASH, CATS } from './data.js';
 
 const add = (o, k, v = 1) => { o[k] = (o[k] || 0) + v; };
@@ -70,6 +74,8 @@ function openPeriod(s) {
     activity: s.players.map(() => ({})), // seconds spent on each activity (same letters as 'pos')
     planted: {}, upgrades: {}, wilted: { wear: {}, aphid: {} }, dug: {},
     bloom: { damage: {}, triggers: {} }, // level-5 abilities (IDEAS R1): damage they added, times they went off
+    elites: { spawned: {}, killed: 0 }, // elite monsters (IDEAS R2) by trait
+    items: { dropped: {}, picked: {}, used: {}, expired: {} }, // their power-ups by kind
   };
 }
 
@@ -111,10 +117,14 @@ export function finishLog(s, how) {
   if (cur(s) && cur(s).waveStartT != null) logWaveEnd(s, how);
   const st = s.stats;
   st.result = { how, wave: s.wave, won: !!s.won, cottage: r1(s.lives), kills: s.kills, seconds: Math.round(s.t) };
-  const totals = { damage: {}, kills: {}, cottageDamage: {}, cottageDamageByRoad: {}, coins: s.players.map(() => ({ earned: 0, plant: 0, upgrade: 0, heal: 0, refund: 0 })), bloom: { damage: {}, triggers: {} } };
+  const totals = { damage: {}, kills: {}, cottageDamage: {}, cottageDamageByRoad: {}, coins: s.players.map(() => ({ earned: 0, plant: 0, upgrade: 0, heal: 0, refund: 0 })), bloom: { damage: {}, triggers: {} },
+    elites: { spawned: {}, killed: 0 }, items: { dropped: {}, picked: {}, used: {}, expired: {} } };
   for (const w of st.waves) {
     for (const k in w.bloom?.damage) add(totals.bloom.damage, k, w.bloom.damage[k]);
     for (const k in w.bloom?.triggers) add(totals.bloom.triggers, k, w.bloom.triggers[k]);
+    for (const k in w.elites?.spawned) add(totals.elites.spawned, k, w.elites.spawned[k]);
+    totals.elites.killed += w.elites?.killed || 0;
+    for (const what in w.items) for (const k in w.items[what]) add(totals.items[what], k, w.items[what][k]);
     for (const k in w.damage) add(totals.damage, k, w.damage[k]);
     for (const k in w.kills) add(totals.kills, k, w.kills[k]);
     for (const k in w.cottageDamage) add(totals.cottageDamage, k, w.cottageDamage[k]);
@@ -159,6 +169,16 @@ export function logDamage(s, src, e, dealt, killed, fid, bloom = false) {
 // flower's damage), and each time an ability goes off.
 export function logBloomDamage(s, type, amt) { if (cur(s)) add(cur(s).bloom.damage, type, amt); }
 export function logBloom(s, type) { if (cur(s)) add(cur(s).bloom.triggers, type); }
+
+// Elites and power-ups. what: 'dropped' | 'picked' | 'used' | 'expired';
+// p is the cat that picked it up or used it (null otherwise).
+export function logElite(s, e) { if (!cur(s)) return; add(cur(s).elites.spawned, e.elite); ev(s, 'elite', e.type, e.elite, e.carry); }
+export function logEliteKilled(s) { if (cur(s)) cur(s).elites.killed++; }
+export function logItem(s, p, kind, what) {
+  if (!cur(s)) return;
+  add(cur(s).items[what], kind);
+  if (what !== 'dropped') ev(s, 'item', p ? p.id : -1, kind, what);
+}
 
 // A monster chewing the cottage; the first bite also goes on the timeline.
 export function logCottage(s, e, amt) {

@@ -2,7 +2,7 @@
 // tick, and sending snapshots, sounds and effects back.
 import { makeSnapshot, effectsMessage } from './snapshot.js';
 
-const TAPS = ['bomb', 'cycle', 'buildTap', 'ready'];
+const TAPS = ['bomb', 'cycle', 'buildTap', 'ready', 'use'];
 
 export function createHostLink() {
   // The guest's inputs. It numbers them, one per guest tick, and resends the
