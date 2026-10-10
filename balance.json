@@ -111,13 +111,13 @@
   "flowerLevels": {
     "maxLevel": 5,
     "loadoutSize": 3,
-    "upgradeCostMultipliers": [0.9, 1.4, 2.0, 2.8],
+    "upgradeCostMultipliers": [0.6, 0.9, 1.2, 1.6],
     "priceStep": 10,
     "plantPrice": 0.5,
     "upgradePrice": 1,
     "growSeconds": [1.36, 2.04, 3.06, 4.08, 5.1],
     "perLevel": {
-      "damage": 0.5,
+      "damage": 0.7,
       "range": 0.06,
       "fasterFiring": 0.07,
       "pierce": 0.5,
