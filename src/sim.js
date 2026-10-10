@@ -341,6 +341,9 @@ function buildQueue(s, n) {
   const avail = s.m.waves.map((u, i) => ({ ...u, fromWave: from[i] })).filter((u) => u.fromWave <= n);
   const bossWave = n % TUNE.bossEvery === 0;
   if (bossWave) budget *= TUNE.bossWaveBudget;
+  // the first endless wave after the big boss is a breather before it ramps up again
+  const breather = n === TOTAL_WAVES + 1;
+  if (breather) budget *= TUNE.breatherWaveSize ?? 1;
   // Monsters that just arrived get the spotlight; older ones slowly make room.
   const weightOf = (u) => {
     const age = n - u.fromWave;
@@ -361,7 +364,7 @@ function buildQueue(s, n) {
   const k = Math.max(TUNE.spawnGapMinScale ?? 0.5, 1 - n * (TUNE.spawnSpeedupPerWave ?? 0.03));
   for (const e of q) e.wait *= k;
   // the opening rush: the first part of every wave pours out almost at once
-  const rush = Math.floor(q.length * (TUNE.openingRush ?? 0));
+  const rush = breather ? 0 : Math.floor(q.length * (TUNE.openingRush ?? 0));
   for (let i = 0; i < rush; i++) q[i].wait = Math.min(q[i].wait, 0.12);
   return q;
 }
@@ -373,7 +376,7 @@ function startWave(s) {
   s.spawnWait = 0.5;
   log.logWaveStart(s);
   const boss = s.wave % TUNE.bossEvery === 0;
-  banner(s, boss ? `Wave ${s.wave} — BOSS!` : `Wave ${s.wave}`);
+  banner(s, boss ? `Wave ${s.wave} — BOSS!` : s.wave === TOTAL_WAVES + 1 ? `Wave ${s.wave} — catch your breath` : `Wave ${s.wave}`);
   ev(s, boss ? 'boss' : 'wave');
 }
 

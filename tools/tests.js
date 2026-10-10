@@ -335,6 +335,18 @@ test('Endless', 'after a win, C carries on into wave 11 and beyond', () => {
   ok(s.stats.waves.length > 0 && s.stats.cur, 'the log carries on');
 });
 
+test('Endless', 'the wave after the big boss is a breather', () => {
+  const s = wonGame();
+  sim.continueEndless(s);
+  tick(s, { ready: true });
+  const calm = s.queue.length;
+  s.queue.length = 0;
+  for (const e of s.enemies) e.dead = true;
+  tick(s);
+  tick(s, { ready: true });
+  ok(calm < s.queue.length * 0.7, `wave 11 has ${calm} monsters, wave 12 ${s.queue.length}`);
+});
+
 test('Endless', 'a lost endless wave can be retried from the break before it', () => {
   const s = wonGame();
   sim.continueEndless(s);
