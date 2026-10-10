@@ -56,7 +56,7 @@ let roomCode = '';
 const ui = {
   cam: { x: 0, y: 0, snap: true },
   menuMap: MAPS[0], // the map behind the menu: the last one played
-  paused: false, shake: 0, dpr: 0, fps: 60, keys: KEYS, netLabel: '', disconnected: false, guide: null, online: null,
+  paused: false, shake: 0, dpr: 0, perf: '', keys: KEYS, netLabel: '', disconnected: false, guide: null, online: null,
   // Online, each person plays with the P1 layout on their own keyboard.
   keysFor: (pid) => (mode === 'local' ? KEYS[pid] : KEYS[0]),
   keyLabel: (code) => DEFAULT_LABELS[code] || code.replace(/^Key|^Digit/, ''),
@@ -458,11 +458,12 @@ function startJoin(code) {
       if (m.t === 'snap') {
         if (awaitingStart) return;
         if (mode !== 'guest') { mode = 'guest'; nPlayers = 2; state = newGuestState(); resetEffects(); ui.cam.snap = true; hideLobby(); canvas.focus(); }
-        applySnapshot(state, m, performance.now());
+        if (applySnapshot(state, m, performance.now())) perf.updates++;
       } else if (m.t === 'fx') {
         if (mode === 'guest') applyEffects(state, m, performance.now());
       } else if (m.t === 'summary') {
-        if (mode === 'guest') ui.summary = m.summary;
+        // kept until the guest's view (which trails the host a little) shows the game ending
+        if (mode === 'guest') guestSummary = m.summary;
       } else if (m.t === 'menu') {
         if (mode === 'guest') menuTogether('The host went back to the menu');
       } else if (m.t === 'start') {
@@ -536,7 +537,10 @@ function pump() {
     drainEffects(state, mode === 'host');
     if (!stopped && !ui.paused) { updateEffects(elapsed); spawnTrails(state, elapsed); }
     playEvents(state.events, mode === 'host');
-    if (mode === 'host' && guestOk && net.connected) host.send(net, state, now, acc, ui.paused);
+    if (mode === 'host' && guestOk && net.connected) {
+      const sent = host.send(net, state, now, acc, ui.paused);
+      if (sent > 0) perf.updates++; else if (sent < 0) perf.dropped++;
+    }
   } else if (mode === 'guest') {
     if (!state.paused) { updateEffects(elapsed); spawnTrails(state, elapsed); }
     playEvents(state.events, false);
@@ -598,16 +602,41 @@ function restorePositions() {
   saved.length = 0;
 }
 
-let lastDraw = performance.now();
+// Shown online next to the ping, measured honestly: frames counted per second
+// of wall-clock time (a browser's frame timestamps can look smooth while the
+// page stalls, as Safari's did), the slowest frame in that second (an average
+// hides hitches), and game updates the guest received or the host had to drop
+// because the connection was backed up (stutter that no frame rate shows).
+const perf = { frames: 0, worst: 0, last: performance.now(), start: performance.now(), updates: 0, dropped: 0 };
+function measureFrame() {
+  const t = performance.now();
+  perf.frames++;
+  perf.worst = Math.max(perf.worst, t - perf.last);
+  perf.last = t;
+  if (t - perf.start < 1000) return;
+  const k = 1000 / (t - perf.start);
+  const net = mode === 'guest' ? ` · ${Math.round(perf.updates * k)} updates/s` : mode === 'host' && perf.dropped ? ` · ${Math.round(perf.dropped * k)} updates/s dropped` : '';
+  ui.perf = `${Math.round(perf.frames * k)} fps · slowest ${Math.round(perf.worst)} ms${net}`;
+  perf.frames = perf.updates = perf.dropped = 0;
+  perf.worst = 0;
+  perf.start = t;
+}
+
+let lastDraw = performance.now(), guestSummary = null, guestEnded = false;
 function frame(now) {
   const frameDt = Math.min(0.1, (now - lastDraw) / 1000);
   lastDraw = now;
-  if (frameDt > 0) ui.fps += (1 / frameDt - ui.fps) * 0.05; // smoothed, shown online next to the ping
+  measureFrame();
   pump();
   if (mode === 'guest') {
     interpolate(state, now);
     ui.paused = state.paused;
-    if (!state.over && !state.won) ui.summary = null; // the host restarted
+    // the end screen's numbers show once the guest's view reaches the end,
+    // and go when the host starts again
+    const ended = state.over || state.won;
+    if (ended && guestSummary) ui.summary = guestSummary;
+    if (!ended && guestEnded) ui.summary = guestSummary = null;
+    guestEnded = ended;
     guest.show(state, frameDt);
   }
   const ticking = mode === 'local' || mode === 'host';

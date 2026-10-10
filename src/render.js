@@ -2272,7 +2272,7 @@ export function render(c, s, ui) {
   drawHud(c, s, time, ui);
   drawJuiceScreen(c);
   if (ui.netLabel) {
-    const txt = `${ui.netLabel} · ${Math.round(ui.fps)} fps`;
+    const txt = ui.perf ? `${ui.netLabel} · ${ui.perf}` : ui.netLabel;
     c.font = `600 13px ${FONT}`;
     const w = c.measureText(txt).width + 26;
     rrect(c, 10, 8, w, 24, 12, 'rgba(20,28,36,0.75)', 'rgba(255,255,255,0.3)', 1.5);

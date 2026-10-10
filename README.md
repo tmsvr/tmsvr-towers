@@ -73,6 +73,11 @@ them.
 - Online, going back to the menu (from the pause, victory or defeat screen)
   takes both players there and keeps you connected: either of you presses
   **3** or **Enter** to play again together, **Esc** leaves.
+- Online, the top-left label shows the ping, frames per second, the slowest
+  frame of the last second and how many game updates arrive each second (for
+  the guest; the host sees updates it had to drop). If the game feels laggy
+  while it says 60 fps, a low update count means the connection, not the
+  computer, is struggling.
 
 ## Tuning
 

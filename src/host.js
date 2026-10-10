@@ -57,17 +57,20 @@ export function createHostLink() {
     // Called every pump. A snapshot goes out every second sim tick (30 a
     // second), or as a slow heartbeat while nothing ticks (paused). It is
     // stamped with the moment its last tick stands for, `acc` seconds ago, so
-    // the guest can space them out evenly.
+    // the guest can space them out evenly. Returns 1 when a snapshot went out,
+    // -1 when one had to be dropped because the connection is backed up.
     send(net, s, now, acc, paused) {
-      if (ticks < 2 && now - lastSent < 100) return;
+      if (ticks < 2 && now - lastSent < 100) return 0;
       lastSent = now;
       ticks = 0;
       const at = now - acc * 1000;
-      if (!net.congested) net.sendFast(makeSnapshot(s, ++snapSeq, at, paused, ack));
+      const sent = !net.congested;
+      if (sent) net.sendFast(makeSnapshot(s, ++snapSeq, at, paused, ack));
       const msg = effectsMessage(fx, [...events.values()], at);
       fx = [];
       events.clear();
       if (msg) net.send(msg);
+      return sent ? 1 : -1;
     },
   };
 }
