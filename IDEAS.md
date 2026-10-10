@@ -17,6 +17,82 @@ or a rework of something core.
 | H1 | Juice: damage numbers, squash, death pops, confetti, coin bounce, hit-stop. J toggles it; `balance.json → juice` switches single effects | `4783b4c` |
 | n/a | Cats collide with trees, rocks and ponds | `4c985cf` |
 | n/a | Walkable cottage yard where nothing can be planted | `2c11ddb` |
+| F4 (part) | Endless mode after a win, with a breather wave and growing boss counts (no high scores yet) | see git log |
+| n/a | Save the game from the pause screen, load it from the menu | `9655abf` |
+
+---
+
+## R. Refined ideas (being built and playtested)
+
+Worked out in detail, with balance in mind. Each one has its own `enabled`
+switch in `balance.json`, so any of them can be turned off after playtesting
+(and its code removed) without touching the others.
+
+### R1. Bloom abilities at level 5
+
+Reaching level 5 unlocks one special ability per flower. This gives the
+upgrade path a goal, without helping "spam level-1 flowers".
+
+| Flower | Level 5 ability | Starting numbers |
+|---|---|---|
+| Daisy | Every 4th seed splits into 3 when it hits | 2 extra seeds at 50% damage |
+| Sunflower | The beam also takes a share of the target's max health (bosses too) | 3% of max health |
+| Fire Lily | Every monster a fireball hits is set on fire | 2 s, 25% of the hit's damage per second |
+| Stinkbloom | Monsters in its cloud take extra damage from everything | +15% |
+| Frostbloom | Every 3rd pulse freezes non-boss monsters solid | 0.6 s |
+| Thornrose | Every 4th pulse reaches twice as far and knocks small monsters back | 2× range |
+| Snapdragon | Swallows any non-boss monster below a share of its health | 15% |
+
+**Balance:** the level 4→5 upgrade costs 25% more while Bloom is on, so the
+ability is paid for. Boss shields (R3) block Bloom damage too. Logged: damage
+and triggers per ability.
+
+### R2. Elite monsters carrying power-ups
+
+From wave 4, some big monsters (tank, charger, hive, shield) arrive as elites:
+a glowing outline, about 2.5× health and one trait: armoured (+3 armour),
+swift (+40% speed), regenerating (heals unless poisoned), frost-proof, or
+splitting (breaks into 3 smaller copies). The chance starts around 5% and
+grows each wave, faster in endless. What an elite carries is a surprise.
+
+A killed elite drops one power-up that any cat can grab within 10 s. Each cat
+carries one (shown in the HUD) and uses it with its own key (P1 **V**, P2
+**;**). Picking up a second swaps them.
+
+- 🌱 **Fertiliser:** the flower you stand on jumps one level, free and instantly.
+- 💧 **Watering can:** flowers within 3 tiles heal to full and stop wearing for the rest of the wave.
+- ☀️ **Sun orb:** the flower you stand on fires twice as fast for 20 s.
+- ❄️ **Snow globe:** every non-boss monster on the map freezes for 2 s.
+
+**Balance:** elites drop the power-up instead of extra coins; the chance,
+health and traits are in `balance.json`. Logged: elites by trait, power-ups
+dropped, picked up, used and wasted.
+
+### R3. Boss shields and the boss chest
+
+**Shield:** at 60% health a boss raises a shield (the wave-10 and endless
+bosses at 70% and 35%). It blocks 90% of flower and baton damage, Bloom
+included, and only bombs break it: 5 bomb hits in co-op, 3 solo; Boom's big
+bombs count as 2. Segments around the boss show the hits left. Once broken the
+boss is stunned for 3 s and takes +50% damage. A shielded boss keeps walking.
+
+**Chest:** a wave in which a boss was killed ends with a chest. Each cat
+picks 1 of 3 random perks (in co-op both pick before the break goes on); each
+perk at most twice per run.
+
+| Perk | Effect |
+|---|---|
+| 🏠 Patch the roof | Cottage +30 health and +10 max health |
+| 🌿 Deep roots | All flowers wear 30% slower |
+| 🪴 Hardy stems | Aphids chew half as hard |
+| 🌸 Fourth flower | A 4th flower type joins your loadout |
+| 💰 Green thumb | Your upgrades cost 15% less |
+| 🐾 Quick paws | You grow and heal 40% faster |
+| 💣 Bomb pouch | +1 bomb, and bombs recharge 25% faster |
+
+**Balance:** two chests in a normal game (waves 5 and 10), one per boss wave
+in endless. Shields make the bosses that give chests harder. Logged: shields
+raised and broken, bomb hits, perks picked.
 
 ---
 
@@ -67,7 +143,7 @@ mechanic** so the theme changes how the game plays, not only how it looks.
 
 ## B. Flowers
 
-- **B1. Branching upgrades at level 3:** each flower chooses one of two specialisations, with a different look. 🎯🎉 · M–L
+- **B1. Branching upgrades at level 3:** each flower chooses one of two specialisations, with a different look. (R1 gives every flower one fixed ability at level 5; this would be the bigger version.) 🎯🎉 · M–L
 - **B2. Targeting modes per flower:** first, last, strongest, closest. Now that Q already cycles modes on a flower, this would need its own key or a fourth mode. 🎯 · S
 - **B3. Economy flower:** makes coins over time but doesn't attack. 🎯 · S
 - **B4. Support flower:** buffs the speed or range of neighbouring flowers, or slows their wear. 🎯 · S
@@ -83,14 +159,14 @@ mechanic** so the theme changes how the game plays, not only how it looks.
 ## C. Enemies
 
 - **C1. Enemy traits that need specific counters:** camouflage only some flowers can reveal, armour only fire melts, regeneration that poison stops. 🎯 · M
-- **C2. Elite affixes:** random modifiers such as fast, shielded, vampiric or explodes-on-death, shown with a glowing outline. 🎯🎉 · M
+- ~~C2. Elite affixes~~ → now **R2**
 - **C3. Ranged attackers** that shoot flowers from outside their range. 🎯 · M
 - **C4. Thieves** that steal coins on the ground and run off with them. 🎯🎉 · S–M
 - **C5. Carrier:** a big enemy that drops a group of small ones when hit or killed. 🎯 · S
 - **C6. Shield bearer:** blocks projectiles from the front. 🎯 · M
 - **C7. Necromancer:** revives recently killed enemies nearby. 🎯 · S
 - **C8. Flower-freezer:** an aura that disables flowers. 🎯 · S
-- **C9. Multi-phase bosses** with an on-screen health bar. 🎯🎉 · M
+- ~~C9. Multi-phase bosses~~ → now **R3** (shield phases)
 - **C10. Seedling snatchers:** flyers that carry a seedling away. 🎯🎉 · M
 
 ## D. Maps and environment
@@ -120,9 +196,9 @@ mechanic** so the theme changes how the game plays, not only how it looks.
 ## F. Run structure and progression
 
 - **F1. Wave preview:** the next wave's enemy icons and which entrance they come from. 🎯 · S
-- **F2. Perk draft:** every few waves, each player picks 1 of 3 cards. 🎉🎯 · M
+- ~~F2. Perk draft~~ → now the **R3** boss chest
 - **F3. Opt-in mutators** for a higher score. 🎯 · S–M
-- **F4. Endless mode and high scores.** 🎉 · S
+- **F4. High scores** for endless mode (endless itself is done). 🎉 · S
 - **F5. Campaign** with maps unlocking in order and 1–3 stars per map. 🎉 · M
 - **F6. Unlocks between runs:** flowers, cat hats. 🎉 · M
 - **F7. Daily seed challenge.** 🎉 · S–M
@@ -153,6 +229,6 @@ Since the dig-up, juice, music, collisions and yard are done, this is where I'd 
 
 1. **Quick wins (about one session):** F1 wave preview, E1 rewarded early calls, F8 end-of-game stats, G4 gamepad support, F9 difficulty select. These are cheap, and each one is noticeable on the first play.
 2. **The cat matters more:** A2 enemies that attack cats, then A1 revive. The chomping change already pulls you back to the cottage, and A2 makes that run dangerous. Together they are the biggest boost to co-op tension.
-3. **Deeper flower choices:** C1 enemy traits and C2 elite affixes, then B1 branching upgrades. Right now any loadout works against any wave; C1 makes the 4-of-7 pick a real decision.
-4. **Replayability:** F2 perk draft between waves, with F3 mutators. This is the step that turns 3 maps × 15 waves into something people come back to.
+3. **Deeper flower choices:** C1 enemy traits (R2 elites are a start), then B1 branching upgrades. Right now any loadout works against any wave; C1 makes the 4-of-7 pick a real decision.
+4. **Replayability:** F3 mutators, on top of the R3 perk chests. This is the step that turns 3 maps × 15 waves into something people come back to.
 5. **Its own identity:** one reskin with its mechanic, ideally S2 Lantern Folk with D1 day/night, or S5 Spirit Grove. This is the largest piece of work, so it's best done once the rules above have settled, to avoid redrawing things twice.
