@@ -55,7 +55,7 @@ Claude Code users: `.claude/launch.json` defines this server as `towers`
 | `src/predict.js` | Guest-side prediction of its own cat, reconciled with the host |
 | `src/save.js` | Saved games (S on the pause screen, O on the menu): the whole state as JSON, keeping shared references (`$id`/`$ref`) and naming shared data (monster types, maps) |
 | `src/util.js` | Seeded RNG, `clamp`, small helpers |
-| `tools/bot.js` | Autopilot that plays whole games through the real sim |
+| `tools/bot.js` | Autopilot that plays whole games through the real sim, copying real co-op habits (`HABITS` at the top) |
 | `tools/balance-test.html` | UI for running the autopilot over many seeds and maps |
 | `tools/gallery.html` | Every flower at every level, every cat (standing and swinging) and every monster, drawn with the real render code. `?zoom=5` for close-ups |
 | `tools/tests.html`, `tools/tests.js` | The test suite: prices, maps, monsters, endless mode, whole autopilot games, saved games, online encoding, drawing. Runs in the browser |
@@ -155,10 +155,18 @@ Check changes like this:
 2. **Run it**: `python3 serve.py`, play a few waves (solo is quickest: press 1).
    Check the browser console for errors.
 3. **Balance sanity**: open `/tools/balance-test.html`, choose map and players,
-   run several games. The bot never uses bombs and plays crudely, so its
-   results are a *lower bound* on what real players manage. From the console:
-   `(await import('/tools/bot.js')).runBot({ players: 2, seed: 1, map: 0 })`
-   returns `{ won, wave, lives, log }`.
+   run several games. The bot plays co-op like the real logs: Boom guards the
+   cottage and bombs crowds (and boss shields), Fern gardens, about 13 cheap
+   flowers before wave 1 then ~2 more a wave (more on maps with more road, and
+   after the cottage gets hurt), most coins into upgrades, heals at 55%,
+   everyone walks, power-ups and chest perks are used. Replayed on the exact
+   balance of 19 logged games it ends within a wave or two of the players,
+   usually a little behind (they won on Hourglass, it wins 4/4 with less
+   cottage left), so read it as a slightly pessimistic estimate. Its habits
+   are numbers in `HABITS` (`runBot({ habits })` overrides them; `onTick`
+   watches it play). Solo play is less tuned (the logs are all co-op). From
+   the console: `(await import('/tools/bot.js')).runBot({ players: 2, seed: 1, map: 0 })`
+   returns `{ won, wave, lives, log, game }`.
 4. **Art**: `/tools/gallery.html` (add `?zoom=5`).
 5. **Real playtest logs**: players press **L** to download the last 20 games
    as JSON (per wave: monsters, cottage damage by type and by road, coins
@@ -191,9 +199,9 @@ the game log, so any of them can be switched off, or removed, on its own.
 | Feature | Switch | Where the code is | Log |
 |---|---|---|---|
 | R1 Bloom abilities (level 5) | `bloom.enabled` | `data.js` (`BLOOM`, `bloomOf`, the price bump in `upgradeCost`); `sim.js`: every `bl`/`burst` in `updateFlowers`, `splitSeed`, burning and `vulnT` in `updateEnemies`/`damage`/`updateClouds`; `render.js`: sparkles in `drawFlower`, flames and the purple ring in `drawEnemy`, `bloomText` in the guide; `schema.js` `burnT`, `vulnT` | `bloom` per wave and in totals |
-| R2 Elites and power-ups | `elites.enabled` | `data.js` (`ELITES`, `ELITE_TRAITS`, `ITEM_KINDS`); `sim.js`: the "Elite monsters and power-ups" section (`maybeElite`, `makeElite`, `frostproof`, `dropItem`, `updateItems`, `useItem`), plus `armorPlus` in `damage`, `speedMul`/regeneration in `updateEnemies`, splitting and drops in `killEnemy`, `wet`/`sunT` in `updateFlowers`, `inp.use`; `render.js`: `ELITE_COLOR`, `drawItemIcon`, `drawItem`, the HUD slot, the menu column; the `use` key in `main.js`, `host.js` `TAPS`, `schema.js` (`use` flag, `item`, `elite`, `mini`, `sunT`, `items`); `save.js` `items` default; sounds `pickup`, `powerup`, `freeze`, `elite` | `elites`, `items` per wave and in totals; `elite` and `item` on the timeline |
-| R3 Boss shields | `bossShield.enabled` | `data.js` `SHIELD`; `sim.js`: "Boss shields" section (`raiseShield`, `bombShield`), `shieldAt` in `spawnEnemy`, the shield/exposed lines in `damage`, `exposedT` in `updateEnemies`, the call in `explode`; `render.js` `drawShield`; `schema.js` `shield`, `shieldMax`, `exposedT`; sounds `shieldUp`, `shieldHit`, `shieldBreak` | `shields` per wave and in totals; `shield` on the timeline |
-| R3 Boss chests | `bossChest.enabled` | `data.js` `CHEST`, `PERKS`; `sim.js`: "Boss chests" section (`rollOffers`, `openChest`, `updateChest`, `applyPerk`), `chestDue` in `killEnemy`/`updateWaves`/`continueEndless`, the `s.chest` early return in `step`, perks in `catStats` and `teamPerk` (wear, aphids), `bombMax`; `render.js` `drawChest`, the bomb count in the HUD; `schema.js` `chest`, `perks`; `guest.js` (no prediction while a chest is open); `tools/bot.js` takes the first perk; sound `chest` | `perks` per wave (`[player, perk]`) and in totals; `perk` on the timeline |
+| R2 Elites and power-ups | `elites.enabled` | `data.js` (`ELITES`, `ELITE_TRAITS`, `ITEM_KINDS`); `sim.js`: the "Elite monsters and power-ups" section (`maybeElite`, `makeElite`, `frostproof`, `dropItem`, `updateItems`, `useItem`), plus `armorPlus` in `damage`, `speedMul`/regeneration in `updateEnemies`, splitting and drops in `killEnemy`, `wet`/`sunT` in `updateFlowers`, `inp.use`; `render.js`: `ELITE_COLOR`, `drawItemIcon`, `drawItem`, the HUD slot, the menu column; the `use` key in `main.js`, `host.js` `TAPS`, `schema.js` (`use` flag, `item`, `elite`, `mini`, `sunT`, `items`); `save.js` `items` default; `tools/bot.js` `itemJob`, `snowNow`; sounds `pickup`, `powerup`, `freeze`, `elite` | `elites`, `items` per wave and in totals; `elite` and `item` on the timeline |
+| R3 Boss shields | `bossShield.enabled` | `data.js` `SHIELD`; `sim.js`: "Boss shields" section (`raiseShield`, `bombShield`), `shieldAt` in `spawnEnemy`, the shield/exposed lines in `damage`, `exposedT` in `updateEnemies`, the call in `explode`; `render.js` `drawShield`; `schema.js` `shield`, `shieldMax`, `exposedT`; `tools/bot.js` bombs shielded bosses first (`bombTarget`); sounds `shieldUp`, `shieldHit`, `shieldBreak` | `shields` per wave and in totals; `shield` on the timeline |
+| R3 Boss chests | `bossChest.enabled` | `data.js` `CHEST`, `PERKS`; `sim.js`: "Boss chests" section (`rollOffers`, `openChest`, `updateChest`, `applyPerk`), `chestDue` in `killEnemy`/`updateWaves`/`continueEndless`, the `s.chest` early return in `step`, perks in `catStats` and `teamPerk` (wear, aphids), `bombMax`; `render.js` `drawChest`, the bomb count in the HUD; `schema.js` `chest`, `perks`; `guest.js` (no prediction while a chest is open); `tools/bot.js` `pickPerk`; sound `chest` | `perks` per wave (`[player, perk]`) and in totals; `perk` on the timeline |
 
 To remove one for good: set its switch to false and play, then delete the
 code listed (and its tests, `_help` entry and log fields), and bump

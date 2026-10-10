@@ -84,8 +84,11 @@ them.
 | `tools/maps.html` | Every map drawn whole, to check a layout after editing `maps.json` (http://localhost:8765/tools/maps.html). |
 | `tools/balance-test.html` | Open http://localhost:8765/tools/balance-test.html to run an autopilot through whole games with the current numbers. |
 
-The autopilot never uses bombs and picks flowers crudely, so treat its
-results as a lower bound on what real players can survive.
+The autopilot plays co-op the way real players do (measured from game logs:
+Boom guards and bombs, Fern gardens, compact gardens near the cottage, most
+coins into upgrades). Checked against real games on the same balance, it
+usually ends within a wave or two of the players, slightly behind, so treat
+its results as a slightly pessimistic estimate.
 
 ## Game logs
 

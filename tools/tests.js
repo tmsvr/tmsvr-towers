@@ -418,6 +418,15 @@ for (const m of MAPS) {
   });
 }
 
+test('Games', 'the autopilot plays like people do: a garden before wave 1, bombs, coins spent', () => {
+  const r = runBot({ players: 2, seed: 1, map: 1, maxMinutes: 5 });
+  const tl = r.game.timeline, first = tl.findIndex((e) => e[1] === 'wave');
+  ok(tl.slice(0, first).filter((e) => e[1] === 'plant').length >= 6, 'starting coins not spent on flowers before wave 1');
+  ok(tl.some((e) => e[1] === 'bomb'), 'no bombs');
+  const w = r.game.waves[1];
+  ok(w.coins.every((c) => c.end < 150), `coins left after wave 2: ${w.coins.map((c) => c.end)}`);
+});
+
 test('Games', 'the end screen summary adds up', () => {
   const r = runBot({ players: 2, seed: 4, map: 0, maxMinutes: 6 }), S = gameSummary(r.game);
   eq(S.cats.length, 2, 'cats');
