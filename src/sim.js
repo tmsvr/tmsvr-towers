@@ -153,7 +153,9 @@ export function spawnEnemy(s, type, from, path = 0) {
   // The last boss is the big one. Bosses also shrink on maps with split-up
   // defences (smaller waveSize), since only some flowers will ever see them.
   const finale = d.boss ? (s.wave >= TOTAL_WAVES ? TUNE.finalBossHp || 1 : 1) * Math.sqrt(s.m.waveSize) : 1;
-  const hpScale = (TUNE.enemyHp ?? 1) * (1 + w * TUNE.hpPerWave + w * w * TUNE.hpPerWaveSquared) * (solo ? (d.boss ? TUNE.soloBossHp : 1) : TUNE.coopEnemyHp) * finale;
+  // after the breather, endless monsters toughen up faster than the crowds grow
+  const endless = 1 + (TUNE.endlessHpPerWave ?? 0) * Math.max(0, s.wave - TOTAL_WAVES - 1);
+  const hpScale = (TUNE.enemyHp ?? 1) * (1 + w * TUNE.hpPerWave + w * w * TUNE.hpPerWaveSquared) * (solo ? (d.boss ? TUNE.soloBossHp : 1) : TUNE.coopEnemyHp) * finale * endless;
   const j = () => (rnd(s) - 0.5) * 18 * U;
   const id = s.nextId++;
   const road = s.m.paths[from ? from.path : path];
@@ -337,7 +339,12 @@ function arrivals(s) {
 function buildQueue(s, n) {
   const q = [];
   const from = arrivals(s);
-  let budget = (TUNE.waveBudgetBase + n * TUNE.waveBudgetPerWave + n * n * (TUNE.waveBudgetPerWaveSquared || 0)) * (s.players.length > 1 ? TUNE.coopWaveSize : TUNE.soloWaveSize) * s.m.waveSize;
+  const size = (k) => TUNE.waveBudgetBase + k * TUNE.waveBudgetPerWave + k * k * (TUNE.waveBudgetPerWaveSquared || 0);
+  // Endless waves past the breather barely grow in number (fewer coins, fewer
+  // easy crowds for pulse flowers); their monsters get tougher instead.
+  const endless = n > TOTAL_WAVES + 1;
+  let budget = (endless ? size(TOTAL_WAVES) * (1 + (TUNE.endlessWaveSizePerWave ?? 0) * (n - TOTAL_WAVES)) : size(n))
+    * (s.players.length > 1 ? TUNE.coopWaveSize : TUNE.soloWaveSize) * s.m.waveSize;
   const avail = s.m.waves.map((u, i) => ({ ...u, fromWave: from[i] })).filter((u) => u.fromWave <= n);
   const bossWave = n % TUNE.bossEvery === 0;
   if (bossWave) budget *= TUNE.bossWaveBudget;
@@ -360,7 +367,12 @@ function buildQueue(s, n) {
     for (let i = 0; i < group; i++) q.push({ type: pick.enemy, path, wait: group > 1 ? 0.18 : lo + rnd(s) * (hi - lo) });
     budget -= pick.cost;
   }
-  if (bossWave) q.push({ type: 'boss', path: Math.floor(rnd(s) * s.m.paths.length), wait: 3 });
+  // endless brings more bosses every bossEvery waves, in ordinary waves too; the extra ones come mid-wave
+  const bosses = (bossWave ? 1 : 0) + (endless ? Math.floor((n - TOTAL_WAVES) / TUNE.bossEvery) * (TUNE.endlessBossesPerCycle ?? 0) : 0);
+  for (let i = 0; i < bosses; i++) {
+    const at = bossWave && i === bosses - 1 ? q.length : Math.floor((q.length * (i + 1)) / (bosses + 1));
+    q.splice(at, 0, { type: 'boss', path: Math.floor(rnd(s) * s.m.paths.length), wait: 3 });
+  }
   const k = Math.max(TUNE.spawnGapMinScale ?? 0.5, 1 - n * (TUNE.spawnSpeedupPerWave ?? 0.03));
   for (const e of q) e.wait *= k;
   // the opening rush: the first part of every wave pours out almost at once
@@ -375,8 +387,8 @@ function startWave(s) {
   s.queue = buildQueue(s, s.wave);
   s.spawnWait = 0.5;
   log.logWaveStart(s);
-  const boss = s.wave % TUNE.bossEvery === 0;
-  banner(s, boss ? `Wave ${s.wave} — BOSS!` : s.wave === TOTAL_WAVES + 1 ? `Wave ${s.wave} — catch your breath` : `Wave ${s.wave}`);
+  const boss = s.queue.filter((e) => e.type === 'boss').length;
+  banner(s, boss > 1 ? `Wave ${s.wave} — ${boss} BOSSES!` : boss ? `Wave ${s.wave} — BOSS!` : s.wave === TOTAL_WAVES + 1 ? `Wave ${s.wave} — catch your breath` : `Wave ${s.wave}`);
   ev(s, boss ? 'boss' : 'wave');
 }
 

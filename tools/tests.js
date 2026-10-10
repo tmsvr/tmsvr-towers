@@ -347,6 +347,20 @@ test('Endless', 'the wave after the big boss is a breather', () => {
   ok(calm < s.queue.length * 0.7, `wave 11 has ${calm} monsters, wave 12 ${s.queue.length}`);
 });
 
+test('Endless', 'later endless waves stay small but bring more bosses', () => {
+  const s = wonGame();
+  sim.continueEndless(s);
+  const waveAt = (n) => {
+    s.wave = n - 1; s.phase = 'prep'; s.queue = []; s.enemies = [];
+    tick(s, { ready: true });
+    eq(s.wave, n, 'wave');
+    return { size: s.queue.length, bosses: s.queue.filter((e) => e.type === 'boss').length };
+  };
+  const w12 = waveAt(TOTAL_WAVES + 2), w15 = waveAt(TOTAL_WAVES + 5), w16 = waveAt(TOTAL_WAVES + 6), w20 = waveAt(TOTAL_WAVES + 10);
+  eq([w12.bosses, w15.bosses, w16.bosses, w20.bosses].join(' '), '0 2 1 3', 'bosses in waves 12, 15, 16, 20');
+  ok(w20.size < w12.size * 1.6, `wave 20 has ${w20.size} monsters, wave 12 ${w12.size}`);
+});
+
 test('Endless', 'a lost endless wave can be retried from the break before it', () => {
   const s = wonGame();
   sim.continueEndless(s);
