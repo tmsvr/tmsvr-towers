@@ -199,13 +199,20 @@ function computeStats(type, lvl) {
   };
 }
 
+// Bloom abilities (IDEAS R1): what a flower of `type` can do at `lvl`
+// beyond its usual attack, or null. BLOOM.enabled can be flipped at runtime
+// (the tests do) to play without them.
+export const BLOOM = { ...BAL.bloom, enabled: !!BAL.bloom?.enabled };
+export const bloomOf = (type, lvl) => (BLOOM.enabled && lvl >= BLOOM.level && BLOOM[type]) || null;
+
 // Prices are rounded to a tidy step (10 coins), never below one step.
 const STEP = LV.priceStep || 1;
 const tidy = (v) => Math.max(STEP, Math.round(v / STEP) * STEP);
 
 // Cost to go from `lvl` to `lvl + 1`.
 export function upgradeCost(type, lvl) {
-  return tidy(FLOWERS[type].cost * LV.upgradeCostMultipliers[lvl - 1] * (LV.upgradePrice ?? 1));
+  const bloom = BLOOM.enabled && lvl + 1 === BLOOM.level ? BLOOM.upgradePrice ?? 1 : 1; // the ability is paid for
+  return tidy(FLOWERS[type].cost * LV.upgradeCostMultipliers[lvl - 1] * (LV.upgradePrice ?? 1) * bloom);
 }
 
 // Coins to plant a seedling and grow it to level 1.

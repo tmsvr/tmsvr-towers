@@ -9,7 +9,7 @@ import { ENEMIES, FLOWER_ORDER, CAT_ORDER } from './data.js';
 // so small numbers take one byte and a position in tenths of a pixel three.
 // Bump whenever a message changes shape, so mismatched copies refuse to play
 // together instead of misreading each other (checked when a guest joins).
-export const PROTOCOL = 7;
+export const PROTOCOL = 8;
 
 const utf8 = new TextEncoder(), fromUtf8 = new TextDecoder();
 
@@ -135,7 +135,7 @@ const ENEMY = struct([
   ['id', int], ['type', oneOf(Object.keys(ENEMIES))], ['x', r1], ['y', r1], ['hp', r1], ['maxhp', r1], ['flash', r2],
   // the drawing only uses wob through sines of 1, 1.5, 2, 2.2, 4 and 0.3 times it, all of which repeat every 20π
   ['wob', cycle(20 * Math.PI, 2)], ['ang', r2], ['slowT', r2], ['stun', r2], ['under', bool], ['dashing', bool], ['chew', bool], ['psn', int],
-  ['atBase', bool],
+  ['atBase', bool], ['burnT', r1], ['vulnT', r1],
 ]);
 
 const DROP = struct([['id', int], ['x', r1], ['y', r1], ['big', bool], ['age', r1]]);

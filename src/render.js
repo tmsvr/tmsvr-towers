@@ -11,6 +11,7 @@
 import {
   T, U, VIEW_W, MAP_H, HUD_H, TOTAL_WAVES, MAPS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, GLOBAL_RANGE, ENEMIES, INTROS,
+  BLOOM, bloomOf,
 } from './data.js';
 import { tileOf, canBuildAt, uprootRefund, catStats, plantPrice, upgradeLeft, healLeft } from './sim.js';
 import { isMuted } from './audio.js';
@@ -849,6 +850,12 @@ function drawFlower(c, f, time) {
   const body = wither ? mix(sp.body, '#8c7a4a', wither * 0.8) : sp.body;
   const dark = wither ? mix(sp.dark, '#5e4a2a', wither * 0.8) : sp.dark;
   (BODIES[f.type] || bodyBouquet)(c, { f, sp, lvl, time, wither, body, dark });
+  if (bloomOf(f.type, lvl)) { // its Bloom ability is on: a few sparkles drift round the head
+    for (let i = 0; i < 3; i++) {
+      const a = time * 1.6 + i * 2.1 + f.id;
+      star(c, Math.cos(a) * 24, -16 + Math.sin(a) * 9, 2 + Math.abs(Math.sin(time * 4 + i)) * 1.6, '#fff6b0', null);
+    }
+  }
   c.restore();
   if (wither > 0.75 && Math.floor(time * 3) % 2) label(c, '!', f.x + T * 0.32, f.y - T * 0.5, 16, '#ff6a5a', 'center', 700);
 }
@@ -1212,6 +1219,13 @@ function drawEnemy(c, e, time) {
     c.globalAlpha = 0.45; circle(c, 0, 0, r + 2, '#9be8ff'); c.globalAlpha = 1;
     for (let i = 0; i < 3; i++) { const a = i * 2.1 + time; star(c, Math.cos(a) * r * 0.8, Math.sin(a) * r * 0.8, 3, '#ffffff'); }
   }
+  if (e.burnT > 0) { // Fire Lily's Bloom
+    for (let i = 0; i < 3; i++) {
+      const k = (time * 2.2 + i / 3) % 1;
+      ellipse(c, (i - 1) * r * 0.45, -r * 0.2 - k * r * 0.9, 3.2 * (1 - k) + 1, 5 * (1 - k) + 1.5, `rgba(255,${120 + 80 * k | 0},40,${0.9 - 0.7 * k})`);
+    }
+  }
+  if (e.vulnT > 0) circle(c, 0, 0, r + 3, null, `rgba(197,140,255,${0.55 + Math.sin(time * 8) * 0.25})`, 2); // Stinkbloom's Bloom
   if (e.stun > 0) {
     for (let i = 0; i < 3; i++) {
       const a = time * 6 + (i * Math.PI * 2) / 3;
@@ -1960,6 +1974,23 @@ function guideRows(t) {
   return rows;
 }
 
+// What a flower's Bloom ability does, in words (numbers from balance.json).
+const nth = (n) => `${n}${n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'}`;
+const pct = (v) => `${Math.round(v * 100)}%`;
+function bloomText(type) {
+  const b = BLOOM[type] || {};
+  switch (type) {
+    case 'daisy': return `every ${nth(b.every)} seed splits, ${b.pieces} more seeds fly on`;
+    case 'sunflower': return `the beam also takes ${pct(b.maxHp)} of the target's max health`;
+    case 'firelily': return `monsters it hits burn for ${b.seconds}s`;
+    case 'stink': return `monsters in its clouds take ${pct(b.vulnerable)} more damage from everything`;
+    case 'frost': return `every ${nth(b.every)} pulse freezes monsters for ${b.freeze}s (not bosses)`;
+    case 'thorn': return `every ${nth(b.every)} pulse reaches ${b.range}× as far and shoves small monsters away`;
+    case 'snap': return `swallows any monster below ${pct(b.below)} health (not bosses)`;
+    default: return 'a special ability';
+  }
+}
+
 function drawGuide(c, time, sel) {
   c.fillStyle = 'rgba(12,18,26,0.94)'; c.fillRect(0, 0, VIEW_W, VIEW_H);
   label(c, 'Flower guide', VIEW_W / 2, 28, 28, '#ffe27a', 'center', 700, OUT);
@@ -1990,11 +2021,12 @@ function drawGuide(c, time, sel) {
     label(c, txt, lx + 9, 273.5 + j * 28, 12, col, 'left', 600, null);
   });
   const notes = [
-    'Each level: more damage, a little more range, faster attacks.',
-    'Level 5 flowers never wear out.',
+    ['Each level: more damage, a little more range, faster attacks.', '#8fa5b3'],
+    ['Level 5 flowers never wear out.', '#8fa5b3'],
   ];
+  if (bloomOf(t, BLOOM.level)) notes.push([`Level ${BLOOM.level} Bloom: ${bloomText(t)}.`, '#ffe27a']);
   let ny = 262 + tags.length * 28 + 20;
-  for (const n of notes) for (const l of wrapText(c, n, 240, 12)) { label(c, l, lx, ny, 12, '#8fa5b3', 'left', 500, null); ny += 16; }
+  for (const [n, col] of notes) for (const l of wrapText(c, n, 240, 12)) { label(c, l, lx, ny, 12, col, 'left', 500, null); ny += 16; }
   // right: the five levels side by side
   const rows = guideRows(t);
   const tx = 300, lw = 150, cw = (VIEW_W - 30 - tx - lw) / MAX_LEVEL;

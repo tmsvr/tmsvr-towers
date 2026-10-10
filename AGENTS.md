@@ -181,6 +181,20 @@ d.flowerStats('daisy', 5);   // a flower's numbers at a level
 d.plantCost('thorn'); d.upgradeCost('thorn', 4);
 ```
 
+## Features being playtested (IDEAS R1–R3)
+
+Three mechanics are on trial. Each has an `enabled` switch in `balance.json`,
+lives in its own clearly marked code, has its own tests and its own part of
+the game log, so any of them can be switched off, or removed, on its own.
+
+| Feature | Switch | Where the code is | Log |
+|---|---|---|---|
+| R1 Bloom abilities (level 5) | `bloom.enabled` | `data.js` (`BLOOM`, `bloomOf`, the price bump in `upgradeCost`); `sim.js`: every `bl`/`burst` in `updateFlowers`, `splitSeed`, burning and `vulnT` in `updateEnemies`/`damage`/`updateClouds`; `render.js`: sparkles in `drawFlower`, flames and the purple ring in `drawEnemy`, `bloomText` in the guide; `schema.js` `burnT`, `vulnT` | `bloom` per wave and in totals |
+
+To remove one for good: set its switch to false and play, then delete the
+code listed (and its tests, `_help` entry and log fields), and bump
+`PROTOCOL` if a snapshot field went.
+
 ## Deploying
 
 - Push to `main` → GitHub Pages redeploys (about 1 minute). Live at

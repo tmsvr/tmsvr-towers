@@ -3,7 +3,7 @@
 // they only count, so they never change how the game plays. Only the copy of
 // the game that runs the rules (local play or the online host) keeps a log.
 //
-// Besides the per-wave summaries, the log keeps (format 2):
+// Besides the per-wave summaries, the log keeps (format 3):
 //  - timeline: what happened when, as compact arrays [t, kind, ...]:
 //      [t, 'wave', n]                        a wave starts
 //      [t, 'end', n, how, cottage]           a wave ends ('cleared' | 'lost' | 'won')
@@ -20,6 +20,10 @@
 //    each level reached [t, lvl, by], how it ended, and its own damage and kills
 //    (in total and per wave), so placement can be judged flower by flower.
 // t is game seconds; tiles are map tile coordinates.
+//
+// Per wave (and in totals) for the features being playtested (IDEAS R1-R3):
+//  - bloom: { damage: {type: n}, triggers: {type: n} }  level-5 abilities; the
+//    damage is also inside `damage`, this is the share the ability added.
 import { DATA_HASH, CATS } from './data.js';
 
 const add = (o, k, v = 1) => { o[k] = (o[k] || 0) + v; };
@@ -29,7 +33,7 @@ const SAMPLE = 2; // seconds between position samples
 // Called when the pick screen ends: who played what, where.
 export function startLog(s) {
   s.stats = {
-    format: 2,
+    format: 3,
     version: DATA_HASH,
     date: new Date().toISOString(),
     map: s.m.id,
@@ -65,6 +69,7 @@ function openPeriod(s) {
     coins: s.players.map((p) => ({ start: p.coins, earned: 0, plant: 0, upgrade: 0, heal: 0, refund: 0 })),
     activity: s.players.map(() => ({})), // seconds spent on each activity (same letters as 'pos')
     planted: {}, upgrades: {}, wilted: { wear: {}, aphid: {} }, dug: {},
+    bloom: { damage: {}, triggers: {} }, // level-5 abilities (IDEAS R1): damage they added, times they went off
   };
 }
 
@@ -89,6 +94,7 @@ export function logWaveEnd(s, how) {
   for (const k in w.cottageDamage) w.cottageDamage[k] = r1(w.cottageDamage[k]);
   for (const k in w.cottageDamageByRoad) w.cottageDamageByRoad[k] = r1(w.cottageDamageByRoad[k]);
   for (const k in w.damage) w.damage[k] = Math.round(w.damage[k]);
+  for (const k in w.bloom.damage) w.bloom.damage[k] = Math.round(w.bloom.damage[k]);
   w.coins.forEach((c, i) => { c.end = Math.round(s.players[i].coins); for (const k in c) c[k] = Math.round(c[k]); });
   w.activity.forEach((a) => { for (const k in a) a[k] = Math.round(a[k]); });
   w.garden = s.flowers.filter((f) => !f.dead).map((f) => ({ id: f.id, type: f.type, lvl: f.lvl, hp: Math.round(f.hp), tx: f.tx, ty: f.ty }));
@@ -105,8 +111,10 @@ export function finishLog(s, how) {
   if (cur(s) && cur(s).waveStartT != null) logWaveEnd(s, how);
   const st = s.stats;
   st.result = { how, wave: s.wave, won: !!s.won, cottage: r1(s.lives), kills: s.kills, seconds: Math.round(s.t) };
-  const totals = { damage: {}, kills: {}, cottageDamage: {}, cottageDamageByRoad: {}, coins: s.players.map(() => ({ earned: 0, plant: 0, upgrade: 0, heal: 0, refund: 0 })) };
+  const totals = { damage: {}, kills: {}, cottageDamage: {}, cottageDamageByRoad: {}, coins: s.players.map(() => ({ earned: 0, plant: 0, upgrade: 0, heal: 0, refund: 0 })), bloom: { damage: {}, triggers: {} } };
   for (const w of st.waves) {
+    for (const k in w.bloom?.damage) add(totals.bloom.damage, k, w.bloom.damage[k]);
+    for (const k in w.bloom?.triggers) add(totals.bloom.triggers, k, w.bloom.triggers[k]);
     for (const k in w.damage) add(totals.damage, k, w.damage[k]);
     for (const k in w.kills) add(totals.kills, k, w.kills[k]);
     for (const k in w.cottageDamage) add(totals.cottageDamage, k, w.cottageDamage[k]);
@@ -133,10 +141,11 @@ export function logSpawn(s, type) { if (cur(s)) add(cur(s).spawned, type); }
 
 // src says what did it: a flower type, 'baton P1', 'bomb P2', 'stink'...;
 // fid is the flower that did it, when a flower did.
-export function logDamage(s, src, e, dealt, killed, fid) {
+export function logDamage(s, src, e, dealt, killed, fid, bloom = false) {
   const w = cur(s);
   if (!w || !src) return;
   add(w.damage, src, dealt);
+  if (bloom) add(w.bloom.damage, src, dealt);
   if (killed) { add(w.kills, src); add(w.killed, e.type); }
   const f = fid != null && s.stats.flowers[fid];
   if (f) {
@@ -145,6 +154,11 @@ export function logDamage(s, src, e, dealt, killed, fid) {
     if (killed) f.kills++;
   }
 }
+
+// Bloom abilities: extra damage counted on its own (it is already in the
+// flower's damage), and each time an ability goes off.
+export function logBloomDamage(s, type, amt) { if (cur(s)) add(cur(s).bloom.damage, type, amt); }
+export function logBloom(s, type) { if (cur(s)) add(cur(s).bloom.triggers, type); }
 
 // A monster chewing the cottage; the first bite also goes on the timeline.
 export function logCottage(s, e, amt) {

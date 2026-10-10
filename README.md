@@ -37,6 +37,9 @@ them.
   (grows and heals faster) or Boom (faster, bigger bombs).
 - Standing on a flower, hold E to upgrade it and R to heal it. Q switches E to
   dig-up mode, which removes the flower and refunds part of what was spent on it.
+- At level 5 every flower **blooms**: it sparkles and gains a special ability
+  (Daisy seeds split, Fire Lily sets monsters alight, Frostbloom freezes…).
+  The flower guide (I) says what each one does.
 - In co-op, each cat keeps the coins it picks up (`economy.coopCoinShare` in
   `balance.json` can split a share of every pickup with the other cat).
 - P1: WASD move · Shift sprint · F baton · G bomb · E plant/upgrade (hold) · R heal (hold) · Q next flower / dig-up mode

@@ -5,7 +5,7 @@
 import * as sim from '../src/sim.js';
 import {
   T, MAPS, FLOWERS, FLOWER_ORDER, MAX_LEVEL, FLOWER_HP, ENEMIES, CATS, CAT_ORDER, BALANCE, TOTAL_WAVES,
-  plantCost, upgradeCost, flowerStats,
+  plantCost, upgradeCost, flowerStats, BLOOM, bloomOf,
 } from '../src/data.js';
 import { encodeSnapshot, encodeInputs, decodeFast } from '../src/schema.js';
 import { gameSummary } from '../src/stats.js';
@@ -424,6 +424,117 @@ test('Games', 'the end screen summary adds up', () => {
   for (const f of S.flowers) eq(f.dmg, Math.round(r.game.totals.damage[f.type] || 0), `${f.type} damage`);
   const fromFlowers = r.game.flowers.reduce((a, f) => a + f.dmg, 0);
   near(S.cats.reduce((a, c) => a + c.garden, 0), fromFlowers, 2, 'flower damage split between the cats');
+});
+
+// ---- Bloom abilities (IDEAS R1) -----------------------------------------------------
+// A flower of `type` by a road, raised straight to the Bloom level.
+function bloomFlower(type) {
+  const r = flowerByRoad(type);
+  r.f.lvl = BLOOM.level;
+  r.f.cd = 0;
+  return r;
+}
+// Pin each monster to its own spot for `secs`.
+function pin(s, spots, secs) {
+  for (let i = 0; i < secs * 60; i++) { for (const [e, x, y] of spots) if (!e.dead) { e.x = x; e.y = y; } tick(s); }
+}
+const at = ([x, y]) => [(x + 0.5) * T, (y + 0.5) * T];
+// Runs fn with Bloom switched off, then back on.
+function withoutBloom(fn) { BLOOM.enabled = false; try { fn(); } finally { BLOOM.enabled = true; } }
+const bloomLog = (s) => s.stats.cur.bloom;
+
+test('Bloom', 'every flower has a Bloom ability, and the upgrade that reaches it costs more', () => {
+  for (const t of FLOWER_ORDER) ok(bloomOf(t, BLOOM.level), `${t} has none`);
+  ok(!bloomOf('daisy', BLOOM.level - 1), 'a level below has it already');
+  const on = upgradeCost('thorn', BLOOM.level - 1);
+  let off = 0, below = 0;
+  withoutBloom(() => { off = upgradeCost('thorn', BLOOM.level - 1); below = upgradeCost('thorn', 1); });
+  ok(on > off, `Bloom upgrade ${on}, without Bloom ${off}`);
+  eq(upgradeCost('thorn', 1), below, 'other upgrades');
+});
+
+test('Bloom', 'Daisy: every few seeds splits on to nearby monsters', () => {
+  const { s, road } = bloomFlower('daisy');
+  const [x, y] = at(road);
+  const list = [0, 1, 2].map(() => monsterOn(s, 'grunt', road));
+  for (const e of list) e.hp = e.maxhp = 1e6;
+  pin(s, list.map((e, i) => [e, x + i * 12, y]), 3);
+  ok(bloomLog(s).triggers.daisy > 0, 'no seed split');
+  ok(bloomLog(s).damage.daisy > 0, 'split seeds did no damage');
+});
+
+test('Bloom', 'Sunflower: the beam also takes a share of max health', () => {
+  const { s, f, road } = bloomFlower('sunflower');
+  const tank = monsterOn(s, 'tank', road);
+  tank.hp = tank.maxhp = 1e5; // tough enough to live through the beam
+  const before = tank.hp;
+  pin(s, [[tank, ...at(road)]], 1 / 60);
+  const st = flowerStats('sunflower', f.lvl);
+  near(before - tank.hp, st.dmg - ENEMIES.tank.armor + tank.maxhp * BLOOM.sunflower.maxHp, 0.01, 'one beam');
+});
+
+test('Bloom', 'Fire Lily: monsters it hits keep burning', () => {
+  const { s, road } = bloomFlower('firelily');
+  const grunt = monsterOn(s, 'grunt', road);
+  grunt.hp = grunt.maxhp = 1e6;
+  for (let i = 0; i < 240 && !(grunt.burnT > 0); i++) pin(s, [[grunt, ...at(road)]], 1 / 60);
+  ok(grunt.burnT > 0, 'the grunt never caught fire');
+  const hp = grunt.hp;
+  s.flowers.length = 0; s.grid.clear(); s.projs.length = 0; // nothing else may hit it now
+  pin(s, [[grunt, ...at(road)]], 0.5);
+  ok(grunt.hp < hp, 'burning did no damage');
+});
+
+test('Bloom', 'Stinkbloom: monsters in its clouds take extra damage', () => {
+  const { s, road } = bloomFlower('stink');
+  const grunt = monsterOn(s, 'grunt', road);
+  grunt.hp = grunt.maxhp = 1e6;
+  for (let i = 0; i < 400 && !(grunt.vulnT > 0); i++) pin(s, [[grunt, ...at(road)]], 1 / 60);
+  ok(grunt.vulnT > 0, 'the grunt was never weakened');
+  const hp = grunt.hp;
+  sim.damage(s, grunt, 100, true);
+  near(hp - grunt.hp, 100 * (1 + BLOOM.stink.vulnerable), 0.01, 'a 100 hit');
+});
+
+test('Bloom', 'Frostbloom: every few pulses freezes monsters, but not bosses', () => {
+  const { s, road } = bloomFlower('frost');
+  const grunt = monsterOn(s, 'grunt', road), boss = monsterOn(s, 'boss', road);
+  grunt.hp = grunt.maxhp = boss.hp = boss.maxhp = 1e6;
+  let frozen = false, bossFrozen = false;
+  for (let i = 0; i < 60 * 12; i++) { pin(s, [[grunt, ...at(road)], [boss, ...at(road)]], 1 / 60); frozen ||= grunt.stun > 0; bossFrozen ||= boss.stun > 0; }
+  ok(frozen, 'the grunt was never frozen');
+  ok(!bossFrozen, 'the boss was frozen');
+});
+
+test('Bloom', 'Thornrose: every few pulses reach further', () => {
+  const { s, f, road } = bloomFlower('thorn');
+  const close = monsterOn(s, 'grunt', road), far = monsterOn(s, 'grunt', road);
+  close.hp = close.maxhp = far.hp = far.maxhp = 1e6;
+  const reach = flowerStats('thorn', f.lvl).range;
+  pin(s, [[close, ...at(road)], [far, f.x + reach * 1.6, f.y]], 1.4); // too soon for a Bloom pulse
+  eq(far.hp, far.maxhp, 'far grunt health before the Bloom pulse');
+  pin(s, [[close, ...at(road)], [far, f.x + reach * 1.6, f.y]], 3);
+  ok(far.hp < far.maxhp, 'the far grunt was never hit');
+});
+
+test('Bloom', 'Snapdragon: swallows a weak big monster whole', () => {
+  const { s, road } = bloomFlower('snap');
+  const tank = monsterOn(s, 'tank', road);
+  tank.hp = tank.maxhp * BLOOM.snap.below * 0.9;
+  for (let i = 0; i < 180 && !tank.dead; i++) pin(s, [[tank, ...at(road)]], 1 / 60);
+  ok(tank.dead, 'the weak tank was not swallowed');
+  ok(bloomLog(s).triggers.snap === 1, 'logged');
+});
+
+test('Bloom', 'switched off, a level-5 flower has no ability', () => {
+  withoutBloom(() => {
+    const { s, f, road } = bloomFlower('sunflower');
+    const tank = monsterOn(s, 'tank', road);
+    tank.hp = tank.maxhp = 1e5;
+    const before = tank.hp;
+    pin(s, [[tank, ...at(road)]], 1 / 60);
+    near(before - tank.hp, flowerStats('sunflower', f.lvl).dmg - ENEMIES.tank.armor, 0.01, 'one beam');
+  });
 });
 
 // ---- saved games ------------------------------------------------------------------

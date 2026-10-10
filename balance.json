@@ -27,7 +27,8 @@
     "waveSets": "Other lists like waves, for maps that name one with waveSet in maps.json; maps without one use waves. rush (Hourglass): fast monsters and ones Frostbloom can't hold, a few flyers at an unknown wave, small wasp packs late. wild (Millstream): leapers and diggers that get past ground flowers, beetles that punish chip damage, flyers rare and late.",
     "enemies.unslowable": "Frostbloom can't slow it.",
     "enemies.dash.leap": "During each dash it is in the air: ground-only flowers and poison clouds can't touch it.",
-    "enemies.enrage": "Speed grows as it loses health, up to maxSpeedMultiplier when nearly dead."
+    "enemies.enrage": "Speed grows as it loses health, up to maxSpeedMultiplier when nearly dead.",
+    "bloom": "Bloom abilities (IDEAS R1): flowers at bloom.level get one special ability each. enabled = false switches them all off (and the price bump). upgradePrice multiplies the cost of the upgrade that reaches bloom.level. daisy: every Nth seed splits into `pieces` more seeds at `damage` share, aimed at monsters within `reach` tiles. sunflower: the beam also takes maxHp of the target's max health. firelily: every monster hit burns for `seconds`, taking `share` of the hit's damage per second (ignores armour). stink: monsters in its clouds take `vulnerable` more damage from everything, for `seconds` after leaving. frost: every Nth pulse freezes non-boss monsters for `freeze` seconds. thorn: every Nth pulse reaches `range` times as far and knocks small monsters back `knock` tiles per second. snap: swallows any non-boss monster below `below` of its health."
   },
 
   "player": {
@@ -136,6 +137,19 @@
     "healPerSecond": 40,
     "fullHealCostFraction": 0.3,
     "poisonSeconds": 3
+  },
+
+  "bloom": {
+    "enabled": true,
+    "level": 5,
+    "upgradePrice": 1.25,
+    "daisy": { "every": 4, "pieces": 2, "damage": 0.5, "reach": 1.5 },
+    "sunflower": { "maxHp": 0.03 },
+    "firelily": { "seconds": 2, "share": 0.25 },
+    "stink": { "vulnerable": 0.15, "seconds": 1 },
+    "frost": { "every": 3, "freeze": 0.6 },
+    "thorn": { "every": 4, "range": 2, "knock": 4 },
+    "snap": { "below": 0.15 }
   },
 
   "flowers": {

@@ -6,7 +6,7 @@
 import {
   T, U, VIEW_W, MAP_H, TOTAL_WAVES, MAPS, ENEMIES, INTROS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, GROW_TIME, FLOWER_HP, WEAR_PER_SEC, WEAR_MULT, HEAL_RATE, HEAL_COST,
-  POISON_TIME, START_COINS, LOADOUT_SIZE, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER,
+  POISON_TIME, START_COINS, LOADOUT_SIZE, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, bloomOf,
 } from './data.js';
 import { prune, clamp, nextSeed, randomFrom } from './util.js';
 import * as log from './stats.js';
@@ -168,6 +168,7 @@ export function spawnEnemy(s, type, from, path = 0) {
     stun: 0, slow: 1, slowT: 0, kx: 0, ky: 0, flash: 0, dead: false, wob: (id * 2.4) % 6, ang: 0, // wob only animates, so it stays off the game's random numbers
     phaseT: rnd(s) * 2, spawnT: 0, under: false, dashing: false, chew: null, chewT: 0, chewCd: 1,
     psn: 0, psnT: 0, psnDps: 0, atBase: false, baseAng: rnd(s) * Math.PI * 2,
+    burnT: 0, burnDps: 0, vulnT: 0, vuln: 0, // Bloom: Fire Lily's burning, Stinkbloom's weak spot
   });
 }
 
@@ -178,15 +179,20 @@ export const hittable = (e) => !e.dead && !e.under;
 export const airborne = (e) => e.def.flying || (e.dashing && e.def.dash.leap);
 
 // src (optional) is who did it, for the game log: a flower type, 'baton P1'...;
-// fid is the flower that did it, so the log can judge each flower's spot.
-export function damage(s, e, amt, ignoreArmor = false, quiet = false, src = null, fid = null) {
+// fid is the flower that did it, so the log can judge each flower's spot;
+// bloom marks damage from a level-5 Bloom ability.
+export function damage(s, e, amt, ignoreArmor = false, quiet = false, src = null, fid = null, bloom = false) {
   if (e.dead) return;
-  const hit = ignoreArmor ? amt : Math.max(1, amt - e.def.armor);
+  let hit = ignoreArmor ? amt : Math.max(1, amt - e.def.armor);
+  // Stinkbloom's Bloom: monsters in its clouds take extra damage from everything
+  const weak = e.vulnT > 0 ? hit * e.vuln : 0;
+  hit += weak;
   const dealt = Math.min(hit, Math.max(0, e.hp));
   e.hp -= hit;
   if (!quiet) e.flash = 0.1;
   if (e.hp <= 0) killEnemy(s, e);
-  log.logDamage(s, src, e, dealt, e.dead, fid);
+  log.logDamage(s, src, e, dealt, e.dead, fid, bloom);
+  if (weak > 0) log.logBloomDamage(s, 'stink', Math.min(weak, dealt));
 }
 
 function killEnemy(s, e) {
@@ -234,6 +240,13 @@ function updateEnemies(s, dt) {
       if (e.psnT <= 0) e.psn = 0;
       if (e.dead) continue;
     }
+    if (e.burnT > 0) { // Fire Lily's Bloom
+      e.burnT -= dt;
+      damage(s, e, e.burnDps * dt, true, true, 'firelily', e.burnFid, true);
+      if (e.burnT <= 0) e.burnDps = 0;
+      if (e.dead) continue;
+    }
+    if (e.vulnT > 0) e.vulnT -= dt;
     if (e.kx || e.ky) {
       e.x += e.kx * dt; e.y += e.ky * dt;
       const f = Math.pow(0.002, dt);
@@ -737,7 +750,7 @@ function updateFlowers(s, dt) {
     if (f.dead) continue;
     f.cd -= dt;
     if (f.cd > 0) continue;
-    const st = flowerStats(f.type, f.lvl);
+    const st = flowerStats(f.type, f.lvl), bl = bloomOf(f.type, f.lvl);
     let best = null;
     const inRange = [];
     for (const e of s.enemies) {
@@ -752,38 +765,56 @@ function updateFlowers(s, dt) {
     }
     if (!best) continue;
     f.cd = st.rate;
+    f.shots = (f.shots || 0) + 1;
+    const burst = !!bl?.every && f.shots % bl.every === 0; // this attack is the Bloom one
     f.angle = Math.atan2(best.y - f.y, best.x - f.x);
     f.flash = 0.15;
     f.headIdx = (f.headIdx + 1) % Math.min(f.lvl, 5);
     const hx = f.x, hy = f.y - T * 0.35;
     if (st.kind === 'single') {
-      s.projs.push({ id: s.nextId++, kind: 'single', x: hx, y: hy, target: best, speed: 460 * U, dmg: st.dmg, color: st.color, src: f.type, fid: f.id });
+      s.projs.push({ id: s.nextId++, kind: 'single', x: hx, y: hy, target: best, speed: 460 * U, dmg: st.dmg, color: st.color, src: f.type, fid: f.id, split: burst ? { ...bl } : null });
     } else if (st.kind === 'beam') {
       damage(s, best, st.dmg, false, false, f.type, f.id);
+      if (bl?.maxHp && !best.dead) { damage(s, best, best.maxhp * bl.maxHp, true, true, f.type, f.id, true); log.logBloom(s, f.type); }
       s.fx.push({ kind: 'beam', x: hx, y: hy, x2: best.x, y2: best.y, col: st.color, w: 4 + f.lvl });
       puff(s, best.x, best.y, '#fff3a0', 10, 110);
     } else if (st.kind === 'bolt') {
       const a = Math.atan2(best.y - hy, best.x - hx);
-      s.projs.push({ id: s.nextId++, kind: 'bolt', x: hx, y: hy, ang: a, speed: 420 * U, dmg: st.dmg, left: st.range * 1.25, hit: [], pierce: st.pierce ?? Infinity, color: st.color, big: f.lvl, src: f.type, fid: f.id });
+      s.projs.push({ id: s.nextId++, kind: 'bolt', x: hx, y: hy, ang: a, speed: 420 * U, dmg: st.dmg, left: st.range * 1.25, hit: [], pierce: st.pierce ?? Infinity, color: st.color, big: f.lvl, src: f.type, fid: f.id, burn: bl?.seconds ? { ...bl } : null });
     } else if (st.kind === 'chomp') {
       // small critters get swallowed whole; everything else loses a bite plus a
       // share of its max health, so the bigger the monster the bigger the chunk
-      const gulp = best.def.light && !best.def.boss;
+      // Snapdragon's Bloom: anything but a boss gets swallowed once it's weak enough
+      const finish = !!bl?.below && !best.def.boss && !best.def.light && best.hp <= best.maxhp * bl.below;
+      const gulp = (best.def.light && !best.def.boss) || finish;
       const chunk = best.maxhp * ((best.def.boss ? st.bossMaxHpBite : st.maxHpBite) || 0);
-      damage(s, best, gulp ? best.hp + 1 : st.dmg + chunk, gulp, false, f.type, f.id);
+      damage(s, best, gulp ? best.hp + 1 : st.dmg + chunk, gulp, false, f.type, f.id, finish);
+      if (finish) log.logBloom(s, f.type);
       s.fx.push({ kind: 'bite', x: best.x, y: best.y, r: best.def.r + 8 * U });
       if (gulp) text(s, best.x, best.y - T * 0.4, 'GULP!', '#ff9ac8');
     } else if (st.kind === 'cloud') {
       s.projs.push({
         id: s.nextId++, kind: 'lob', x: hx, y: hy, sx: hx, sy: hy, tx: best.x, ty: best.y, speed: 260 * U, color: st.color, t: 0,
-        cloud: { r: st.cloudR, dur: st.cloudDur, dps: st.dmg, stacks: st.stacks, fid: f.id },
+        cloud: { r: st.cloudR, dur: st.cloudDur, dps: st.dmg, stacks: st.stacks, fid: f.id, vuln: bl?.vulnerable ?? 0, vulnSec: bl?.seconds ?? 0 },
       });
+      if (bl?.vulnerable) log.logBloom(s, f.type);
     } else {
-      s.fx.push({ kind: 'ring', x: f.x, y: f.y, r: st.range, col: st.color, life: 0.35 });
-      for (const e of inRange) {
+      let hits = inRange, r = st.range;
+      if (burst && bl.range) { // Thornrose's Bloom: a pulse twice as wide
+        r = st.range * bl.range;
+        hits = s.enemies.filter((e) => hittable(e) && dist(e, f) <= r + e.def.r);
+      }
+      s.fx.push({ kind: 'ring', x: f.x, y: f.y, r, col: st.color, life: burst ? 0.5 : 0.35 });
+      for (const e of hits) {
         if (st.dmg > 0) damage(s, e, st.dmg, false, false, f.type, f.id); // the frostbloom only slows
         if (st.slow && !e.def.unslowable) { e.slow = Math.min(e.slow, st.slow); e.slowT = Math.max(e.slowT, st.slowSeconds); }
+        if (!burst || e.dead || e.def.boss) continue;
+        // Bloom: Thornrose shoves small monsters away, Frostbloom freezes them solid
+        const dx = e.x - f.x, dy = e.y - f.y, d = Math.hypot(dx, dy);
+        if (bl.knock && e.def.light && d > 0) { e.kx += (dx / d) * bl.knock * T; e.ky += (dy / d) * bl.knock * T; }
+        if (bl.freeze && !e.def.unslowable) { e.stun = Math.max(e.stun, bl.freeze); e.chew = null; }
       }
+      if (burst) log.logBloom(s, f.type);
     }
     ev(s, 'shoot_' + f.type);
   }
@@ -797,7 +828,12 @@ function updateProjs(s, dt) {
       const dx = p.target.x - p.x, dy = p.target.y - p.y;
       const d = Math.hypot(dx, dy), mv = p.speed * dt;
       p.ang = Math.atan2(dy, dx);
-      if (d <= mv + p.target.def.r) { damage(s, p.target, p.dmg, false, false, p.src, p.fid); p.done = true; puff(s, p.target.x, p.target.y, p.color, 3, 60); }
+      if (d <= mv + p.target.def.r) {
+        damage(s, p.target, p.dmg, false, false, p.src, p.fid, !!p.bloom);
+        p.done = true;
+        puff(s, p.target.x, p.target.y, p.color, 3, 60);
+        if (p.split) splitSeed(s, p);
+      }
       else { p.x += (dx / d) * mv; p.y += (dy / d) * mv; }
     } else if (p.kind === 'bolt') {
       const mv = p.speed * dt;
@@ -809,6 +845,12 @@ function updateProjs(s, dt) {
           p.hit.push(e.id);
           damage(s, e, p.dmg, false, false, p.src, p.fid);
           puff(s, e.x, e.y, '#ffb347', 5, 80);
+          if (p.burn && !e.dead) { // Fire Lily's Bloom sets it alight
+            e.burnDps = Math.max(e.burnT > 0 ? e.burnDps : 0, p.dmg * p.burn.share);
+            e.burnT = p.burn.seconds;
+            e.burnFid = p.fid;
+            log.logBloom(s, p.src);
+          }
           if (p.hit.length >= p.pierce) { p.done = true; break; } // burnt out
         }
       }
@@ -828,6 +870,15 @@ function updateProjs(s, dt) {
   prune(s.projs, isDone);
 }
 
+// Daisy's Bloom: a seed bursts into more seeds that fly on to the monsters
+// nearest the one it hit.
+function splitSeed(s, p) {
+  const t = p.target, b = p.split;
+  const near = s.enemies.filter((e) => e !== t && hittable(e) && dist(e, t) <= b.reach * T).sort((a, c) => dist(a, t) - dist(c, t)).slice(0, b.pieces);
+  for (const e of near) s.projs.push({ id: s.nextId++, kind: 'single', x: t.x, y: t.y, target: e, speed: 460 * U, dmg: p.dmg * b.damage, color: p.color, src: p.src, fid: p.fid, bloom: true });
+  if (near.length) log.logBloom(s, p.src);
+}
+
 // Poison clouds add a stack to every ground enemy inside, twice a second.
 function updateClouds(s, dt) {
   for (const c of s.clouds) {
@@ -842,6 +893,7 @@ function updateClouds(s, dt) {
         e.psnT = POISON_TIME;
         e.psnDps = Math.max(e.psnDps, c.dps);
         e.psnFid = c.fid; // the log credits the poison to the newest cloud's flower
+        if (c.vuln) { e.vuln = c.vuln; e.vulnT = Math.max(e.vulnT, c.vulnSec); } // Stinkbloom's Bloom
       }
     }
   }
