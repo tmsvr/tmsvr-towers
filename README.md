@@ -42,6 +42,7 @@ them.
 - P1: WASD move · Shift sprint · F baton · G bomb · E plant/upgrade (hold) · R heal (hold) · Q next flower / dig-up mode
 - P2 (local): arrows · Right Shift sprint · `,` baton · `.` bomb · `/` plant/upgrade · `'` heal · M next flower
 - P or Esc pauses (either player, online too). From the pause screen R restarts the same map with the same cats and flowers, M goes back to the menu.
+- Beat all 10 waves and press C on the victory screen to keep going in **endless mode**: wave after wave, each bigger than the last, with a boss every 5 waves. Lose an endless wave and R retries it from the break before it (same garden, same coins); Esc goes back to the menu.
 - I (in the menu or while picking) opens the flower guide: every flower's stats at each level, worked out from `balance.json`.
 - L downloads the game logs (see below).
 - J turns the extra effects (damage numbers, confetti, hit-stop…) on and off.

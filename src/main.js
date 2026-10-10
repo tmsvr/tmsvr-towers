@@ -4,7 +4,7 @@
 //   local     – this browser runs the game for 1 or 2 players on one keyboard
 //   host      – this browser runs the game; player 2's inputs arrive over the network (host.js)
 //   guest     – this browser only sends inputs and draws snapshots from the host (guest.js)
-import { createState, step } from './sim.js';
+import { createState, step, continueEndless, retryWave } from './sim.js';
 import { finishLog, currentLog, gameSummary } from './stats.js';
 import { render, VIEW_W, VIEW_H } from './render.js';
 import { initAudio, play, toggleMute, setMusicMood } from './audio.js';
@@ -138,9 +138,16 @@ addEventListener('keydown', (e) => {
   if (code === 'KeyP') togglePause();
   // R after a game: back to the pick screen. R while paused: the same map,
   // cats and flowers again, straight into the game.
+  // After a win, C keeps going (endless mode); after losing an endless wave,
+  // R tries that wave again from the break before it.
+  const endlessLoss = state?.endless && state.over;
+  if (code === 'KeyC' && state?.won && !ui.paused) {
+    if (mode === 'guest') net.send({ t: 'continue' });
+    else if (mode === 'local' || mode === 'host') keepGoing();
+  }
   if (code === 'KeyR' && state && (state.over || state.won || ui.paused)) {
-    if (mode === 'guest') net.send({ t: 'restart' });
-    else if (mode === 'local' || mode === 'host') newGame(ui.paused && !state.over && !state.won);
+    if (mode === 'guest') net.send({ t: endlessLoss && !ui.paused ? 'retry' : 'restart' });
+    else if (mode === 'local' || mode === 'host') { if (endlessLoss && !ui.paused) retry(); else newGame(ui.paused && !state.over && !state.won); }
   }
 });
 addEventListener('keyup', (e) => held.delete(e.code || KEY_TO_CODE[e.key] || ''));
@@ -166,7 +173,9 @@ function saveGameLog(how) {
     ui.summary = gameSummary(entry);
     if (mode === 'host' && guestOk && net.connected) net.send({ t: 'summary', summary: ui.summary });
   }
-  try { localStorage.setItem(LOG_KEY, JSON.stringify([...savedLogs(), entry].slice(-LOG_KEEP))); } catch { /* storage full or blocked */ }
+  // an endless game is saved again each time it ends; keep only its latest log
+  const others = savedLogs().filter((g) => g.date !== entry.date);
+  try { localStorage.setItem(LOG_KEY, JSON.stringify([...others, entry].slice(-LOG_KEEP))); } catch { /* storage full or blocked */ }
 }
 function downloadLogs() {
   const logs = savedLogs();
@@ -204,6 +213,17 @@ function newGame(same = false) {
   ui.summary = null;
   resetEffects();
   play('wave');
+}
+
+function keepGoing() {
+  state.logSaved = false; // the same game's log goes on, and replaces the saved one when it ends
+  continueEndless(state);
+  ui.summary = null;
+}
+function retry() {
+  retryWave(state);
+  ui.summary = null;
+  resetEffects();
 }
 
 function startLocal(n) { mode = 'local'; nPlayers = n; newGame(); }
@@ -278,6 +298,8 @@ function onGuestMessage(m) {
   if (m.t === 'in') host.receiveInputs(m.inputs);
   else if (m.t === 'pause') ui.paused = !ui.paused;
   else if (m.t === 'restart' && state && (state.over || state.won || ui.paused)) newGame(ui.paused && !state.over && !state.won);
+  else if (m.t === 'continue' && state?.won) keepGoing();
+  else if (m.t === 'retry' && state?.endless && state.over) retry();
   else if (m.t === 'ping' && Number.isFinite(m.at)) net.send({ t: 'pong', at: m.at });
 }
 

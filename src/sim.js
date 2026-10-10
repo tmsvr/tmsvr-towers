@@ -392,7 +392,7 @@ function updateWaves(s, dt, ready) {
       s.spawnWait = e.wait;
     }
   } else if (!s.enemies.some((e) => !e.dead)) {
-    if (s.wave >= TOTAL_WAVES) { s.won = true; log.logWaveEnd(s, 'won'); ev(s, 'win'); return; }
+    if (s.wave >= TOTAL_WAVES && !s.endless) { s.won = true; log.logWaveEnd(s, 'won'); ev(s, 'win'); return; }
     s.phase = 'prep';
     s.timer = TUNE.timeBetweenWaves;
     // Everyone gets a share; in co-op each cat gets a bit more than half.
@@ -401,7 +401,39 @@ function updateWaves(s, dt, ready) {
     log.logWaveEnd(s, 'cleared');
     banner(s, bonus > 0 ? `Wave cleared!  +${bonus} each` : 'Wave cleared!');
     ev(s, 'clear');
+    if (s.endless) saveCheckpoint(s);
   }
+}
+
+// ---- Endless mode ---------------------------------------------------------
+// After winning, players can keep going: the waves carry on past the last one,
+// bigger every time (the same formulas, with every boss at final-boss size).
+// Each break between endless waves is saved, so a lost wave can be retried
+// from the start of the break before it.
+export function continueEndless(s) {
+  if (!s.won) return;
+  s.won = false;
+  s.endless = true;
+  s.phase = 'prep';
+  s.timer = TUNE.timeBetweenWaves;
+  log.resumeLog(s);
+  banner(s, 'Endless mode: how far can you go?');
+  ev(s, 'wave');
+  saveCheckpoint(s);
+}
+
+// The map is shared by every state and never changes, so it isn't copied.
+function saveCheckpoint(s) {
+  s.checkpoint = structuredClone({ ...s, m: null, checkpoint: null, fx: [], events: [] });
+}
+
+export function retryWave(s) {
+  if (!s.endless || !s.over || !s.checkpoint) return;
+  const { m, checkpoint } = s;
+  for (const k of Object.keys(s)) delete s[k];
+  Object.assign(s, structuredClone(checkpoint), { m, checkpoint });
+  banner(s, `Try wave ${s.wave + 1} again!`);
+  ev(s, 'wave');
 }
 
 // ---- Players --------------------------------------------------------------

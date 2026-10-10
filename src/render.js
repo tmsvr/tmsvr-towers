@@ -1660,7 +1660,7 @@ function drawHud(c, s, time, ui) {
   rrect(c, 40, y0 + 22, 150, 16, 8, 'rgba(0,0,0,0.45)', s.baseHitT > 0 ? '#ff6a5a' : OUT, 2);
   rrect(c, 42, y0 + 24, Math.max(0, 146 * hr), 12, 6, hr > 0.5 ? '#6be06b' : hr > 0.25 ? '#ffd23f' : '#ff6a5a');
   label(c, `${Math.ceil(s.lives)} / ${s.maxLives}`, 115, y0 + 30.5, 12, '#ffffff', 'center', 700);
-  label(c, `Wave ${Math.max(1, s.wave)}/${TOTAL_WAVES}`, 14, y0 + 58, 16, '#e8f1f7', 'left', 600, null);
+  label(c, s.endless ? `Wave ${s.wave} · endless` : `Wave ${Math.max(1, s.wave)}/${TOTAL_WAVES}`, 14, y0 + 58, 16, s.endless ? '#ffb86b' : '#e8f1f7', 'left', 600, null);
   const status = s.phase === 'pick' ? 'Choosing flowers' : s.phase === 'prep' ? `Next in ${Math.ceil(s.timer)}s · Enter` : `${s.enemies.length + s.queue.length} enemies left`;
   label(c, status, 14, y0 + 78, 12, '#a9bccb', 'left', 500, null);
   label(c, isMuted() ? '🔇' : '', 220, y0 + 30, 14, '#fff', 'center', 500, null);
@@ -1872,13 +1872,17 @@ const short = (v) => (v >= 1e5 ? `${Math.round(v / 1000)}k` : v >= 1e4 ? `${(v /
 const monsterName = (t) => (INTROS[t]?.[0] || t[0].toUpperCase() + t.slice(1) + 's').replace(/!$/, ''); // intro titles are already plural
 function drawEndScreen(c, s, ui, time) {
   const won = s.won, S = ui.summary;
-  const col = won ? '#8dff9a' : '#ff7a6a', keys = `${won ? 'R: play again' : 'R: try again'}  ·  Esc: menu  ·  L: download the game log`;
-  const head = won ? `All ${TOTAL_WAVES} waves defended  ·  ${s.kills} monsters bonked` : `You reached wave ${s.wave}  ·  ${s.kills} monsters bonked`;
+  // after a win: keep going into endless mode; after an endless loss: retry that wave
+  const col = won ? '#8dff9a' : '#ff7a6a';
+  const keys = won ? 'C: keep going (endless)  ·  R: play again  ·  Esc: menu  ·  L: game log'
+    : s.endless ? `R: retry wave ${s.wave}  ·  Esc: menu  ·  L: download the game log`
+    : 'R: try again  ·  Esc: menu  ·  L: download the game log';
+  const head = won ? `All ${TOTAL_WAVES} waves defended  ·  ${s.kills} monsters bonked` : `You reached ${s.endless ? 'endless ' : ''}wave ${s.wave}  ·  ${s.kills} monsters bonked`;
   if (!S) { drawOverlay(c, won ? 'Victory!' : 'The garden fell…', [head, keys], col); return; }
   c.fillStyle = 'rgba(12,18,26,0.86)'; c.fillRect(0, 0, VIEW_W, VIEW_H);
   label(c, won ? 'Victory!' : 'The garden fell…', VIEW_W / 2, 50, 46, col, 'center', 700, OUT);
   const mins = Math.floor(S.seconds / 60), secs = String(S.seconds % 60).padStart(2, '0');
-  label(c, `${won ? `All ${TOTAL_WAVES} waves` : `Wave ${S.wave}/${TOTAL_WAVES}`}  ·  ${mins}:${secs}  ·  ${S.kills} monsters bonked  ·  cottage ${S.cottage}/${S.maxCottage}`, VIEW_W / 2, 96, 18, '#e8f1f7', 'center', 500, null);
+  label(c, `${won ? `All ${TOTAL_WAVES} waves` : S.wave > TOTAL_WAVES ? `Endless wave ${S.wave}` : `Wave ${S.wave}/${TOTAL_WAVES}`}  ·  ${mins}:${secs}  ·  ${S.kills} monsters bonked  ·  cottage ${S.cottage}/${S.maxCottage}`, VIEW_W / 2, 96, 18, '#e8f1f7', 'center', 500, null);
   const top = 124, h = 444;
 
   // flowers: damage per type, biggest first

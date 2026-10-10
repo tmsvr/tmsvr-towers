@@ -9,7 +9,7 @@ import { ENEMIES, FLOWER_ORDER, CAT_ORDER } from './data.js';
 // so small numbers take one byte and a position in tenths of a pixel three.
 // Bump whenever a message changes shape, so mismatched copies refuse to play
 // together instead of misreading each other (checked when a guest joins).
-export const PROTOCOL = 6;
+export const PROTOCOL = 7;
 
 const utf8 = new TextEncoder(), fromUtf8 = new TextDecoder();
 
@@ -111,7 +111,7 @@ const flowerType = oneOf(FLOWER_ORDER);
 // ---- the snapshot -------------------------------------------------------------
 const GAME = struct([
   ['lives', r1], ['wave', int], ['phase', oneOf(PHASES)], ['timer', r1], ['queue', count], ['over', bool], ['won', bool],
-  ['kills', int], ['map', int], ['baseHitT', r2], ['maxLives', int],
+  ['kills', int], ['map', int], ['baseHitT', r2], ['maxLives', int], ['endless', bool],
 ]);
 
 const PICK = struct([['cursor', int], ['chosen', listOf(flowerType)], ['ready', bool], ['row', int]]);

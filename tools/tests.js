@@ -306,6 +306,59 @@ test('Monsters', 'per-map coin drops are read from maps.json', () => {
   ok(MAPS.some((m) => m.coinDrops !== 1), 'some map has its own coin drops');
 });
 
+// ---- endless mode ---------------------------------------------------------------
+// A game that has just won: a small garden, wave 10 done.
+function wonGame() {
+  const s = game({ cats: ['bomber', 'gardener'] }), [boom] = s.players;
+  const f = plant(s, boom, freeTile(s), 'thorn');
+  growOnce(s, boom, f);
+  s.wave = TOTAL_WAVES; s.won = true; s.phase = 'wave';
+  return s;
+}
+// Start the next wave and clear it at once.
+function clearNextWave(s) {
+  tick(s, { ready: true });
+  ok(s.phase === 'wave', 'the wave did not start');
+  s.queue.length = 0;
+  for (const e of s.enemies) e.dead = true;
+  tick(s);
+}
+
+test('Endless', 'after a win, C carries on into wave 11 and beyond', () => {
+  const s = wonGame();
+  sim.continueEndless(s);
+  ok(!s.won && s.endless && s.phase === 'prep', 'not back in a break');
+  clearNextWave(s);
+  eq(s.wave, TOTAL_WAVES + 1, 'wave'); ok(!s.won && s.phase === 'prep', 'endless waves never win');
+  clearNextWave(s);
+  eq(s.wave, TOTAL_WAVES + 2, 'wave');
+  ok(s.stats.waves.length > 0 && s.stats.cur, 'the log carries on');
+});
+
+test('Endless', 'a lost endless wave can be retried from the break before it', () => {
+  const s = wonGame();
+  sim.continueEndless(s);
+  clearNextWave(s); // wave 11 done, break before 12 saved
+  const coins = s.players.map((p) => p.coins), lives = s.lives, garden = s.flowers.map((f) => `${f.type}${f.lvl}@${f.tx},${f.ty}`);
+  tick(s, { ready: true });
+  for (let i = 0; i < 120; i++) tick(s);
+  s.players[0].coins = 0; s.flowers[0].lvl = 1;
+  s.lives = 0; s.over = true;
+  sim.retryWave(s);
+  ok(!s.over && s.phase === 'prep' && s.endless, 'back in the break');
+  eq(s.wave, TOTAL_WAVES + 1, 'wave before the retried one');
+  eq(s.lives, lives, 'cottage');
+  s.players.forEach((p, i) => eq(p.coins, coins[i], `P${i + 1} coins`));
+  eq(s.flowers.map((f) => `${f.type}${f.lvl}@${f.tx},${f.ty}`).join(' '), garden.join(' '), 'garden');
+  const f = s.flowers[0];
+  ok(s.grid.get(f.ty * s.m.W + f.tx) === f, 'the garden grid points at the restored flowers');
+  ok(s.m === MAPS[s.map], 'the map is the shared one');
+  tick(s, { ready: true });
+  eq(s.wave, TOTAL_WAVES + 2, 'the retried wave starts');
+  const m = decodeFast(encodeSnapshot(s, { seq: 1, at: 0, paused: false, ack: 0 }));
+  ok(m.state.game.endless, 'online guests are told it is endless');
+});
+
 // ---- whole games ----------------------------------------------------------------
 test('Games', 'the same seed plays out the same game', () => {
   const a = runBot({ players: 2, seed: 11, map: 1, maxMinutes: 4 });

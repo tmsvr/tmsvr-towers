@@ -45,6 +45,13 @@ export function startLog(s) {
   openPeriod(s);
 }
 
+// Endless mode after a win: the same log carries on with the next wave.
+export function resumeLog(s) {
+  if (!s.stats) return;
+  s.stats.endless = true;
+  openPeriod(s);
+}
+
 // A period runs from the end of one wave (or the start of the game) to the
 // end of the next, so spending in the break before a wave counts towards it.
 function openPeriod(s) {
