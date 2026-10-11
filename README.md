@@ -66,7 +66,6 @@ them.
 - Beat all 10 waves and press C on the victory screen to keep going in **endless mode**: wave after wave, each tougher than the last. Wave 11, right after the big boss, is a smaller one to catch your breath; after that the monsters come in about the same numbers but get much tougher, and every 5 waves brings one more boss (wave 15 has two, waves 16–19 one each, wave 20 three…). Lose an endless wave and R retries it from the break before it (same garden, same coins); Esc goes back to the menu.
 - I (in the menu or while picking) opens the flower guide: every flower's stats at each level, worked out from `balance.json`.
 - L downloads the game logs (see below).
-- J turns the extra effects (damage numbers, confetti, hit-stop…) on and off.
 - Online, both players use the P1 keys on their own keyboard. Your friend needs
   the game too: easiest is hosting it on GitHub Pages (see above) and sending
   them the invite link.

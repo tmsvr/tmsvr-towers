@@ -8,7 +8,7 @@ import { createState, step, continueEndless, retryWave } from './sim.js';
 import { finishLog, currentLog, gameSummary } from './stats.js';
 import { render, VIEW_W, VIEW_H } from './render.js';
 import { initAudio, play, toggleMute, setMusicMood } from './audio.js';
-import { juiceEvent, hitStopping, toggleJuice } from './juice.js';
+import { juiceEvent, hitStopping } from './juice.js';
 import { hostGame, joinGame } from './net.js';
 import { applySnapshot, applyEffects, interpolate, newGuestState } from './snapshot.js';
 import { decodeFast, PROTOCOL } from './schema.js';
@@ -119,7 +119,6 @@ addEventListener('keydown', (e) => {
   held.add(code);
   pressed.add(code);
   if (code === 'KeyN') toggleMute();
-  if (code === 'KeyJ') toggleJuice();
   if (code === 'KeyL') downloadLogs();
   // Esc in a game pauses (and resumes); M in the pause menu leaves. After the
   // game, before it starts online, or once disconnected, Esc leaves at once.

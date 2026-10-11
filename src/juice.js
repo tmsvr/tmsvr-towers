@@ -1,8 +1,8 @@
 // Extra game feel ("juice"): floating damage numbers, squash on hits, pops when
 // monsters die, confetti, a bouncing coin counter and a brief freeze on big
 // moments. It is purely presentational: it watches the state and events and
-// never changes the game. J toggles it in game; balance.json → "juice" sets
-// the default and switches single effects off.
+// never changes the game. It is always on; balance.json → "juice" can switch
+// single effects (or all of them, with enabled) off.
 import { BALANCE, PLAYER } from './data.js';
 import { prune } from './util.js';
 
@@ -11,25 +11,18 @@ const CFG = {
   ...(BALANCE.juice || {}),
 };
 const FONT = '"Fredoka", system-ui, -apple-system, sans-serif';
-let on = CFG.enabled;
+const on = CFG.enabled;
 const want = (k) => on && CFG[k];
 
 const seen = new Map(); // enemy id -> { hp, x, y, r, squash, pending, pendingT }
 const nums = [], pops = [], confetti = [];
 let coinT = [], lastCoins = [];
-let stop = 0, last = 0, lastState = null, toast = null;
+let stop = 0, last = 0, lastState = null;
 
 function reset() {
   seen.clear();
   nums.length = 0; pops.length = 0; confetti.length = 0; coinT = []; lastCoins = [];
   stop = 0;
-}
-
-export function toggleJuice() {
-  on = !on;
-  reset();
-  toast = { txt: on ? 'Effects on' : 'Effects off', t: 1.5 };
-  return on;
 }
 
 // Called by the game loop for every sound/shake event.
@@ -100,7 +93,6 @@ export function observeJuice(s) {
   prune(pops, (p) => p.t >= 0.3);
   for (const k of confetti) { k.t += dt; k.x += k.vx * dt; k.y += k.vy * dt; k.vx *= 0.99; k.rot += k.vr * dt; }
   prune(confetti, (k) => k.y >= 760 || k.t >= 6);
-  if (toast) { toast.t -= dt; if (toast.t <= 0) toast = null; }
 }
 
 function flush(rec) {
@@ -161,10 +153,5 @@ export function drawJuiceScreen(c) {
     c.save(); c.translate(k.x, k.y); c.rotate(k.rot);
     c.fillStyle = k.col; c.fillRect(-k.w / 2, -k.w / 4, k.w, k.w / 2 * (0.4 + Math.abs(Math.sin(k.t * 8))));
     c.restore();
-  }
-  if (toast) {
-    c.globalAlpha = Math.min(1, toast.t * 3);
-    text(c, toast.txt, 504, 70, 20, '#ffffff');
-    c.globalAlpha = 1;
   }
 }

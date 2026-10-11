@@ -2189,7 +2189,7 @@ function drawMenu(c, time, ui) {
     `Each player picks a different cat and ${LOADOUT_SIZE} of the ${FLOWER_ORDER.length} flowers. In co-op, each cat keeps the coins it picks up.`,
   ];
   tips.forEach((t, i) => label(c, t, cx, 455 + i * 24, 13.5, '#cfe0ea', 'center', 500, null));
-  label(c, 'Enter: early wave  ·  P or Esc: pause  ·  N: sound  ·  J: effects  ·  I: flower guide  ·  L: game logs', cx, 545, 14, '#8fa5b3', 'center', 500, null);
+  label(c, 'Enter: early wave  ·  P or Esc: pause  ·  N: sound  ·  I: flower guide  ·  L: game logs', cx, 545, 14, '#8fa5b3', 'center', 500, null);
   label(c, 'Online, both players use the P1 keys (or arrows) on their own keyboard.', cx, 570, 13, '#8fa5b3', 'center', 500, null);
 }
 
