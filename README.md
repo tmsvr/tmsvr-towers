@@ -51,7 +51,8 @@ them.
 - **Bosses raise a shield** at 60% health (the last boss and endless bosses at
   70% and 35%). It blocks 90% of all damage except bombs: 5 bomb hits break it
   in co-op, 3 alone, and Boom's bombs count double. A broken shield leaves the
-  boss stunned and taking 50% more damage for 3 s.
+  boss stunned and taking 50% more damage for 3 s. Bosses also shrug off half
+  of a Frostbloom's slow and can't be frozen solid.
 - A wave in which a boss died ends with a **boss chest**: each cat picks one
   of 3 perks for the rest of the run (cottage repair, slower wear, softer
   aphids, an extra flower type, cheaper flowers, faster growing, a bigger bomb

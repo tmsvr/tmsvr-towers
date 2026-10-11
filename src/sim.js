@@ -1017,12 +1017,15 @@ function updateFlowers(s, dt) {
       let hits = inRange, r = st.range;
       if (burst && bl.range) { // Thornrose's Bloom: a pulse twice as wide
         r = st.range * bl.range;
-        hits = s.enemies.filter((e) => hittable(e) && dist(e, f) <= r + e.def.r);
+        hits = s.enemies.filter((e) => hittable(e) && !(st.groundOnly && airborne(e)) && dist(e, f) <= r + e.def.r);
       }
       s.fx.push({ kind: 'ring', x: f.x, y: f.y, r, col: st.color, life: burst ? 0.5 : 0.35 });
       for (const e of hits) {
         if (st.dmg > 0) damage(s, e, st.dmg, false, false, f.type, f.id); // the frostbloom only slows
-        if (st.slow && !frostproof(e)) { e.slow = Math.min(e.slow, st.slow); e.slowT = Math.max(e.slowT, st.slowSeconds); }
+        if (st.slow && !frostproof(e)) { // bosses shrug off part of it, so frost alone can't hold them
+          e.slow = Math.min(e.slow, 1 - (1 - st.slow) * (1 - (e.def.slowResist || 0)));
+          e.slowT = Math.max(e.slowT, st.slowSeconds);
+        }
         if (!burst || e.dead || e.def.boss) continue;
         // Bloom: Thornrose shoves small monsters away, Frostbloom freezes them solid
         const dx = e.x - f.x, dy = e.y - f.y, d = Math.hypot(dx, dy);

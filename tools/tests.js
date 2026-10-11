@@ -224,6 +224,18 @@ test('Monsters', 'Frostbloom slows a grunt but not a woolly bear', () => {
   eq(woolly.slow, 1, 'woolly bear speed');
 });
 
+test('Monsters', 'bosses shrug off part of the Frostbloom slow', () => {
+  const s = game({ cats: ['bomber'] }), p = s.players[0], spot = tileByRoad(s);
+  const f = plant(s, p, spot.flower, 'frost');
+  growOnce(s, p, f);
+  const grunt = monsterOn(s, 'grunt', spot.road), boss = monsterOn(s, 'boss', spot.road);
+  for (let i = 0; i < 30; i++) { grunt.x = boss.x = (spot.road[0] + 0.5) * T; grunt.y = boss.y = (spot.road[1] + 0.5) * T; tick(s); }
+  ok(grunt.slowT > 0 && boss.slowT > 0, 'both were slowed');
+  const resist = ENEMIES.boss.slowResist;
+  ok(resist > 0, 'bosses have a slowResist');
+  near(1 - boss.slow, (1 - grunt.slow) * (1 - resist), 1e-9, 'the boss loses less speed');
+});
+
 test('Monsters', 'ground-only flowers miss flyers and leaping grasshoppers', () => {
   const def = (t) => ({ def: ENEMIES[t], dashing: false });
   ok(!sim.airborne(def('grunt')), 'a grunt is on the ground');
@@ -273,12 +285,13 @@ test('Monsters', 'poison gets through armour; poison-immune monsters shrug it of
   eq(grunt.psn, 0, 'poison stacks on an immune monster');
 });
 
-test('Monsters', 'Thornrose hits flyers', () => {
+test('Monsters', 'Thornrose hits the ground but misses flyers', () => {
   const { s, road } = flowerByRoad('thorn');
-  const flyer = monsterOn(s, 'flyer', road);
-  flyer.hp = flyer.maxhp = 1e6;
-  hold(s, [flyer], road, 2);
-  ok(flyer.hp < flyer.maxhp, 'the flyer took no damage');
+  const grunt = monsterOn(s, 'grunt', road), flyer = monsterOn(s, 'flyer', road);
+  grunt.hp = grunt.maxhp = flyer.hp = flyer.maxhp = 1e6;
+  hold(s, [grunt, flyer], road, 2);
+  ok(grunt.hp < grunt.maxhp, 'the grunt took no damage');
+  eq(flyer.hp, flyer.maxhp, 'flyer health');
 });
 
 test('Monsters', 'a hurt stag beetle runs faster', () => {

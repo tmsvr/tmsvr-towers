@@ -26,6 +26,7 @@
     "waves": "Which enemies can appear: fromWave = first wave it shows up (or [lo, hi]: a random wave in that range, rolled once per game), weight = how often it is picked, cost = how much of the wave budget one group uses, group = how many spawn together.",
     "waveSets": "Other lists like waves, for maps that name one with waveSet in maps.json; maps without one use waves. rush (Hourglass): fast monsters and ones Frostbloom can't hold, a few flyers at an unknown wave, small wasp packs late. wild (Millstream): leapers and diggers that get past ground flowers, beetles that punish chip damage, flyers rare and late.",
     "enemies.unslowable": "Frostbloom can't slow it.",
+    "enemies.slowResist": "Share of a Frostbloom's slow it shrugs off (0.5 = half as slowed: a slow to 25% speed becomes 62.5%).",
     "enemies.dash.leap": "During each dash it is in the air: ground-only flowers and poison clouds can't touch it.",
     "enemies.enrage": "Speed grows as it loses health, up to maxSpeedMultiplier when nearly dead.",
     "bloom": "Bloom abilities (IDEAS R1): flowers at bloom.level get one special ability each. enabled = false switches them all off (and the price bump). upgradePrice multiplies the cost of the upgrade that reaches bloom.level. daisy: every Nth seed splits into `pieces` more seeds at `damage` share, aimed at monsters within `reach` tiles. sunflower: the beam also takes maxHp of the target's max health. firelily: every monster hit burns for `seconds`, taking `share` of the hit's damage per second (ignores armour). stink: monsters in its clouds take `vulnerable` more damage from everything, for `seconds` after leaving. frost: every Nth pulse freezes non-boss monsters for `freeze` seconds. thorn: every Nth pulse reaches `range` times as far and knocks small monsters back `knock` tiles per second. snap: swallows any non-boss monster below `below` of its health.",
@@ -63,9 +64,9 @@
   "economy": {
     "startCoinsSolo": 70,
     "startCoinsCoop": 50,
-    "coinDropMultiplier": 1.0,
-    "coinFadePerWave": 0.07,
-    "coinFadeMin": 0.4,
+    "coinDropMultiplier": 0.9,
+    "coinFadePerWave": 0.08,
+    "coinFadeMin": 0.35,
     "waveBonusBase": 0,
     "waveBonusPerWave": 0,
     "coopBonusShare": 0.6,
@@ -94,7 +95,7 @@
     "oldEnemyMin": 0.6,
     "packGrowthPerWave": 0.2,
     "openingRush": 0.35,
-    "finalBossHp": 2.7,
+    "finalBossHp": 3.4,
     "breatherWaveSize": 0.5,
     "endlessWaveSizePerWave": 0.04,
     "endlessHpPerWave": 0.2,
@@ -213,7 +214,7 @@
     "firelily":  { "name": "Fire Lily",  "desc": "Fireball pierces a few monsters in a line", "cost": 45, "range": 3, "damage": 16, "rate": 1.5, "kind": "bolt", "pierce": 3, "color": "#ff7a2f" },
     "stink":     { "name": "Stinkbloom", "desc": "Poison clouds stack, ignore armor (ground)", "cost": 45, "range": 2.6, "damage": 2.1, "rate": 2.4, "kind": "cloud", "cloudRadius": 0.95, "cloudSeconds": 3.5, "maxStacks": 5, "groundOnly": true, "color": "#9ad14b" },
     "frost":     { "name": "Frostbloom", "desc": "Cheap. No damage, slows everything nearby", "cost": 16, "range": 2.3, "damage": 0, "rate": 2.75, "kind": "pulse", "slow": 0.45, "slowSeconds": 2.5, "color": "#8fe3ff" },
-    "thorn":     { "name": "Thornrose",  "desc": "Spiky pulse hits everything close, flyers too", "cost": 42, "range": 1.5, "damage": 8, "rate": 1.0, "kind": "pulse", "color": "#ff4d5e" },
+    "thorn":     { "name": "Thornrose",  "desc": "Spiky pulse hits everything close (ground)", "cost": 42, "range": 1.5, "damage": 8, "rate": 1.2, "kind": "pulse", "groundOnly": true, "color": "#ff4d5e" },
     "snap":      { "name": "Snapdragon", "desc": "Gulps critters, bites chunks off big monsters (ground)", "cost": 40, "range": 1.5, "damage": 45, "rate": 2.0, "kind": "chomp", "maxHpBite": 0.05, "bossMaxHpBite": 0.015, "groundOnly": true, "color": "#e0569b" }
   },
 
@@ -235,7 +236,7 @@
     "hopper":   { "hp": 30,   "speed": 1.8,  "coins": 3,  "bite": 2, "size": 0.25, "armor": 0, "light": true, "dash": { "every": 2.2, "duration": 0.6, "speedMultiplier": 3.4, "leap": true } },
     "charger":  { "hp": 90,   "speed": 1.3,  "coins": 5,  "bite": 3, "size": 0.34, "armor": 2, "enrage": { "maxSpeedMultiplier": 2.6 } },
     "hive":     { "hp": 150,  "speed": 1.05, "coins": 7,  "bite": 4, "size": 0.43, "armor": 1, "spawns": { "type": "swarm", "every": 4.5, "count": 2 } },
-    "boss":     { "hp": 800,  "speed": 0.98, "coins": 40, "bite": 8,  "size": 0.6,  "armor": 3, "boss": true, "spawns": { "type": "grunt", "every": 6, "count": 2 } }
+    "boss":     { "hp": 800,  "speed": 0.98, "coins": 40, "bite": 8,  "size": 0.6,  "armor": 3, "boss": true, "slowResist": 0.5, "spawns": { "type": "grunt", "every": 6, "count": 2 } }
   },
 
   "intros": {
