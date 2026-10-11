@@ -225,6 +225,13 @@ code listed (and its tests, `_help` entry and log fields), and bump
   quotes, semicolons, compact one-line helpers. Comments explain *why* and
   game intent in plain language; match the density of the surrounding code.
 - **Keep the sim pure**: no DOM, canvas, audio or `Math.random()` in `sim.js`. Keep the state plain data (objects, arrays, Maps, Sets, numbers, strings) so saved games work; a new kind of shared game data the state points at needs a name in `save.js` (`constants`).
+- **Keep Firefox on the GPU**: Firefox switches a canvas to slow software
+  drawing for good once it sees many shapes under scales/rotations (or font
+  sizes) it hasn't seen before. `main.js` snaps `scale`/`rotate` on the game
+  canvas to fine steps, which covers the usual squash and sway. Don't spin
+  hundreds of things through `rotate` (draw them as rotated shapes, like the
+  confetti) or animate font sizes smoothly (round them). Moving things with
+  `translate` is always fine. Check with Firefox when adding lots of animation.
 - **Numbers belong in JSON**, not in code, whenever someone might want to tune
   them; document new fields in the JSON `_help` section.
 - **Commits**: one meaningful change per commit, imperative summary line

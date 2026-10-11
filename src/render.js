@@ -80,14 +80,16 @@ function mix(a, b, t) {
 }
 
 // A canvas for pictures painted once and then stamped many times a frame
-// (flower heads, background tiles, minimap). willReadFrequently keeps it in
-// ordinary memory instead of on the GPU. In Firefox, stamping from a GPU canvas
-// cost about 0.1 ms per drawImage, over half of a busy frame; from one of these
-// it is a third faster overall. Chrome draws them just as fast either way.
+// (flower heads, background tiles, minimap). These stay on the GPU like the
+// game canvas, so stamping is a GPU-to-GPU copy. (They used to be kept in
+// ordinary memory, which measured faster only because Firefox had quietly
+// switched the game canvas itself to software drawing; see the transform
+// snapping in main.js. With that fixed, ordinary-memory pictures had to be
+// uploaded again and again and made busy waves stutter.)
 function cacheCanvas(w, h) {
   const cv = document.createElement('canvas');
   cv.width = w; cv.height = h;
-  return { cv, c: cv.getContext('2d', { willReadFrequently: true }) };
+  return { cv, c: cv.getContext('2d') };
 }
 
 // ---- static background (pre-rendered once per map) -------------------------

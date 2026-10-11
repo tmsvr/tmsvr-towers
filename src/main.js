@@ -21,6 +21,18 @@ import { MAPS, MAP_H, DATA_HASH, FLOWER_ORDER, LOADOUT_SIZE } from './data.js';
 const canvas = document.getElementById('game');
 const lobby = document.getElementById('lobby');
 const ctx = canvas.getContext('2d');
+// Firefox draws a canvas on the GPU until it sees too many shapes under scales
+// and rotations it hasn't seen before; then it switches that canvas to software
+// drawing for good, about 8x slower per call. The game's squash, sway and
+// breathing nudge scale and rotation a little every frame, which tripped it
+// within seconds, even in the menu. Snapping them to steps too fine to see
+// (1/128 and 0.01 rad, about half a degree) keeps the set small, so the canvas
+// stays on the GPU. Other browsers don't care either way.
+const SCALE_STEP = 1 / 128, TURN_STEP = 0.01;
+const snap = (v, step) => Math.round(v / step) * step || v; // never snap a tiny value to nothing
+const { scale, rotate } = CanvasRenderingContext2D.prototype;
+ctx.scale = (x, y) => scale.call(ctx, snap(x, SCALE_STEP), snap(y, SCALE_STEP));
+ctx.rotate = (a) => rotate.call(ctx, snap(a, TURN_STEP));
 // The game is laid out at VIEW_W x VIEW_H and stretched to fit the window; the
 // canvas gets as many real pixels as it is shown at, so it stays sharp at any
 // size. Steps of 0.25 keep resizing from rebuilding the caches every frame.

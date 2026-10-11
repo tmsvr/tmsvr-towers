@@ -142,16 +142,20 @@ export function drawJuiceWorld(c) {
   for (const n of nums) {
     c.globalAlpha = Math.min(1, (0.8 - n.t) * 4);
     const pop = 1 + Math.max(0, 0.12 - n.t) * 4;
-    text(c, n.txt, n.x, n.y, (n.big ? 20 : 13) * pop, n.big ? '#ffd23f' : '#ffffff');
+    // half-pixel font sizes: Firefox's GPU canvas falls back to slow drawing when every frame asks for new ones
+    text(c, n.txt, n.x, n.y, Math.round((n.big ? 20 : 13) * pop * 2) / 2, n.big ? '#ffd23f' : '#ffffff');
   }
   c.globalAlpha = 1;
 }
 
 // Drawn in screen space, over the HUD.
 export function drawJuiceScreen(c) {
+  // each piece is a turned rectangle drawn as a shape, not through a rotated
+  // canvas: hundreds of freely spinning rotations knock Firefox's canvas off the GPU
   for (const k of confetti) {
-    c.save(); c.translate(k.x, k.y); c.rotate(k.rot);
-    c.fillStyle = k.col; c.fillRect(-k.w / 2, -k.w / 4, k.w, k.w / 2 * (0.4 + Math.abs(Math.sin(k.t * 8))));
-    c.restore();
+    const cs = Math.cos(k.rot), sn = Math.sin(k.rot), hw = k.w / 2, h0 = -k.w / 4, h1 = h0 + k.w / 2 * (0.4 + Math.abs(Math.sin(k.t * 8)));
+    c.beginPath();
+    for (const [px, py] of [[-hw, h0], [hw, h0], [hw, h1], [-hw, h1]]) c.lineTo(k.x + px * cs - py * sn, k.y + px * sn + py * cs);
+    c.closePath(); c.fillStyle = k.col; c.fill();
   }
 }
