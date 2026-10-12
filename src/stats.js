@@ -11,7 +11,7 @@
 //      [t, 'lvl', p, fid, lvl, coins]        flower fid reaches lvl (1 = done growing); p finished it, coins = p's coins after
 //      [t, 'heal', p, fid, hp]               p starts healing flower fid (at hp health)
 //      [t, 'dig', p, fid, lvl, refund]       p digs flower fid up
-//      [t, 'wilt', fid, cause]               flower fid wilts ('wear' | 'aphid')
+//      [t, 'wilt', fid, cause]               flower fid wilts ('wear' | 'aphid' | 'moleking' | 'witch')
 //      [t, 'bomb', p, tx, ty, hits]          p's bomb lands on tile tx, ty and hits that many monsters
 //      [t, 'leak', type, road]               a monster reaches the cottage (road = index into the map's paths)
 //      [t, 'pos', p, tx, ty, act, coins]     every 2 s: where each cat is and what it mostly did since the last sample
@@ -240,7 +240,7 @@ export function logHealStart(s, p, f) { if (cur(s)) ev(s, 'heal', p.id, f.id, Ma
 
 export function logWilt(s, f, cause) {
   if (!cur(s)) return;
-  add(cur(s).wilted[cause], f.type);
+  add(cur(s).wilted[cause] ??= {}, f.type);
   const rec = s.stats.flowers[f.id];
   if (rec) rec.end = [r1(s.t), 'wilt', cause];
   ev(s, 'wilt', f.id, cause);

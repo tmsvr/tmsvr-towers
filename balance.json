@@ -19,7 +19,7 @@
     "enemies.size": "Radius in tiles. 'light' enemies can be knocked back by the baton and swallowed by Snapdragons.",
     "intros": "The warning shown the first time each monster type turns up in a game: [title, hint]. Leave a type out to skip its warning.",
     "difficulty.spawn": "spawnGap = seconds between single monsters (random between the two), shrinking by spawnSpeedupPerWave each wave down to spawnGapMinScale of it. packGrowthPerWave makes packs (swarms, wasps) that much bigger every wave after they appear. openingRush = the share of each wave that pours out right at the start. newEnemyBoost multiplies how often a monster type appears in its first two waves; after that older types fade by oldEnemyFade per wave down to oldEnemyMin, so every wave feels different.",
-    "difficulty": "Enemy health = base * enemyHp * (1 + hpPerWave*(wave-1) + hpPerWaveSquared*(wave-1)^2). Wave size budget = waveBudgetBase + waveBudgetPerWave*wave + waveBudgetPerWaveSquared*wave^2. Both grow slowly at first and steeply towards the last waves. Every bossEvery-th wave has a boss; the one on the last wave has finalBossHp times more health. In endless mode the wave right after that big boss is a breather: breatherWaveSize times as many monsters, and no opening rush. After it, endless waves stop growing fast: the size budget is the last wave's times (1 + endlessWaveSizePerWave per wave past it), while health gets an extra (1 + endlessHpPerWave per wave past the breather). Every bossEvery waves into endless, each wave brings endlessBossesPerCycle more bosses (ordinary waves too). Endless bosses have endlessBossHp times the health they would otherwise have.",
+    "difficulty": "Enemy health = base * enemyHp * (1 + hpPerWave*(wave-1) + hpPerWaveSquared*(wave-1)^2). Wave size budget = waveBudgetBase + waveBudgetPerWave*wave + waveBudgetPerWaveSquared*wave^2. Both grow slowly at first and steeply towards the last waves. Every bossEvery-th wave has a boss; the one on the last wave has finalBossHp times more health. In endless mode the wave right after that big boss is a breather: breatherWaveSize times as many monsters, and no opening rush. After it, endless waves stop growing fast: the size budget is the last wave's times (1 + endlessWaveSizePerWave per wave past it), while health gets an extra (1 + endlessHpPerWave per wave past the breather). Every bossEvery waves into endless, each boss wave brings endlessBossesPerCycle more bosses; ordinary waves get them too, but bossFreeCycles cycles later (with 1: wave 15 has 2 bosses, 16-19 none, 20 has 3, 21-24 one each, 25 has 4, 26-29 two each). Endless bosses have endlessBossHp times the health they would otherwise have. Each boss is picked at random from bossTypes (by weight).",
     "economy.coopCoinShare": "In co-op, the share of every coin picked up that is split evenly between all cats (1 = fully shared, 0 = whoever picks it up keeps it).",
     "economy.uprootRefund": "Share of the coins poured into a flower (planting + upgrades, not healing) you get back when you dig it up. uprootSeconds = how long you hold the key to dig.",
     "juice": "Extra effects that don't change the game: damage numbers, hit squash, death pops, confetti, coin counter bounce, short freeze (hit-stop) on bombs and boss kills. They are always on in the game; set any to false here to drop just that one (enabled: false drops them all).",
@@ -31,6 +31,9 @@
     "enemies.unslowable": "Frostbloom can't slow it.",
     "enemies.slowResist": "Share of a Frostbloom's slow it shrugs off (0.5 = half as slowed: a slow to 25% speed becomes 62.5%).",
     "enemies.dash.leap": "During each dash it is in the air: ground-only flowers and poison clouds can't touch it.",
+    "enemies.heals": "Mends monsters within radius tiles: perSecond health a second plus share of their max health a second.",
+    "enemies.quake": "Each time it comes up from underground, flowers within radius tiles lose damage health (times wearMultiplierByLevel for their level; max level is immune).",
+    "enemies.withers": "Flowers within radius tiles lose perSecond health a second (times wearMultiplierByLevel; max level is immune).",
     "enemies.enrage": "Speed grows as it loses health, up to maxSpeedMultiplier when nearly dead.",
     "bloom": "Bloom abilities (IDEAS R1): flowers at bloom.level get one special ability each. enabled = false switches them all off (and the price bump). upgradePrice multiplies the cost of the upgrade that reaches bloom.level. daisy: every Nth seed splits into `pieces` more seeds at `damage` share, aimed at monsters within `reach` tiles. sunflower: the beam also takes maxHp of the target's max health. firelily: every monster hit burns for `seconds`, taking `share` of the hit's damage per second (ignores armour). stink: monsters in its clouds take `vulnerable` more damage from everything, for `seconds` after leaving. frost: every Nth pulse freezes non-boss monsters for `freeze` seconds. thorn: every Nth pulse reaches `range` times as far and knocks small monsters back `knock` tiles per second. snap: swallows any non-boss monster below `below` of its health.",
     "elites": "Elite monsters (IDEAS R2). enabled = false switches them off. Only `types` can be elite, from wave `fromWave`: the chance is `chance` + `chancePerWave` per wave after that, at most `maxChance`; in endless mode (where the monsters are already much tougher) it starts again at `endlessChance` in wave 11 and grows `endlessChancePerWave` a wave up to `endlessMaxChance`. Elites have `hp` times the health and one trait (picked by weight): armoured adds `armor`; swift multiplies speed by `speed`; regenerating heals `perSecond` of its max health a second while not poisoned or burning; frostproof can't be slowed or frozen; splitting breaks into `count` copies with `hp` of a normal one's health. Each elite carries one power-up (by weight), dropped when it dies and gone after `itemSeconds` if nobody picks it up. fertiliser: the flower you stand on gains a level for free. water: flowers within `radius` tiles heal to full and stop wearing for the rest of the wave. sun: the flower you stand on fires `fireRate` times as fast for `seconds`. snow: every non-boss monster freezes for `seconds`.",
@@ -104,7 +107,9 @@
     "endlessWaveSizePerWave": 0.04,
     "endlessHpPerWave": 0.2,
     "endlessBossesPerCycle": 1,
+    "bossFreeCycles": 1,
     "endlessBossHp": 0.85,
+    "bossTypes": { "boss": 1, "moleking": 1, "witch": 1 },
     "soloWaveSize": 0.6,
     "soloBossHp": 0.6,
     "coopWaveSize": 1.3,
@@ -243,7 +248,9 @@
     "hopper":   { "hp": 30,   "speed": 1.8,  "coins": 3,  "bite": 2, "size": 0.25, "armor": 0, "light": true, "dash": { "every": 2.2, "duration": 0.6, "speedMultiplier": 3.4, "leap": true } },
     "charger":  { "hp": 90,   "speed": 1.3,  "coins": 5,  "bite": 3, "size": 0.34, "armor": 2, "enrage": { "maxSpeedMultiplier": 2.6 } },
     "hive":     { "hp": 150,  "speed": 1.05, "coins": 7,  "bite": 4, "size": 0.43, "armor": 1, "spawns": { "type": "swarm", "every": 4.5, "count": 2 } },
-    "boss":     { "hp": 800,  "speed": 0.98, "coins": 40, "bite": 8,  "size": 0.6,  "armor": 3, "boss": true, "slowResist": 0.5, "spawns": { "type": "grunt", "every": 6, "count": 2 } }
+    "boss":     { "hp": 800,  "speed": 0.98, "coins": 40, "bite": 8,  "size": 0.6,  "armor": 3, "boss": true, "slowResist": 0.5, "spawns": { "type": "grunt", "every": 6, "count": 2 } },
+    "moleking": { "hp": 620,  "speed": 0.98, "coins": 40, "bite": 8,  "size": 0.6,  "armor": 3, "boss": true, "slowResist": 0.5, "burrow": { "aboveSeconds": 5, "belowSeconds": 1.6, "speedMultiplier": 1.2 }, "quake": { "radius": 1.8, "damage": 18 } },
+    "witch":    { "hp": 720,  "speed": 0.95, "coins": 40, "bite": 8,  "size": 0.55, "armor": 2, "boss": true, "slowResist": 0.5, "heals": { "radius": 2.5, "perSecond": 0, "share": 0.02 }, "withers": { "radius": 1.6, "perSecond": 6 } }
   },
 
   "intros": {
@@ -262,7 +269,9 @@
     "woolly":   ["Woolly bears!", "Thick fur: Frostbloom can't slow them. Hit them hard and early"],
     "hopper":   ["Grasshoppers!", "They leap over ground flowers. Daisy and Fire Lily hit them mid-air"],
     "charger":  ["Stag beetles!", "Armoured, and they run faster when hurt. Stinkbloom poison seeps through; Snapdragon, Fire Lily and Sunflower crack them"],
-    "boss":     ["The boss!", "Huge and armoured: small hits do little. Sunflower and Snapdragon bite through"]
+    "boss":     ["The boss!", "Huge and armoured: small hits do little. Sunflower and Snapdragon bite through"],
+    "moleking": ["The Mole King!", "A boss that digs under your flowers and shakes them when it comes up. Bomb it while it's above ground"],
+    "witch":    ["The Bramble Witch!", "A boss that heals the monsters around it and withers the flowers it walks past. Heal your flowers and strike it down fast"]
   },
 
   "waves": [

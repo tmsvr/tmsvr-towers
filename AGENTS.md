@@ -138,6 +138,7 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
 | Make a map easier or harder | `waveSize` (monster count; boss HP scales with its square root) and `startCoins` in `maps.json` |
 | Add a flower | New entry in `balance.json → flowers` (its `kind` picks the attack code in `sim.js`; a new kind needs new code there), plus its look in `render.js` (`SPEC`, `PERSONA`, `BODIES`). The pick screen, guide and network encoding pick it up automatically; bump `PROTOCOL` |
 | Add an enemy | Entry in `balance.json → enemies`, plus an entry in `waves` or a `waveSets` list (`fromWave`, `weight`, `cost`, `group`) so it spawns, an `intros` card, and its drawing in `drawEnemy` (`render.js`; check it in `/tools/gallery.html`). Bump `PROTOCOL` |
+| Add a boss | Like an enemy, with `"boss": true`, plus a weight in `balance.json → difficulty.bossTypes` so it gets picked. Everything keyed on `def.boss` (shields, chests, Sunflower's bonus, Snapdragon's smaller bite, banners) picks it up |
 | Give a map its own monsters | Add a list to `balance.json → waveSets` and name it with `waveSet` in the map's `maps.json` entry. Maps without one use `waves`. `fromWave: [lo, hi]` makes a type arrive in a random wave in that range (rolled once per game) |
 | Add a key | `KEYS` in `main.js` (P1 and P2 layouts); show it in the menu (`drawMenu`) and README. Online inputs are flags in `schema.js` (`INPUT_FLAGS`, bump `PROTOCOL`) |
 | Change art | `render.js`, then check `tools/gallery.html` |

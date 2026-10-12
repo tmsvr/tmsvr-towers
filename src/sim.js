@@ -418,9 +418,11 @@ function updateEnemies(s, dt) {
     }
     if (e.def.heals) {
       for (const o of s.enemies) {
-        if (o !== e && !o.dead && o.hp < o.maxhp && dist(o, e) < e.def.heals.radius) o.hp = Math.min(o.maxhp, o.hp + e.def.heals.perSecond * dt);
+        if (o !== e && !o.dead && o.hp < o.maxhp && dist(o, e) < e.def.heals.radius) o.hp = Math.min(o.maxhp, o.hp + (e.def.heals.perSecond + (e.def.heals.share ?? 0) * o.maxhp) * dt);
       }
     }
+    // the Bramble Witch withers the flowers it walks past
+    if (e.def.withers) for (const f of s.flowers) if (!f.dead && dist(f, e) < e.def.withers.radius) hurtFlower(s, f, e.def.withers.perSecond * WEAR_MULT[f.lvl] * dt, false, e.type);
     if (e.stun > 0) { e.stun -= dt; continue; }
     if (e.def.spawns) {
       e.spawnT += dt;
@@ -437,6 +439,7 @@ function updateEnemies(s, dt) {
         e.under = !e.under;
         puff(s, e.x, e.y, '#8a6038', 8, 70);
         ev(s, 'burrow');
+        if (!e.under && e.def.quake) quake(s, e);
       }
     }
     if (e.def.dash) {
@@ -485,6 +488,15 @@ function updateEnemies(s, dt) {
   }
 }
 
+// The Mole King comes up with a quake that shakes the flowers around it.
+function quake(s, e) {
+  const q = e.def.quake;
+  for (const f of s.flowers) if (!f.dead && dist(f, e) < q.radius) hurtFlower(s, f, q.damage * WEAR_MULT[f.lvl], false, e.type);
+  s.fx.push({ kind: 'ring', x: e.x, y: e.y, r: q.radius, col: '#9c7444' });
+  puff(s, e.x, e.y, '#8a6038', 16, 120);
+  ev(s, 'shake', { amt: 5 });
+}
+
 // Enemies that reach the cottage keep biting it until someone deals with them.
 function chompCottage(s, e, dt) {
   e.atBase = true;
@@ -505,6 +517,13 @@ function chompCottage(s, e, dt) {
 }
 
 // ---- Waves ----------------------------------------------------------------
+// Which boss comes: each one is picked at random, by its weight in bossTypes.
+function pickBoss(s) {
+  const types = TUNE.bossTypes ?? { boss: 1 }, keys = Object.keys(types);
+  let r = rnd(s) * keys.reduce((a, k) => a + types[k], 0);
+  for (const k of keys) if ((r -= types[k]) <= 0) return k;
+  return keys[keys.length - 1];
+}
 // The wave each monster type first turns up in. A [lo, hi] range is rolled
 // once per game, so players can't always know when the flyers are coming.
 function arrivals(s) {
@@ -543,11 +562,13 @@ function buildQueue(s, n) {
     for (let i = 0; i < group; i++) q.push({ type: pick.enemy, path, wait: group > 1 ? 0.18 : lo + rnd(s) * (hi - lo) });
     budget -= pick.cost;
   }
-  // endless brings more bosses every bossEvery waves, in ordinary waves too; the extra ones come mid-wave
-  const bosses = (bossWave ? 1 : 0) + (endless ? Math.floor((n - TOTAL_WAVES) / TUNE.bossEvery) * (TUNE.endlessBossesPerCycle ?? 0) : 0);
+  // endless brings more bosses every bossEvery waves; the extra ones come mid-wave. Ordinary
+  // waves get them bossFreeCycles cycles later, so bosses don't come every wave too soon
+  const cycles = endless ? Math.floor((n - TOTAL_WAVES) / TUNE.bossEvery) : 0;
+  const bosses = (bossWave ? 1 : 0) + Math.max(0, cycles - (bossWave ? 0 : TUNE.bossFreeCycles ?? 0)) * (TUNE.endlessBossesPerCycle ?? 0);
   for (let i = 0; i < bosses; i++) {
     const at = bossWave && i === bosses - 1 ? q.length : Math.floor((q.length * (i + 1)) / (bosses + 1));
-    q.splice(at, 0, { type: 'boss', path: Math.floor(rnd(s) * s.m.paths.length), wait: 3 });
+    q.splice(at, 0, { type: pickBoss(s), path: Math.floor(rnd(s) * s.m.paths.length), wait: 3 });
   }
   const k = Math.max(TUNE.spawnGapMinScale ?? 0.5, 1 - n * (TUNE.spawnSpeedupPerWave ?? 0.03));
   for (const e of q) e.wait *= k;
@@ -564,7 +585,7 @@ function startWave(s) {
   s.spawnWait = 0.5;
   log.logWaveStart(s);
   staggerMapWide(s);
-  const boss = s.queue.filter((e) => e.type === 'boss').length;
+  const boss = s.queue.filter((e) => ENEMIES[e.type].boss).length;
   banner(s, boss > 1 ? `Wave ${s.wave} — ${boss} BOSSES!` : boss ? `Wave ${s.wave} — BOSS!` : s.wave === TOTAL_WAVES + 1 ? `Wave ${s.wave} — catch your breath` : `Wave ${s.wave}`);
   ev(s, boss ? 'boss' : 'wave');
 }

@@ -5,7 +5,7 @@
 import * as sim from '../src/sim.js';
 import {
   T, MAPS, FLOWERS, FLOWER_ORDER, MAX_LEVEL, FLOWER_HP, ENEMIES, CATS, CAT_ORDER, BALANCE, TOTAL_WAVES,
-  plantCost, upgradeCost, flowerStats, BLOOM, bloomOf, ELITES, SHIELD, CHEST, LOADOUT_SIZE, PLAYER,
+  plantCost, upgradeCost, flowerStats, WEAR_MULT, BLOOM, bloomOf, ELITES, SHIELD, CHEST, LOADOUT_SIZE, PLAYER,
 } from '../src/data.js';
 import { encodeSnapshot, encodeInputs, decodeFast } from '../src/schema.js';
 import { gameSummary } from '../src/stats.js';
@@ -258,6 +258,37 @@ function hold(s, list, [x, y], secs) {
   for (let i = 0; i < secs * 60; i++) { for (const e of list) if (!e.dead) { e.x = (x + 0.5) * T; e.y = (y + 0.5) * T; } tick(s); }
 }
 
+test('Bosses', 'every kind of boss turns up, picked at random', () => {
+  const s = wonGame(), seen = new Set();
+  sim.continueEndless(s);
+  for (let n = TOTAL_WAVES + 5; n < TOTAL_WAVES + 40; n++) {
+    s.wave = n - 1; s.phase = 'prep'; s.queue = []; s.enemies = [];
+    tick(s, { ready: true });
+    for (const e of s.queue) if (ENEMIES[e.type].boss) seen.add(e.type);
+  }
+  eq([...seen].sort().join(' '), Object.keys(BALANCE.difficulty.bossTypes).sort().join(' '), 'boss kinds seen');
+});
+
+test('Bosses', 'the Mole King shakes the flowers around it when it comes up', () => {
+  const { s, f, road } = flowerByRoad('frost');
+  const king = monsterOn(s, 'moleking', road), q = ENEMIES.moleking.quake;
+  king.under = true; king.phaseT = ENEMIES.moleking.burrow.belowSeconds - 0.001;
+  const before = f.hp;
+  tick(s);
+  ok(!king.under, 'back above ground');
+  near(before - f.hp, q.damage * WEAR_MULT[f.lvl], 0.5, 'quake damage');
+});
+
+test('Bosses', 'the Bramble Witch heals monsters near it and withers flowers', () => {
+  const { s, f, road } = flowerByRoad('frost');
+  const witch = monsterOn(s, 'witch', road), grunt = monsterOn(s, 'grunt', road), d = ENEMIES.witch;
+  grunt.hp = grunt.maxhp / 2;
+  const hp = grunt.hp, before = f.hp;
+  hold(s, [witch, grunt], road, 1);
+  near(grunt.hp - hp, d.heals.share * grunt.maxhp, grunt.maxhp * 0.01, 'grunt healed');
+  near(before - f.hp, d.withers.perSecond * WEAR_MULT[f.lvl], 0.5, 'flower withered');
+});
+
 test('Monsters', 'Snapdragon bites off a share of a big monster\'s max health', () => {
   const { s, f, road } = flowerByRoad('snap');
   const tank = monsterOn(s, 'tank', road), before = tank.hp;
@@ -397,10 +428,11 @@ test('Endless', 'later endless waves stay small but bring more bosses', () => {
     s.wave = n - 1; s.phase = 'prep'; s.queue = []; s.enemies = [];
     tick(s, { ready: true });
     eq(s.wave, n, 'wave');
-    return { size: s.queue.length, bosses: s.queue.filter((e) => e.type === 'boss').length };
+    return { size: s.queue.length, bosses: s.queue.filter((e) => ENEMIES[e.type].boss).length };
   };
   const w12 = waveAt(TOTAL_WAVES + 2), w15 = waveAt(TOTAL_WAVES + 5), w16 = waveAt(TOTAL_WAVES + 6), w20 = waveAt(TOTAL_WAVES + 10);
-  eq([w12.bosses, w15.bosses, w16.bosses, w20.bosses].join(' '), '0 2 1 3', 'bosses in waves 12, 15, 16, 20');
+  const w21 = waveAt(TOTAL_WAVES + 11), w25 = waveAt(TOTAL_WAVES + 15), w26 = waveAt(TOTAL_WAVES + 16);
+  eq([w12, w15, w16, w20, w21, w25, w26].map((w) => w.bosses).join(' '), '0 2 0 3 1 4 2', 'bosses in waves 12, 15, 16, 20, 21, 25, 26');
   ok(w20.size < w12.size * 1.6, `wave 20 has ${w20.size} monsters, wave 12 ${w12.size}`);
 });
 

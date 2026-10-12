@@ -965,8 +965,16 @@ const BODY = {
   grunt: '#9b7bc8', swarm: '#e2b93b', runner: '#f08a3c', flyer: '#5f6bd6', wasp: '#ffd23f',
   shield: '#5b95dc', healer: '#5cc97f', tank: '#7b6250', boss: '#d43a3a', dasher: '#3cc6b4',
   splitter: '#c66bd8', blobling: '#ec9af0', mole: '#8a6a55', aphid: '#a6e07a', hive: '#e0a63a',
-  woolly: '#c9783a', hopper: '#8cc63f', charger: '#4a3a5c',
+  woolly: '#c9783a', hopper: '#8cc63f', charger: '#4a3a5c', moleking: '#6e5242', witch: '#6f8f4e',
 };
+
+// The boss crown, sitting on top of a monster of radius r (y = top of its head).
+function crown(c, r, y = -r) {
+  c.fillStyle = '#ffd23f'; c.strokeStyle = OUT; c.lineWidth = 2; c.lineJoin = 'round';
+  c.beginPath(); c.moveTo(-r * 0.6, y); c.lineTo(-r * 0.65, y - r * 0.55); c.lineTo(-r * 0.3, y - r * 0.25);
+  c.lineTo(0, y - r * 0.7); c.lineTo(r * 0.3, y - r * 0.25); c.lineTo(r * 0.65, y - r * 0.55); c.lineTo(r * 0.6, y); c.closePath();
+  c.fill(); c.stroke();
+}
 
 function eyes(c, r, ang, angry) {
   const ex = Math.cos(ang) * r * 0.16, ey = Math.sin(ang) * r * 0.1;
@@ -1006,6 +1014,7 @@ function drawEnemy(c, e, time) {
   const flash = e.flash > 0;
   const col = flash ? '#ffffff' : BODY[e.type];
   ellipse(c, e.x, e.y + r * 0.75, r * (fly || leap ? 0.7 : 0.95), r * 0.35, 'rgba(0,0,0,0.22)');
+  if (e.def.withers) circle(c, e.x, e.y, e.def.withers.radius, 'rgba(110,70,40,0.12)', `rgba(150,95,60,${0.35 + Math.sin(time * 3) * 0.1})`, 1.5); // the flowers it withers
   c.save();
   c.translate(e.x, e.y + hop);
   if (e.mini) c.scale(0.7, 0.7); // a splitting elite's smaller copies
@@ -1069,10 +1078,7 @@ function drawEnemy(c, e, time) {
         rrect(c, -r * 0.8, r * 0.25, r * 1.6, r * 0.5, 3, flash ? '#fff' : '#5a4636', OUT, 1.5);
         for (const sx of [-0.5, 0, 0.5]) circle(c, sx * r, r * 0.5, 2, '#cfc3b5');
       } else {
-        c.fillStyle = '#ffd23f'; c.strokeStyle = OUT; c.lineWidth = 2; c.lineJoin = 'round';
-        c.beginPath(); c.moveTo(-r * 0.6, -r); c.lineTo(-r * 0.65, -r * 1.55); c.lineTo(-r * 0.3, -r * 1.25);
-        c.lineTo(0, -r * 1.7); c.lineTo(r * 0.3, -r * 1.25); c.lineTo(r * 0.65, -r * 1.55); c.lineTo(r * 0.6, -r); c.closePath();
-        c.fill(); c.stroke();
+        crown(c, r);
         c.fillStyle = '#fff'; for (const sx of [-1, 1]) { c.beginPath(); c.moveTo(sx * r * 0.25, r * 0.45); c.lineTo(sx * r * 0.15, r * 0.75); c.lineTo(sx * r * 0.05, r * 0.45); c.fill(); }
       }
       eyes(c, r, e.ang, true);
@@ -1101,7 +1107,12 @@ function drawEnemy(c, e, time) {
       eyes(c, r, e.ang, e.type === 'blobling');
       break;
     }
-    case 'mole': {
+    case 'mole':
+    case 'moleking': {
+      if (e.type === 'moleking') for (const sx of [-1, 1]) { // big digging claws
+        c.fillStyle = flash ? '#fff' : '#e8d8c4'; c.strokeStyle = OUT; c.lineWidth = 1.4;
+        for (const k of [-1, 0, 1]) { c.beginPath(); c.moveTo(sx * r * 0.95, r * 0.35 + k * r * 0.14); c.lineTo(sx * r * 1.35, r * 0.4 + k * r * 0.2); c.lineTo(sx * r * 0.95, r * 0.5 + k * r * 0.14); c.fill(); c.stroke(); }
+      }
       circle(c, 0, 0, r, col, OUT, 2);
       ellipse(c, 0, r * 0.25, r * 0.6, r * 0.5, flash ? '#fff' : '#b8957a');
       c.save(); c.rotate(e.ang);
@@ -1109,6 +1120,21 @@ function drawEnemy(c, e, time) {
       c.restore();
       for (const sx of [-1, 1]) circle(c, sx * r * 0.35, -r * 0.2, r * 0.1, '#1a1a1a');
       for (const sx of [-1, 1]) ellipse(c, sx * r * 0.95, r * 0.45, r * 0.32, r * 0.2, '#f2d7c0', OUT, 1.2);
+      if (e.type === 'moleking') crown(c, r * 0.9, -r * 0.85);
+      break;
+    }
+    case 'witch': {
+      // a hunched cloak with brambles round the hem, and a tall crooked hat
+      c.beginPath(); c.moveTo(-r * 1.05, r * 0.85); c.quadraticCurveTo(-r * 0.9, -r * 0.6, 0, -r * 0.75); c.quadraticCurveTo(r * 0.9, -r * 0.6, r * 1.05, r * 0.85); c.closePath();
+      c.fillStyle = flash ? '#fff' : '#4a2e5c'; c.fill(); c.strokeStyle = OUT; c.lineWidth = 2.2; c.stroke();
+      c.fillStyle = flash ? '#fff' : '#3e6b2a';
+      for (let i = 0; i < 6; i++) { const x = -r * 0.9 + i * r * 0.36; c.beginPath(); c.moveTo(x - r * 0.1, r * 0.82); c.lineTo(x + r * 0.05, r * 0.5); c.lineTo(x + r * 0.2, r * 0.82); c.fill(); }
+      circle(c, 0, -r * 0.15, r * 0.62, col, OUT, 2);
+      eyes(c, r * 0.8, e.ang, true);
+      ellipse(c, 0, -r * 0.72, r * 0.95, r * 0.2, flash ? '#fff' : '#2c1b38', OUT, 1.8);
+      c.beginPath(); c.moveTo(-r * 0.5, -r * 0.75); c.lineTo(r * 0.15, -r * 1.75); c.lineTo(r * 0.45, -r * 1.5); c.lineTo(r * 0.5, -r * 0.75); c.closePath();
+      c.fillStyle = flash ? '#fff' : '#2c1b38'; c.fill(); c.stroke();
+      rrect(c, -r * 0.45, -r * 0.98, r * 0.92, r * 0.16, 2, '#c58cff');
       break;
     }
     case 'aphid': {
@@ -1246,12 +1272,12 @@ function drawEnemy(c, e, time) {
   }
   c.restore();
   if (e.hp < e.maxhp) {
-    const w = Math.max(26, r * 2.2), bx = e.x - w / 2, by = e.y + hop - r - (e.type === 'boss' ? r * 0.85 : 12);
+    const w = Math.max(26, r * 2.2), bx = e.x - w / 2, by = e.y + hop - r - (e.def.boss ? r * 0.85 : 12);
     rrect(c, bx - 1.5, by - 1.5, w + 3, 7, 3, OUT);
     rrect(c, bx, by, Math.max(0, w * (e.hp / e.maxhp)), 4, 2, e.psn > 0 ? '#a6e04a' : e.hp / e.maxhp > 0.4 ? '#6be06b' : '#ff6a5a');
   }
   if (e.shield > 0 || e.exposedT > 0) drawShield(c, e, e.x, e.y + hop, r, time);
-  if (e.elite) label(c, `★ ${ELITE_WORD[e.elite] || e.elite}`, e.x, e.y + hop - r - (e.type === 'boss' ? r * 0.85 : 12) - 10, 10, ELITE_COLOR[e.elite] || '#ffe27a', 'center', 700);
+  if (e.elite) label(c, `★ ${ELITE_WORD[e.elite] || e.elite}`, e.x, e.y + hop - r - (e.def.boss ? r * 0.85 : 12) - 10, 10, ELITE_COLOR[e.elite] || '#ffe27a', 'center', 700);
 }
 
 // A boss's shield (IDEAS R3): a bubble ringed with one segment per bomb hit
@@ -1790,6 +1816,33 @@ function drawHud(c, s, time, ui) {
       c.save(); c.translate(sx + 19, sy + 19); c.scale(0.8, 0.8); if (!afford) c.globalAlpha = 0.45; drawHead(c, t); c.restore();
       label(c, `${cost}`, sx + 19 + (sw - 19) / 2, sy + 20, 14, afford ? '#ffe27a' : '#c07070', 'center', 700, null);
     });
+    // boss chest perks on the card's bottom edge: this cat's own, then the team's (green); the pause screen spells them out
+    heldPerks(s, p).forEach(([id, n, team], j) => {
+      const px = x0 + 50 + j * 34, py = y0 + 81;
+      rrect(c, px, py, 32, 13, 6, 'rgba(20,28,36,0.95)', team ? '#8dff9a' : pc, 1.2);
+      label(c, CHEST.perks[id]?.icon || '★', px + (n > 1 ? 9 : 16), py + 7, 10, '#fff', 'center', 500, null);
+      if (n > 1) label(c, `×${n}`, px + 23, py + 7, 9, '#ffe27a', 'center', 700, null);
+    });
+  });
+}
+
+// The pause screen's list of chest perks: each cat's own, then the team's, with what they add up to.
+function drawPerkList(c, s, y) {
+  const cols = s.players.map((p, i) => [`P${i + 1}`, PLAYER.scarves[i], heldPerks({}, p)]);
+  const team = heldPerks(s, null);
+  if (team.length) cols.push(['Team', '#8dff9a', team]);
+  if (!cols.some(([, , list]) => list.length)) return;
+  label(c, 'Perks from boss chests', VIEW_W / 2, y, 16, '#ffe27a', 'center', 700, null);
+  const w = VIEW_W / cols.length;
+  cols.forEach(([who, col, list], i) => {
+    const cx = w * (i + 0.5);
+    label(c, who, cx, y + 28, 14, col, 'center', 700, null);
+    if (!list.length) label(c, 'none yet', cx, y + 50, 12, '#8fa5b3', 'center', 500, null);
+    list.forEach(([id, n], j) => {
+      const P = CHEST.perks[id];
+      label(c, fitText(c, `${P.icon} ${P.name}${n > 1 ? ` ×${n}` : ''}`, w - 24, 13, 600), cx, y + 50 + j * 34, 13, '#fff', 'center', 600, null);
+      label(c, fitText(c, perkTotal(id, n), w - 24, 11.5), cx, y + 66 + j * 34, 11.5, '#a9bccb', 'center', 500, null);
+    });
   });
 }
 
@@ -1950,6 +2003,27 @@ function drawPick(c, s, ui, time) {
 }
 
 // The boss chest (IDEAS R3): each cat's perk cards side by side.
+// What n copies of a chest perk add up to, in words. Most multiply: two Deep
+// roots make flowers wear 0.7 x 0.7 = 0.49 as fast, i.e. 51% slower.
+function perkTotal(id, n) {
+  const P = CHEST.perks[id] || {};
+  switch (id) {
+    case 'roof': return `cottage +${P.cottage} health, right away`;
+    case 'roots': return `flowers wear ${pct(1 - P.wear ** n)} slower`;
+    case 'stems': return `aphids chew ${pct(1 - P.aphids ** n)} softer`;
+    case 'fourth': return `${n} more flower type${n > 1 ? 's' : ''}`;
+    case 'thumb': return `flowers cost you ${pct(1 - P.price ** n)} less`;
+    case 'paws': return `you grow and heal ${pct(P.growSpeed ** n - 1)} faster`;
+    case 'pouch': return `+${P.bombs * n} bomb${P.bombs * n > 1 ? 's' : ''}, recharging ${pct(1 - P.recharge ** n)} faster`;
+  }
+  return P.desc || id;
+}
+// The perks that last (not the one-off roof repair): [id, count, team?], this cat's own first.
+const heldPerks = (s, p) => [
+  ...Object.entries(p?.perks || {}).map(([id, n]) => [id, n, false]),
+  ...Object.entries(s.perks || {}).map(([id, n]) => [id, n, true]),
+].filter(([id, n]) => n > 0 && !CHEST.perks[id]?.cottage);
+
 function drawChest(c, s, ui, time) {
   const ch = s.chest;
   c.fillStyle = 'rgba(12,18,26,0.72)'; c.fillRect(0, 0, VIEW_W, MAP_H);
@@ -1971,9 +2045,11 @@ function drawChest(c, s, ui, time) {
       else label(c, P.icon || '★', x + cw / 2, y + 40, 30, '#fff', 'center', 600, null);
       const name = id === 'fourth' && FLOWERS[arg] ? `+ ${FLOWERS[arg].name}` : P.name || id;
       label(c, fitText(c, name, cw - 12, 14, 700), x + cw / 2, y + 82, 14, '#ffe27a', 'center', 700, null);
-      wrapText(c, P.desc || '', cw - 16, 11.5).slice(0, 4).forEach((l, k) => label(c, l, x + cw / 2, y + 106 + k * 15, 11.5, '#dce7ef', 'center', 500, null));
-      const have = (P.team ? s.perks?.[id] : p.perks?.[id]) || 0;
-      if (have) label(c, `have ${have}${P.team ? ' (team)' : ''}`, x + cw / 2, y + h - 14, 11, '#8fa5b3', 'center', 500, null);
+      // who it's for, how often it can be taken, and what taking it again adds up to
+      const have = (P.team ? s.perks?.[id] : p.perks?.[id]) || 0, again = have && !P.cottage;
+      wrapText(c, P.desc || '', cw - 16, 11.5).slice(0, again ? 3 : 4).forEach((l, k) => label(c, l, x + cw / 2, y + 106 + k * 15, 11.5, '#dce7ef', 'center', 500, null));
+      label(c, fitText(c, `${P.team ? 'Whole team' : 'Just you'} · ${have ? `have ${have} of ${CHEST.maxEach}` : `up to ${CHEST.maxEach}×`}`, cw - 12, 11), x + cw / 2, y + h - (again ? 44 : 16), 11, P.team ? '#8dff9a' : '#8fa5b3', 'center', 600, null);
+      if (again) wrapText(c, `Then: ${perkTotal(id, have + 1)}`, cw - 14, 10.5).slice(0, 2).forEach((l, k) => label(c, l, x + cw / 2, y + h - 28 + k * 13, 10.5, '#ffe27a', 'center', 500, null));
       c.globalAlpha = 1;
     });
     if (picked != null) label(c, 'Picked!', cx, 352, 15, '#8dff9a', 'center', 700, null);
@@ -2293,7 +2369,7 @@ export function render(c, s, ui) {
   if (s.chest && !ui.disconnected) drawChest(c, s, ui, time);
   if (ui.guide != null) drawGuide(c, time, ui.guide);
   if (ui.disconnected) drawOverlay(c, 'Disconnected', ['The connection to the host was lost', 'M or Esc: menu'], '#ff7a6a');
-  else if (ui.paused) drawOverlay(c, 'Paused', ['P or Esc: resume  ·  S: save the game', stopKeys(s)], '#ffffff');
+  else if (ui.paused) { drawOverlay(c, 'Paused', ['P or Esc: resume  ·  S: save the game', stopKeys(s)], '#ffffff'); drawPerkList(c, s, VIEW_H / 2 + 78); }
   else if (s.over || s.won) drawEndScreen(c, s, ui, time);
   if (ui.note && performance.now() < ui.note.until) label(c, ui.note.txt, VIEW_W / 2, MAP_H - 24, 16, '#ffffff', 'center', 700);
 }

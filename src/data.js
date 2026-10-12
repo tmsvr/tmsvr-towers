@@ -139,7 +139,9 @@ for (const [id, e] of Object.entries(BAL.enemies)) {
     r: e.size * T,
     coin: e.coins,
     bite: e.bite,
-    heals: e.heals && { radius: e.heals.radius * T, perSecond: e.heals.perSecond },
+    heals: e.heals && { ...e.heals, radius: e.heals.radius * T },
+    quake: e.quake && { ...e.quake, radius: e.quake.radius * T },
+    withers: e.withers && { ...e.withers, radius: e.withers.radius * T },
     eats: e.eats && { ...e.eats, reach: e.eats.reach * T },
   };
 }

@@ -48,6 +48,12 @@ them.
   flowers heal and stop wearing for the wave), sun orb (the flower you stand
   on fires twice as fast for 20 s) or snow globe (every monster but bosses
   freezes for 2 s). Unclaimed power-ups vanish after 10 s.
+- **Three kinds of boss**, and each boss is picked at random: the **Boss**
+  (lets out grunts as it walks), the **Mole King** (digs underground where
+  nothing can hit it, and shakes the flowers around it each time it comes up)
+  and the **Bramble Witch** (heals the monsters around it and withers the
+  flowers it walks past). Max-level flowers shrug off the quake and the
+  withering.
 - **Bosses raise a shield** at 60% health (the last boss and endless bosses at
   70% and 35%). It blocks 90% of all damage except bombs: 3 bomb hits break it
   (in co-op or alone), and Boom's bombs count double. A broken shield leaves the
@@ -57,7 +63,12 @@ them.
   of 3 perks for the rest of the run (cottage repair, slower wear, softer
   aphids, an extra flower type, cheaper flowers, faster growing, a bigger bomb
   pouch). Left/right to choose, plant or baton key to take it. Each perk can
-  be taken twice.
+  be taken twice: team perks (roof, roots, stems) by the whole team, the
+  others by each cat. A second copy stacks: percentages multiply (two Deep
+  roots: flowers wear 0.7 × 0.7 = 51% slower), extra bombs and flower types
+  add up, and the roof repair is a one-off. Each cat's HUD card shows its
+  perks along the bottom (team perks in green), and the pause screen spells
+  out what everyone's perks add up to.
 - In co-op, each cat keeps the coins it picks up (`economy.coopCoinShare` in
   `balance.json` can split a share of every pickup with the other cat).
 - P1: WASD move · Shift sprint · F baton · G bomb · V use power-up · E plant/upgrade (hold) · R heal (hold) · Q next flower / dig-up mode
@@ -69,7 +80,7 @@ them.
   - **M** goes back to the menu (Esc too, after the game)
   - **C** on the victory screen keeps going in endless mode
 - **O** on the main menu loads a saved game (solo, local co-op or online) and carries on from the moment it was saved, paused. Online, the host saves and loads; a loaded online game starts once P2 joins.
-- Beat all 10 waves and press C on the victory screen to keep going in **endless mode**: wave after wave, each tougher than the last. Wave 11, right after the big boss, is a smaller one to catch your breath; after that the monsters come in about the same numbers but get much tougher, and every 5 waves brings one more boss (wave 15 has two, waves 16–19 one each, wave 20 three…).
+- Beat all 10 waves and press C on the victory screen to keep going in **endless mode**: wave after wave, each tougher than the last. Wave 11, right after the big boss, is a smaller one to catch your breath; after that the monsters come in about the same numbers but get much tougher, and every 5 waves brings one more boss (wave 15 has two, wave 20 three, wave 25 four…). From wave 21 the waves in between bring bosses too (one each until wave 25, then two…).
 - I (in the menu or while picking) opens the flower guide: every flower's stats at each level, worked out from `balance.json`.
 - L downloads the game logs (see below).
 - Online, both players use the P1 keys on their own keyboard. Your friend needs
