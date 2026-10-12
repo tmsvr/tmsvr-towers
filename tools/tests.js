@@ -646,6 +646,16 @@ test('Power-ups', 'walk over one to carry it; a second one swaps; unclaimed ones
   eq(s.stats.cur.items.expired.sun, 1, 'logged');
 });
 
+test('Power-ups', 'two cats on one spot, both carrying, don\'t swap forever', () => {
+  const s = game({ cats: ['bomber', 'gardener'] }), [a, b] = s.players;
+  b.x = a.x; b.y = a.y;
+  a.item = 'water'; b.item = 'snow';
+  loose(s, 'sun', a.x, a.y);
+  for (let i = 0; i < 30; i++) tick(s);
+  ok(s.items.length <= 2, `items on the ground: ${s.items.length}`);
+  eq([a.item, b.item, ...s.items.map((it) => it.kind)].sort().join(), 'snow,sun,water', 'every item still exists once');
+});
+
 test('Power-ups', 'fertiliser: a free level for the flower you stand on', () => {
   const s = game(), p = s.players[0], spot = freeTile(s);
   const f = plant(s, p, spot, 'thorn');

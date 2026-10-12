@@ -228,14 +228,20 @@ function dropItem(s, kind, x, y, by = null) {
 }
 
 // Walk over a power-up to take it. A cat already carrying one swaps.
+// Items put down in a swap wait for the next tick, and a cat takes at most one
+// per tick: two cats on one spot, both carrying, would otherwise hand items
+// back and forth forever within a single tick.
 function updateItems(s, dt) {
-  for (const it of s.items) {
+  const took = new Set();
+  for (let k = 0, n = s.items.length; k < n; k++) {
+    const it = s.items[k];
     it.age += dt;
     if (it.age >= ELITES.itemSeconds) { it.done = true; log.logItem(s, null, it.kind, 'expired'); continue; }
     for (const p of s.players) {
       const d = dist(p, it);
       if (it.by === p.id) { if (d > T * 0.9) it.by = null; continue; }
-      if (p.stun > 0 || !p.loadout || d > T * 0.6) continue;
+      if (p.stun > 0 || !p.loadout || d > T * 0.6 || took.has(p.id)) continue;
+      took.add(p.id);
       it.done = true;
       if (p.item) dropItem(s, p.item, p.x, p.y, p.id);
       p.item = it.kind;
