@@ -275,6 +275,25 @@ test('Monsters', 'Snapdragon bites only a small share off a boss', () => {
   near(before - boss.hp, st.dmg + boss.maxhp * st.bossMaxHpBite - ENEMIES.boss.armor, 0.01, 'one bite');
 });
 
+test('Monsters', 'Snapdragon bites the toughest monster in reach, not the critter in front', () => {
+  const { s, road } = flowerByRoad('snap');
+  const swarm = monsterOn(s, 'swarm', road), tank = monsterOn(s, 'tank', road), before = tank.hp;
+  for (let i = 0; i < 120 && tank.hp === before; i++) hold(s, [swarm, tank], road, 1 / 60);
+  ok(tank.hp < before, 'the tank was bitten');
+  ok(!swarm.dead, 'the critter went first');
+});
+
+test('Monsters', 'Sunflowers spread their beams out instead of all firing at once', () => {
+  const s = game({ loadout: ['sunflower', 'frost', 'daisy'] }), [p] = s.players;
+  const used = [];
+  for (let i = 0; i < 3; i++) { const at = freeTile(s, used); used.push(at); growOnce(s, p, plant(s, p, at, 'sunflower')); }
+  for (let i = 0; i < 60; i++) tick(s); // ready all break long
+  tick(s, { ready: true });
+  ok(s.phase === 'wave', 'the wave started');
+  const cds = s.flowers.map((f) => f.cd).sort((a, b) => a - b), rate = flowerStats('sunflower', 1).rate;
+  for (let i = 1; i < cds.length; i++) ok(cds[i] - cds[i - 1] > rate / 3 - 0.1, `beams ${cds.map((c) => c.toFixed(1))} are spread out`);
+});
+
 test('Monsters', 'poison gets through armour; poison-immune monsters shrug it off', () => {
   const { s, road } = flowerByRoad('stink');
   const grunt = monsterOn(s, 'grunt', road), beetle = monsterOn(s, 'charger', road);

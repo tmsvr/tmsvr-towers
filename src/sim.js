@@ -6,7 +6,7 @@
 import {
   T, U, VIEW_W, MAP_H, TOTAL_WAVES, MAPS, ENEMIES, INTROS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, GROW_TIME, FLOWER_HP, WEAR_PER_SEC, WEAR_MULT, HEAL_RATE, HEAL_COST,
-  POISON_TIME, START_COINS, LOADOUT_SIZE, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, bloomOf, ELITES, SHIELD, CHEST, PERKS,
+  POISON_TIME, START_COINS, LOADOUT_SIZE, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, plantCost, GLOBAL_RANGE, PLAYER, CATS, CAT_ORDER, bloomOf, ELITES, SHIELD, CHEST, PERKS,
 } from './data.js';
 import { prune, clamp, nextSeed, randomFrom } from './util.js';
 import * as log from './stats.js';
@@ -561,9 +561,18 @@ function startWave(s) {
   s.queue = buildQueue(s, s.wave);
   s.spawnWait = 0.5;
   log.logWaveStart(s);
+  staggerMapWide(s);
   const boss = s.queue.filter((e) => e.type === 'boss').length;
   banner(s, boss > 1 ? `Wave ${s.wave} — ${boss} BOSSES!` : boss ? `Wave ${s.wave} — BOSS!` : s.wave === TOTAL_WAVES + 1 ? `Wave ${s.wave} — catch your breath` : `Wave ${s.wave}`);
   ev(s, boss ? 'boss' : 'wave');
+}
+
+// A flower that reaches the whole map sits ready all break long, so they would
+// all fire at the first monster of the wave in the same instant and stay in
+// step. Spread them out over one cooldown instead.
+function staggerMapWide(s) {
+  const wide = s.flowers.filter((f) => f.lvl > 0 && !f.dead && flowerStats(f.type, f.lvl).range >= GLOBAL_RANGE);
+  wide.forEach((f, i) => { f.cd = Math.max(f.cd, (flowerStats(f.type, f.lvl).rate * i) / wide.length); });
 }
 
 function updateWaves(s, dt, ready) {
@@ -987,7 +996,10 @@ function updateFlowers(s, dt) {
         inRange.push(e);
         // 'strong' locks onto the toughest monster (by max health), so a nearly
         // dead boss isn't abandoned for its fresh minions
-        const better = st.target === 'strong' ? !best || e.maxhp > best.maxhp || (e.maxhp === best.maxhp && e.hp < best.hp) : !best || e.left < best.left;
+        // 'big' bites the toughest monster in reach, the one furthest along if several are as tough
+        const better = st.target === 'strong' ? !best || e.maxhp > best.maxhp || (e.maxhp === best.maxhp && e.hp < best.hp)
+          : st.target === 'big' ? !best || e.maxhp > best.maxhp || (e.maxhp === best.maxhp && e.left < best.left)
+          : !best || e.left < best.left;
         if (better) best = e;
       }
     }
