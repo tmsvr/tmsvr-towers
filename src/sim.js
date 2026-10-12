@@ -719,6 +719,7 @@ function swing(s, p) {
 
 function throwBomb(s, p) {
   p.bombs -= 1;
+  p.bombCd = PLAYER.bombGap; // a second bomb needs a fresh press, not a double tap
   const tx = clamp(p.x + Math.cos(p.dir) * PLAYER.bombRange, 10, s.m.worldW - 10);
   const ty = clamp(p.y + Math.sin(p.dir) * PLAYER.bombRange, 10, s.m.worldH - 10);
   s.bombs.push({ id: s.nextId++, sx: p.x, sy: p.y, tx, ty, x: p.x, y: p.y, h: 0, t: 0, dur: 0.6, r: catStats(p).bombRadius, dmg: catStats(p).bombDmg, owner: p.id });
@@ -915,11 +916,12 @@ function updatePlayers(s, dt, inputs) {
     const had = p.bombs;
     p.bombs = Math.min(catStats(p).bombMax, p.bombs + dt / catStats(p).bombRecharge);
     if (had < 1 && p.bombs >= 1) ev(s, 'bombReady');
+    p.bombCd = Math.max(0, (p.bombCd || 0) - dt);
     if (inp.ready) ready = true;
     if (!moveCat(s, p, inp, dt)) continue;
     // Fighting cancels build mode.
     if (inp.atk && p.atkCd <= 0) { swing(s, p); p.building = false; }
-    if (inp.bomb && p.bombs >= 1) { throwBomb(s, p); p.building = false; }
+    if (inp.bomb && p.bombs >= 1 && !p.bombCd) { throwBomb(s, p); p.building = false; }
     if (inp.use && p.item) useItem(s, p);
 
     const { tx, ty } = tileOf(s.m, p);

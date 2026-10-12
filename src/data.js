@@ -258,6 +258,7 @@ export const PLAYER = {
   bombMax: 1,
   swingTime: 0.18, // seconds the baton's arc is on screen
   bombRecharge: P.bombRecharge,
+  bombGap: P.bombGap ?? 0,
   sprintSpeed: P.sprintSpeed,
   sprintSeconds: P.sprintSeconds,
   sprintRecover: P.sprintRecoverSeconds,

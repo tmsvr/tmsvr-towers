@@ -5,7 +5,7 @@
 import * as sim from '../src/sim.js';
 import {
   T, MAPS, FLOWERS, FLOWER_ORDER, MAX_LEVEL, FLOWER_HP, ENEMIES, CATS, CAT_ORDER, BALANCE, TOTAL_WAVES,
-  plantCost, upgradeCost, flowerStats, BLOOM, bloomOf, ELITES, SHIELD, CHEST, LOADOUT_SIZE,
+  plantCost, upgradeCost, flowerStats, BLOOM, bloomOf, ELITES, SHIELD, CHEST, LOADOUT_SIZE, PLAYER,
 } from '../src/data.js';
 import { encodeSnapshot, encodeInputs, decodeFast } from '../src/schema.js';
 import { gameSummary } from '../src/stats.js';
@@ -837,6 +837,19 @@ test('Boss chests', 'a wave with a boss kill ends with a chest; the game waits f
   eq(s.stats.waves.at(-1).perks.length, 2, 'logged');
   eq(s.stats.waves.at(-1).perks[1][1], want, "P2's perk");
   withSwitch(CHEST, false, () => ok(!clearBossWave().chest, 'a chest while switched off'));
+});
+
+test('Cats', 'two bombs need two presses at least a moment apart', () => {
+  const s = game(), [p] = s.players;
+  sim.applyPerk(s, p, 'pouch'); // room for two
+  p.bombs = 2;
+  tick(s, { bomb: true });
+  eq(Math.floor(p.bombs), 1, 'first bomb');
+  tick(s, { bomb: true });
+  eq(Math.floor(p.bombs), 1, 'a second press right away');
+  for (let t = 0; t < PLAYER.bombGap; t += DT) tick(s);
+  tick(s, { bomb: true });
+  eq(Math.floor(p.bombs), 0, 'a second bomb after the gap');
 });
 
 test('Boss chests', 'every perk does what it says', () => {
