@@ -2128,6 +2128,7 @@ function drawGuide(c, time, sel) {
   if (F.kind === 'cloud') tags.push(['Ignores armour', '#9ad14b']);
   if (F.kind === 'chomp') tags.push(['Swallows small critters whole', '#e0569b'], [`Bites off ${Math.round((F.maxHpBite || 0) * 100)}% of max health (${+((F.bossMaxHpBite || 0) * 100).toFixed(1)}% on bosses)`, '#e0569b']);
   if (F.kind === 'beam') tags.push(['Aims at the toughest monster', '#ffd23f']);
+  if (F.flyerDamage > 1) tags.push([`+${Math.round((F.flyerDamage - 1) * 100)}% damage to flyers`, '#8fe3ff']);
   if (F.bossDamage > 1) tags.push([`+${Math.round((F.bossDamage - 1) * 100)}% damage to bosses`, '#ffd23f']);
   if (F.target === 'big') tags.push(['Bites the toughest monster in reach', '#e0569b']);
   if (F.kind === 'bolt') tags.push(['Hits several in a line', '#ff7a2f']);

@@ -1014,7 +1014,7 @@ function updateFlowers(s, dt) {
     f.headIdx = (f.headIdx + 1) % Math.min(f.lvl, 5);
     const hx = f.x, hy = f.y - T * 0.35;
     if (st.kind === 'single') {
-      s.projs.push({ id: s.nextId++, kind: 'single', x: hx, y: hy, target: best, speed: 460 * U, dmg: st.dmg, color: st.color, src: f.type, fid: f.id, split: burst ? { ...bl } : null });
+      s.projs.push({ id: s.nextId++, kind: 'single', x: hx, y: hy, target: best, speed: 460 * U, dmg: st.dmg, flyer: st.flyerDamage, color: st.color, src: f.type, fid: f.id, split: burst ? { ...bl } : null });
     } else if (st.kind === 'beam') {
       damage(s, best, st.dmg * (best.def.boss ? st.bossDamage ?? 1 : 1), false, false, f.type, f.id); // the boss killer
       if (bl?.maxHp && !best.dead) { damage(s, best, best.maxhp * bl.maxHp, true, true, f.type, f.id, true); log.logBloom(s, f.type); }
@@ -1074,7 +1074,7 @@ function updateProjs(s, dt) {
       const d = Math.hypot(dx, dy), mv = p.speed * dt;
       p.ang = Math.atan2(dy, dx);
       if (d <= mv + p.target.def.r) {
-        damage(s, p.target, p.dmg, false, false, p.src, p.fid, !!p.bloom);
+        damage(s, p.target, p.dmg * (p.target.def.flying ? p.flyer ?? 1 : 1), false, false, p.src, p.fid, !!p.bloom); // Daisy's extra against flyers
         p.done = true;
         puff(s, p.target.x, p.target.y, p.color, 3, 60);
         if (p.split) splitSeed(s, p);
@@ -1120,7 +1120,7 @@ function updateProjs(s, dt) {
 function splitSeed(s, p) {
   const t = p.target, b = p.split;
   const near = s.enemies.filter((e) => e !== t && hittable(e) && dist(e, t) <= b.reach * T).sort((a, c) => dist(a, t) - dist(c, t)).slice(0, b.pieces);
-  for (const e of near) s.projs.push({ id: s.nextId++, kind: 'single', x: t.x, y: t.y, target: e, speed: 460 * U, dmg: p.dmg * b.damage, color: p.color, src: p.src, fid: p.fid, bloom: true });
+  for (const e of near) s.projs.push({ id: s.nextId++, kind: 'single', x: t.x, y: t.y, target: e, speed: 460 * U, dmg: p.dmg * b.damage, flyer: p.flyer, color: p.color, src: p.src, fid: p.fid, bloom: true });
   if (near.length) log.logBloom(s, p.src);
 }
 

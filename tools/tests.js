@@ -624,6 +624,21 @@ test('Bloom', 'switched off, a level-5 flower has no ability', () => {
   });
 });
 
+test('Monsters', 'Daisy seeds hit flyers harder', () => {
+  withoutBloom(() => {
+    const { s, f, road } = bloomFlower('daisy');
+    const st = flowerStats('daisy', f.lvl);
+    ok(st.flyerDamage > 1, 'a bonus against flyers');
+    for (const [type, mul] of [['flyer', st.flyerDamage], ['grunt', 1]]) {
+      s.enemies = []; s.projs = [];
+      const e = monsterOn(s, type, road);
+      e.hp = e.maxhp = 1e5; e.armorPlus = 0;
+      for (let i = 0; i < 240 && e.hp === e.maxhp; i++) pin(s, [[e, ...at(road)]], 1 / 60);
+      near(e.maxhp - e.hp, Math.max(1, st.dmg * mul - ENEMIES[type].armor), 0.01, `one seed into a ${type}`);
+    }
+  });
+});
+
 test('Bloom', 'Sunflower beams hit bosses harder', () => {
   withoutBloom(() => {
     const { s, f, road } = bloomFlower('sunflower');
