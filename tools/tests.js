@@ -747,7 +747,7 @@ test('Boss shields', 'a boss shields itself at 60%; only bombs break it, then it
   eq(s.stats.cur.shields.broken, 1, 'logged');
 });
 
-test('Boss shields', "Boom's bombs count double; alone the shield is smaller", () => {
+test('Boss shields', "Boom's bombs count double; the solo shield has its own size", () => {
   const { s, boss } = bossGame(['bomber', 'gardener']);
   hurtTo(s, boss, SHIELD.at[0] - 0.01);
   bombOn(s, boss, 0);

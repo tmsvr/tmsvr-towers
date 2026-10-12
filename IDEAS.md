@@ -72,7 +72,7 @@ dropped, picked up, used and wasted.
 
 **Shield:** at 60% health a boss raises a shield (the wave-10 and endless
 bosses at 70% and 35%). It blocks 90% of flower and baton damage, Bloom
-included, and only bombs break it: 5 bomb hits in co-op, 3 solo; Boom's big
+included, and only bombs break it: 3 bomb hits (co-op or solo); Boom's big
 bombs count as 2. Segments around the boss show the hits left. Once broken the
 boss is stunned for 3 s and takes +50% damage. A shielded boss keeps walking.
 

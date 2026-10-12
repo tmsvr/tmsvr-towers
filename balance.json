@@ -173,7 +173,7 @@
     "at": [0.6],
     "atBig": [0.7, 0.35],
     "block": 0.9,
-    "hitsCoop": 5,
+    "hitsCoop": 3,
     "hitsSolo": 3,
     "catHits": { "bomber": 2 },
     "exposedSeconds": 3,

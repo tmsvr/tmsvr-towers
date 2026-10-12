@@ -49,8 +49,8 @@ them.
   on fires twice as fast for 20 s) or snow globe (every monster but bosses
   freezes for 2 s). Unclaimed power-ups vanish after 10 s.
 - **Bosses raise a shield** at 60% health (the last boss and endless bosses at
-  70% and 35%). It blocks 90% of all damage except bombs: 5 bomb hits break it
-  in co-op, 3 alone, and Boom's bombs count double. A broken shield leaves the
+  70% and 35%). It blocks 90% of all damage except bombs: 3 bomb hits break it
+  (in co-op or alone), and Boom's bombs count double. A broken shield leaves the
   boss stunned and taking 50% more damage for 3 s. Bosses also shrug off half
   of a Frostbloom's slow and can't be frozen solid.
 - A wave in which a boss died ends with a **boss chest**: each cat picks one
