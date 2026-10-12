@@ -53,7 +53,8 @@ From wave 4, some big monsters (tank, charger, hive, shield) arrive as elites:
 a glowing outline, about 2.5× health and one trait: armoured (+3 armour),
 swift (+40% speed), regenerating (heals unless poisoned), frost-proof, or
 splitting (breaks into 3 smaller copies). The chance starts around 5% and
-grows each wave, faster in endless. What an elite carries is a surprise.
+grows each wave to about 17% in wave 10; endless waves, whose monsters are
+already much tougher, have a flat 12%. What an elite carries is a surprise.
 
 A killed elite drops one power-up that any cat can grab within 10 s. Each cat
 carries one (shown in the HUD) and uses it with its own key (P1 **V**, P2
