@@ -860,7 +860,7 @@ test('Saves', 'a game saved mid-wave and loaded plays on exactly like the origin
   for (let i = 0; i < 6; i++) growOnce(s, boom, plant(s, boom, spots[i * 5], i % 2 ? 'thorn' : 'daisy'));
   const f = plant(s, fern, spots[31], 'daisy');
   tick(s, { ready: true });
-  for (let i = 0; i < 900; i++) tick(s, { build: true }, fern.id); // Fern is mid-grow, monsters and seeds are about
+  for (let i = 0; i < 900 || (i < 4000 && !(s.enemies.length && s.projs.length)); i++) tick(s, { build: true }, fern.id); // Fern is mid-grow, monsters and seeds are about
   ok(s.enemies.length && s.projs.length, 'no monsters or seeds in flight to save');
   const json = JSON.stringify(saveGame(s, 'local'));
   const { state: c, mode, sameVersion } = loadGame(JSON.parse(json));
@@ -871,6 +871,17 @@ test('Saves', 'a game saved mid-wave and loaded plays on exactly like the origin
   for (const g of [s, c]) for (let i = 0; i < 1800; i++) tick(g, i < 200 ? { build: true } : {}, fern.id);
   ok(f.lvl > 0, 'growing went on');
   eq(JSON.stringify(saveGame(c, 'local').state), JSON.stringify(saveGame(s, 'local').state), 'the two games');
+});
+
+test('Saves', 'a save names its map, so reordering the maps doesn\'t break it', () => {
+  const s = game({ map: MAPS.length - 1 });
+  const data = saveGame(s, 'solo'), json = JSON.stringify(data);
+  ok(json.includes(`map:${s.m.id}`), 'the map is saved by name');
+  const back = loadGame(JSON.parse(json)).state;
+  ok(back.m === s.m && back.map === s.m.index, 'loads onto the same map');
+  let msg = '';
+  try { loadGame(JSON.parse(json.replaceAll(`map:${s.m.id}`, 'map:3'))); } catch (e) { msg = e.message; }
+  ok(/before the maps changed/.test(msg), `an old numbered save: "${msg}"`);
 });
 
 test('Saves', 'other files are refused', () => {

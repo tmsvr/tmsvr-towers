@@ -15,13 +15,14 @@ function constants() {
   const c = new Map();
   for (const [k, v] of Object.entries(ENEMIES)) c.set(v, `enemy:${k}`);
   for (const [k, v] of Object.entries(FLOWERS)) c.set(v, `flower:${k}`);
-  MAPS.forEach((m, i) => c.set(m, `map:${i}`));
+  for (const m of MAPS) c.set(m, `map:${m.id}`); // by name: the list of maps can change order
   return c;
 }
 function constant(name) {
   const [kind, k] = name.split(':');
-  const v = kind === 'enemy' ? ENEMIES[k] : kind === 'flower' ? FLOWERS[k] : kind === 'map' ? MAPS[+k] : undefined;
-  if (!v) throw new Error(`unknown ${kind} "${k}"`);
+  if (kind === 'map' && /^\d+$/.test(k)) throw new Error('saved before the maps changed; that map can no longer be loaded');
+  const v = kind === 'enemy' ? ENEMIES[k] : kind === 'flower' ? FLOWERS[k] : kind === 'map' ? MAPS.find((m) => m.id === k) : undefined;
+  if (!v) throw new Error(kind === 'map' ? `the map "${k}" no longer exists` : `unknown ${kind} "${k}"`);
   return v;
 }
 const children = (v) => (v instanceof Map ? [...v.keys(), ...v.values()] : v instanceof Set ? [...v] : Object.values(v));
@@ -76,6 +77,7 @@ export function loadGame(data) {
   };
   const s = back(data.state);
   s.items ??= []; // saved before elites dropped power-ups
-  if (s.m !== MAPS[s.map]) throw new Error('the map in this save no longer exists');
+  s.map = s.m.index; // where that map sits in today's list
+  if (s.checkpoint) s.checkpoint.map = s.map;
   return { state: s, mode: data.mode, sameVersion: data.version === DATA_HASH };
 }

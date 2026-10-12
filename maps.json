@@ -13,26 +13,6 @@
   },
   "maps": [
     {
-      "id": "fork",
-      "name": "Forked Path",
-      "desc": "One road forks",
-      "width": 33,
-      "height": 23,
-      "base": [29, 11],
-      "start": [27, 12],
-      "waveSize": 0.9,
-      "startCoins": 1.4,
-      "paths": [
-        [[0, 11], [5, 11], [5, 3], [12, 3], [12, 7], [18, 7], [18, 2], [29, 2], [29, 11]],
-        [[0, 11], [5, 11], [5, 19], [12, 19], [12, 15], [18, 15], [18, 20], [29, 20], [29, 11]]
-      ],
-      "obstacles": [
-        { "type": "pond", "x": 8, "y": 9, "w": 17, "h": 5 },
-        { "type": "bridge", "x": 16, "y": 9, "w": 1, "h": 5 }
-      ],
-      "scatter": { "trees": 26, "rocks": 10, "seed": 71 }
-    },
-    {
       "id": "lakeside",
       "name": "Lakeside",
       "desc": "Two corners",
@@ -265,31 +245,6 @@
       "scatter": { "trees": 26, "rocks": 10, "seed": 13 }
     },
     {
-      "id": "millstream",
-      "name": "Millstream",
-      "desc": "A shortcut",
-      "width": 33,
-      "height": 25,
-      "base": [28, 5],
-      "start": [26, 7],
-      "waveSize": 0.8,
-      "startCoins": 2.2,
-      "waveSet": "wild",
-      "paths": [
-        [[0, 4], [8, 4], [8, 10], [14, 10], [14, 2], [24, 2], [24, 5], [28, 5]],
-        [[0, 20], [6, 20], [6, 14], [13, 14], [13, 21], [24, 21], [24, 5], [28, 5]],
-        [[32, 23], [27, 23], [27, 19], [31, 19], [31, 14], [26, 14], [26, 9], [28, 9], [28, 5]]
-      ],
-      "obstacles": [
-        { "type": "pond", "x": 19, "y": 0, "w": 2, "h": 25 },
-        { "type": "bridge", "x": 19, "y": 12, "w": 2, "h": 1 },
-        { "type": "pond", "x": 10, "y": 6, "w": 3, "h": 2 },
-        { "type": "pond", "x": 8, "y": 16, "w": 3, "h": 3 },
-        { "type": "pond", "x": 28, "y": 20, "w": 2, "h": 2 }
-      ],
-      "scatter": { "trees": 26, "rocks": 10, "seed": 29 }
-    },
-    {
       "id": "twinwhirls",
       "name": "Twin Whirls",
       "desc": "Hard: two whirls",
@@ -352,6 +307,59 @@
         { "type": "pond", "x": 32, "y": 12, "w": 2, "h": 3 }
       ],
       "scatter": { "trees": 28, "rocks": 10, "seed": 37 }
+    },
+    {
+      "id": "bramble",
+      "name": "Bramblewood",
+      "desc": "Hard: crowded woods",
+      "width": 33,
+      "height": 25,
+      "base": [16, 12],
+      "start": [13, 14],
+      "waveSize": 0.9,
+      "startCoins": 2,
+      "waveSet": "wild",
+      "paths": [
+        [[0, 5], [8, 5], [8, 12], [16, 12]],
+        [[32, 2], [24, 2], [24, 7], [16, 7], [16, 12]],
+        [[22, 24], [22, 18], [16, 18], [16, 12]]
+      ],
+      "obstacles": [
+        { "type": "pond", "x": 10, "y": 14, "w": 3, "h": 2 },
+        { "type": "pond", "x": 19, "y": 9, "w": 3, "h": 3 },
+        { "type": "pond", "x": 27, "y": 15, "w": 3, "h": 3 },
+        { "type": "pond", "x": 3, "y": 18, "w": 3, "h": 2 },
+        { "type": "rock", "x": 6, "y": 9 },
+        { "type": "rock", "x": 25, "y": 11 }
+      ],
+      "scatter": { "trees": 60, "rocks": 20, "seed": 7 }
+    },
+    {
+      "id": "fords",
+      "name": "Five Fords",
+      "desc": "Hard: roads from every side",
+      "width": 31,
+      "height": 29,
+      "base": [15, 14],
+      "start": [13, 16],
+      "waveSize": 0.7,
+      "startCoins": 2.8,
+      "waveSet": "rush",
+      "paths": [
+        [[15, 0], [15, 4], [11, 4], [11, 9], [15, 9], [15, 14]],
+        [[0, 8], [6, 8], [6, 14], [15, 14]],
+        [[30, 10], [24, 10], [24, 14], [15, 14]],
+        [[4, 28], [4, 21], [10, 21], [10, 18], [15, 18], [15, 14]],
+        [[26, 28], [26, 22], [20, 22], [20, 18], [15, 18], [15, 14]]
+      ],
+      "obstacles": [
+        { "type": "pond", "x": 19, "y": 2, "w": 2, "h": 14 },
+        { "type": "bridge", "x": 19, "y": 6, "w": 2, "h": 1 },
+        { "type": "pond", "x": 6, "y": 15, "w": 3, "h": 3 },
+        { "type": "pond", "x": 25, "y": 3, "w": 3, "h": 3 },
+        { "type": "pond", "x": 1, "y": 11, "w": 3, "h": 2 }
+      ],
+      "scatter": { "trees": 26, "rocks": 10, "seed": 53 }
     }
   ]
 }
