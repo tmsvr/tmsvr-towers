@@ -617,8 +617,10 @@ test('Elites', 'elites only come from their wave on, and only of the listed type
     ok(!monsterOn(s, 'grunt', road).elite, 'an elite grunt');
   });
   withElites({ chancePerWave: 1 }, () => { s.wave = TOTAL_WAVES; near(sim.eliteChance(s), ELITES.maxChance, 1e-9, 'the chance stops growing'); });
-  s.wave = TOTAL_WAVES + 4;
-  near(sim.eliteChance(s), ELITES.endlessChance, 1e-9, 'fewer elites in endless mode');
+  s.wave = TOTAL_WAVES + 1;
+  near(sim.eliteChance(s), ELITES.endlessChance, 1e-9, 'fewer elites when endless mode starts');
+  s.wave = TOTAL_WAVES + 30;
+  near(sim.eliteChance(s), ELITES.endlessMaxChance, 1e-9, 'endless elites stop growing');
   withElites({ enabled: false }, () => eq(sim.eliteChance(s), 0, 'chance when switched off'));
 });
 

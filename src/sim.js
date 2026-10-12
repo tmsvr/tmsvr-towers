@@ -196,7 +196,8 @@ function pickWeighted(s, table) {
 export function eliteChance(s) {
   const E = ELITES;
   if (!E.enabled || s.wave < E.fromWave) return 0;
-  if (s.wave > TOTAL_WAVES && E.endlessChance != null) return E.endlessChance; // endless monsters are tough enough already
+  // endless monsters are tough enough already: fewer elites, growing slowly
+  if (s.wave > TOTAL_WAVES && E.endlessChance != null) return Math.min(E.endlessMaxChance ?? 1, E.endlessChance + (E.endlessChancePerWave ?? 0) * (s.wave - TOTAL_WAVES - 1));
   return Math.min(E.maxChance, E.chance + E.chancePerWave * (s.wave - E.fromWave));
 }
 
