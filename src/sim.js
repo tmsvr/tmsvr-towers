@@ -1016,7 +1016,7 @@ function updateFlowers(s, dt) {
     if (st.kind === 'single') {
       s.projs.push({ id: s.nextId++, kind: 'single', x: hx, y: hy, target: best, speed: 460 * U, dmg: st.dmg, color: st.color, src: f.type, fid: f.id, split: burst ? { ...bl } : null });
     } else if (st.kind === 'beam') {
-      damage(s, best, st.dmg, false, false, f.type, f.id);
+      damage(s, best, st.dmg * (best.def.boss ? st.bossDamage ?? 1 : 1), false, false, f.type, f.id); // the boss killer
       if (bl?.maxHp && !best.dead) { damage(s, best, best.maxhp * bl.maxHp, true, true, f.type, f.id, true); log.logBloom(s, f.type); }
       s.fx.push({ kind: 'beam', x: hx, y: hy, x2: best.x, y2: best.y, col: st.color, w: 4 + f.lvl });
       puff(s, best.x, best.y, '#fff3a0', 10, 110);

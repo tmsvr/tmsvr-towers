@@ -624,6 +624,18 @@ test('Bloom', 'switched off, a level-5 flower has no ability', () => {
   });
 });
 
+test('Bloom', 'Sunflower beams hit bosses harder', () => {
+  withoutBloom(() => {
+    const { s, f, road } = bloomFlower('sunflower');
+    const boss = monsterOn(s, 'boss', road);
+    boss.hp = boss.maxhp = 1e6; boss.shieldAt = []; // no shield in the way
+    const before = boss.hp, st = flowerStats('sunflower', f.lvl);
+    pin(s, [[boss, ...at(road)]], 1 / 60);
+    ok(st.bossDamage > 1, 'a bonus against bosses');
+    near(before - boss.hp, st.dmg * st.bossDamage - ENEMIES.boss.armor, 0.01, 'one beam');
+  });
+});
+
 // ---- elites and power-ups (IDEAS R2) -------------------------------------------------
 // Runs fn with some ELITES numbers changed, then puts them back.
 function withElites(changes, fn) {
