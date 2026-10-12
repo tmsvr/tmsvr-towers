@@ -62,9 +62,14 @@ them.
   `balance.json` can split a share of every pickup with the other cat).
 - P1: WASD move · Shift sprint · F baton · G bomb · V use power-up · E plant/upgrade (hold) · R heal (hold) · Q next flower / dig-up mode
 - P2 (local): arrows · Right Shift sprint · `,` baton · `.` bomb · `;` use power-up · `/` plant/upgrade · `'` heal · M next flower
-- P or Esc pauses (either player, online too). From the pause screen R restarts the same map with the same cats and flowers, M goes back to the menu, and S saves the game as a file.
+- P or Esc pauses (either player, online too); S on the pause screen saves the game as a file.
+- The pause, defeat and victory screens share the same keys:
+  - **R** retries the wave from the break before it (same garden, same coins), in any wave
+  - **T** starts a new game (the pick screen, with your last map, cats and flowers already chosen)
+  - **M** goes back to the menu (Esc too, after the game)
+  - **C** on the victory screen keeps going in endless mode
 - **O** on the main menu loads a saved game (solo, local co-op or online) and carries on from the moment it was saved, paused. Online, the host saves and loads; a loaded online game starts once P2 joins.
-- Beat all 10 waves and press C on the victory screen to keep going in **endless mode**: wave after wave, each tougher than the last. Wave 11, right after the big boss, is a smaller one to catch your breath; after that the monsters come in about the same numbers but get much tougher, and every 5 waves brings one more boss (wave 15 has two, waves 16–19 one each, wave 20 three…). Lose an endless wave and R retries it from the break before it (same garden, same coins); Esc goes back to the menu.
+- Beat all 10 waves and press C on the victory screen to keep going in **endless mode**: wave after wave, each tougher than the last. Wave 11, right after the big boss, is a smaller one to catch your breath; after that the monsters come in about the same numbers but get much tougher, and every 5 waves brings one more boss (wave 15 has two, waves 16–19 one each, wave 20 three…).
 - I (in the menu or while picking) opens the flower guide: every flower's stats at each level, worked out from `balance.json`.
 - L downloads the game logs (see below).
 - Online, both players use the P1 keys on their own keyboard. Your friend needs

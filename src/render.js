@@ -1995,13 +1995,18 @@ function drawOverlay(c, title, sub, col) {
 // is there, just the title and keys.
 const short = (v) => (v >= 1e5 ? `${Math.round(v / 1000)}k` : v >= 1e4 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`);
 const monsterName = (t) => (INTROS[t]?.[0] || t[0].toUpperCase() + t.slice(1) + 's').replace(/!$/, ''); // intro titles are already plural
+// The keys on every screen that stops the game, the same everywhere (main.js
+// handles them): R retries the wave, T starts a new game, M goes to the menu.
+const retryWaveNo = (s) => (s.over || s.phase === 'wave' ? s.wave : s.wave + 1);
+function stopKeys(s, extra = '') {
+  const retry = s.won || s.phase === 'pick' ? '' : `R: retry wave ${Math.max(1, retryWaveNo(s))}  ·  `;
+  return `${s.won ? 'C: keep going (endless)  ·  ' : ''}${retry}T: new game  ·  M: menu${extra}`;
+}
+
 function drawEndScreen(c, s, ui, time) {
   const won = s.won, S = ui.summary;
-  // after a win: keep going into endless mode; after an endless loss: retry that wave
   const col = won ? '#8dff9a' : '#ff7a6a';
-  const keys = won ? 'C: keep going (endless)  ·  R: play again  ·  Esc: menu  ·  L: game log'
-    : s.endless ? `R: retry wave ${s.wave}  ·  Esc: menu  ·  L: download the game log`
-    : 'R: try again  ·  Esc: menu  ·  L: download the game log';
+  const keys = stopKeys(s, '  ·  L: game log');
   const head = won ? `All ${TOTAL_WAVES} waves defended  ·  ${s.kills} monsters bonked` : `You reached ${s.endless ? 'endless ' : ''}wave ${s.wave}  ·  ${s.kills} monsters bonked`;
   if (!S) { drawOverlay(c, won ? 'Victory!' : 'The garden fell…', [head, keys], col); return; }
   c.fillStyle = 'rgba(12,18,26,0.86)'; c.fillRect(0, 0, VIEW_W, VIEW_H);
@@ -2284,8 +2289,8 @@ export function render(c, s, ui) {
   if (s.phase === 'pick' && !ui.disconnected) drawPick(c, s, ui, time);
   if (s.chest && !ui.disconnected) drawChest(c, s, ui, time);
   if (ui.guide != null) drawGuide(c, time, ui.guide);
-  if (ui.disconnected) drawOverlay(c, 'Disconnected', ['The connection to the host was lost', 'Esc: back to menu'], '#ff7a6a');
-  else if (ui.paused) drawOverlay(c, 'Paused', ['P or Esc: resume', 'R: restart this map  ·  M: back to the menu  ·  S: save the game'], '#ffffff');
+  if (ui.disconnected) drawOverlay(c, 'Disconnected', ['The connection to the host was lost', 'M or Esc: menu'], '#ff7a6a');
+  else if (ui.paused) drawOverlay(c, 'Paused', ['P or Esc: resume  ·  S: save the game', stopKeys(s)], '#ffffff');
   else if (s.over || s.won) drawEndScreen(c, s, ui, time);
   if (ui.note && performance.now() < ui.note.until) label(c, ui.note.txt, VIEW_W / 2, MAP_H - 24, 16, '#ffffff', 'center', 700);
 }

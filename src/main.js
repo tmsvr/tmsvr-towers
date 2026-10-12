@@ -4,7 +4,7 @@
 //   local     – this browser runs the game for 1 or 2 players on one keyboard
 //   host      – this browser runs the game; player 2's inputs arrive over the network (host.js)
 //   guest     – this browser only sends inputs and draws snapshots from the host (guest.js)
-import { createState, step, continueEndless, retryWave } from './sim.js';
+import { createState, step, continueEndless, retryWave, canRetry } from './sim.js';
 import { finishLog, currentLog, gameSummary } from './stats.js';
 import { render, VIEW_W, VIEW_H } from './render.js';
 import { initAudio, play, toggleMute, setMusicMood } from './audio.js';
@@ -16,7 +16,7 @@ import { createHostLink } from './host.js';
 import { createGuestLink } from './guest.js';
 import { saveGame, loadGame } from './save.js';
 import { spawnEffect, spawnTrails, updateEffects, resetEffects } from './fx.js';
-import { MAPS, MAP_H, DATA_HASH, FLOWER_ORDER, LOADOUT_SIZE } from './data.js';
+import { MAPS, MAP_H, DATA_HASH, FLOWER_ORDER } from './data.js';
 
 const canvas = document.getElementById('game');
 const lobby = document.getElementById('lobby');
@@ -132,16 +132,22 @@ addEventListener('keydown', (e) => {
   pressed.add(code);
   if (code === 'KeyN') toggleMute();
   if (code === 'KeyL') downloadLogs();
-  // Esc in a game pauses (and resumes); M in the pause menu leaves. After the
-  // game, before it starts online, or once disconnected, Esc leaves at once.
+  // Esc in a game pauses (and resumes). After the game, before it starts
+  // online, or once disconnected, Esc leaves at once.
   if (code === 'Escape') {
     if (mode === 'menu') { if (ui.online) { leaveOnline(); flashNote('Left the online game'); } return; }
     if (state && !state.over && !state.won && !ui.disconnected) togglePause();
     else backToMenu();
     return;
   }
-  if (code === 'KeyM' && ui.paused && mode !== 'menu') { backToMenu(); return; }
-  if (code === 'KeyS' && ui.paused && mode !== 'menu') { saveToFile(); return; }
+  // The same keys on every screen that stops the game (pause, defeat,
+  // victory): R tries the wave again from the break before it, T starts a new
+  // game from the pick screen (last choices ready), M goes to the menu; C after
+  // a win keeps going into endless mode, S on the pause screen saves.
+  const inGame = mode === 'local' || mode === 'host' || mode === 'guest';
+  const stopped = inGame && state && (state.over || state.won || ui.paused);
+  if (code === 'KeyM' && inGame && (stopped || ui.disconnected)) { backToMenu(); return; }
+  if (code === 'KeyS' && ui.paused && inGame) { saveToFile(); return; }
   if (mode === 'menu') {
     // still connected after a game: 3 or Enter plays again together, any other mode leaves
     if (ui.online && (code === 'Digit3' || code === 'Numpad3' || code === 'Enter')) { playAgainOnline(); return; }
@@ -154,19 +160,11 @@ addEventListener('keydown', (e) => {
     return;
   }
   if (code === 'KeyP') togglePause();
-  // R after a game: back to the pick screen. R while paused: the same map,
-  // cats and flowers again, straight into the game.
-  // After a win, C keeps going (endless mode); after losing an endless wave,
-  // R tries that wave again from the break before it.
-  const endlessLoss = state?.endless && state.over;
-  if (code === 'KeyC' && state?.won && !ui.paused) {
-    if (mode === 'guest') net.send({ t: 'continue' });
-    else if (mode === 'local' || mode === 'host') keepGoing();
-  }
-  if (code === 'KeyR' && state && (state.over || state.won || ui.paused)) {
-    if (mode === 'guest') net.send({ t: endlessLoss && !ui.paused ? 'retry' : 'restart' });
-    else if (mode === 'local' || mode === 'host') { if (endlessLoss && !ui.paused) retry(); else newGame(ui.paused && !state.over && !state.won); }
-  }
+  if (!stopped || ui.disconnected) return;
+  const ask = (t) => net.send({ t }); // online the host decides
+  if (code === 'KeyC' && state.won && !ui.paused) { if (mode === 'guest') ask('continue'); else keepGoing(); }
+  if (code === 'KeyR') { if (mode === 'guest') ask('retry'); else retry(); }
+  if (code === 'KeyT') { if (mode === 'guest') ask('restart'); else newGame(); }
 });
 addEventListener('keyup', (e) => held.delete(e.code || KEY_TO_CODE[e.key] || ''));
 addEventListener('blur', () => held.clear());
@@ -223,13 +221,11 @@ function togglePause() {
   else if (mode === 'local' || mode === 'host') ui.paused = !ui.paused;
 }
 
-// same: restart with the same map, cats and flowers, skipping the pick screen.
-function newGame(same = false) {
+// A new game starts on the pick screen with the last map, cats and flowers chosen.
+function newGame() {
   saveGameLog('quit');
   if (state && state.players) { lastLoadouts = state.players.map((p) => p.loadout || p.pick.chosen); lastCats = state.players.map((p) => p.cat); lastMap = state.map; }
   state = createState(nPlayers, (Math.random() * 1e9) | 0, { sharedScreen: mode === 'local' && nPlayers > 1, loadouts: lastLoadouts, cats: lastCats, map: lastMap });
-  // everyone already has a full loadout, so the next tick leaves the pick screen
-  if (same && state.players.every((p) => p.pick.chosen.length === LOADOUT_SIZE)) for (const p of state.players) p.pick.ready = true;
   ui.cam.snap = true;
   ui.paused = false;
   ui.summary = null;
@@ -243,7 +239,10 @@ function keepGoing() {
   ui.summary = null;
 }
 function retry() {
+  if (!canRetry(state)) { if (!state.won) flashNote('Nothing to retry yet: pick your flowers first'); return; }
   retryWave(state);
+  state.logSaved = false; // the same game's log goes on
+  ui.paused = false;
   ui.summary = null;
   resetEffects();
 }
@@ -425,9 +424,9 @@ function onGuestMessage(m) {
   if (!guestOk) return;
   if (m.t === 'in') host.receiveInputs(m.inputs);
   else if (m.t === 'pause') ui.paused = !ui.paused;
-  else if (m.t === 'restart' && state && (state.over || state.won || ui.paused)) newGame(ui.paused && !state.over && !state.won);
+  else if (m.t === 'restart' && state && (state.over || state.won || ui.paused)) newGame();
   else if (m.t === 'continue' && state?.won) keepGoing();
-  else if (m.t === 'retry' && state?.endless && state.over) retry();
+  else if (m.t === 'retry' && state && (state.over || ui.paused)) retry();
   else if (m.t === 'ping' && Number.isFinite(m.at)) net.send({ t: 'pong', at: m.at });
   else if (m.t === 'menu' && mode === 'host') menuTogether('P2 went back to the menu');
   else if (m.t === 'again' && mode === 'menu' && ui.online === 'host') playAgainOnline();

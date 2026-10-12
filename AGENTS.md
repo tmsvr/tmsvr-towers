@@ -96,6 +96,12 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
   into endless mode (`continueEndless`): wave 11 is a smaller breather, then
   waves barely grow in number while health and boss count climb
   (`breatherWaveSize`, `endless*` in `balance.json → difficulty`).
+- **Stop screens.** Pause, defeat and victory share their keys (`keydown` in
+  `main.js`, `stopKeys` in `render.js`): R retries the wave (`retryWave`
+  rewinds to the checkpoint the sim saves at the start of every break), T
+  starts a new game at the pick screen, M goes to the menu, C after a win
+  goes endless. Online the guest asks the host (`retry`, `restart`,
+  `continue`).
 - **Saved games.** S on the pause screen downloads the whole state
   (`save.js`); O on the menu loads it, paused. A loaded game is just a state,
   so it carries on exactly as it would have (the tests check this).
@@ -147,7 +153,7 @@ Check changes like this:
    half-paid levels, healing, digging), maps are well formed and every road
    is reachable on foot, monster rules (frost-proof, leaping, enrage, ranged
    arrival waves, Snapdragon bites), endless mode (breather, wave size, extra
-   health and bosses, retrying a wave), every Bloom ability, elite traits and
+   health and bosses), retrying a wave (lost or from the pause screen, early waves and endless), every Bloom ability, elite traits and
    each power-up, boss shields and chest perks (each with its switch off too), the same seed gives the same game, the
    autopilot plays every map, a game saved mid-wave and loaded plays on exactly
    like the original, snapshots and inputs survive encoding, and the screens

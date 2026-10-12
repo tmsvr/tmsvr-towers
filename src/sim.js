@@ -590,15 +590,13 @@ function updateWaves(s, dt, ready) {
     banner(s, bonus > 0 ? `Wave cleared!  +${bonus} each` : 'Wave cleared!');
     ev(s, 'clear');
     if (s.chestDue) openChest(s);
-    if (s.endless) saveCheckpoint(s);
+    saveCheckpoint(s);
   }
 }
 
 // ---- Endless mode ---------------------------------------------------------
 // After winning, players can keep going: the waves carry on past the last one,
 // bigger every time (the same formulas, with every boss at final-boss size).
-// Each break between endless waves is saved, so a lost wave can be retried
-// from the start of the break before it.
 export function continueEndless(s) {
   if (!s.won) return;
   s.won = false;
@@ -612,16 +610,22 @@ export function continueEndless(s) {
   saveCheckpoint(s);
 }
 
+// ---- Retrying a wave ---------------------------------------------------------
+// The start of every break is saved, so a wave can be tried again from the
+// break before it (same garden, same coins): after losing it, or from the pause
+// screen, in the first ten waves and in endless mode alike.
 // The map is shared by every state and never changes, so it isn't copied.
 function saveCheckpoint(s) {
   s.checkpoint = structuredClone({ ...s, m: null, checkpoint: null, fx: [], events: [] });
 }
 
+export const canRetry = (s) => !!s.checkpoint && !s.won;
+
 export function retryWave(s) {
-  if (!s.endless || !s.over || !s.checkpoint) return;
-  const { m, checkpoint } = s;
+  if (!canRetry(s)) return;
+  const { m, checkpoint } = s, retries = [...(s.retries || []), s.wave + (s.phase === 'wave' || s.over ? 0 : 1)];
   for (const k of Object.keys(s)) delete s[k];
-  Object.assign(s, structuredClone(checkpoint), { m, checkpoint });
+  Object.assign(s, structuredClone(checkpoint), { m, checkpoint, retries }); // the log remembers every retry
   banner(s, `Try wave ${s.wave + 1} again!`);
   ev(s, 'wave');
 }
@@ -667,7 +671,7 @@ function updateChest(s, inputs) {
   if (ch.picked.some((x) => x == null)) return;
   s.players.forEach((p, i) => { if (ch.picked[i]) applyPerk(s, p, ch.picked[i]); });
   s.chest = null;
-  if (s.endless) saveCheckpoint(s); // a retried wave starts with the perks taken
+  saveCheckpoint(s); // a retried wave starts with the perks taken
 }
 
 // offer: a perk id, or 'fourth:<flower>'.
@@ -1227,6 +1231,7 @@ function updatePick(s, inputs) {
     banner(s, 'Plant your flowers!');
     ev(s, 'wave');
     log.startLog(s);
+    saveCheckpoint(s);
   }
 }
 

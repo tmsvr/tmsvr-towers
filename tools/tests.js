@@ -417,6 +417,43 @@ test('Endless', 'a lost endless wave can be retried from the break before it', (
   ok(m.state.game.endless, 'online guests are told it is endless');
 });
 
+test('Retry', 'a lost early wave can be retried from the break before it', () => {
+  const s = game({ cats: ['bomber', 'gardener'] }), [boom] = s.players;
+  ok(sim.canRetry(s), 'wave 1 can be retried once the flowers are picked');
+  clearNextWave(s); // wave 1 done, break before 2 saved
+  const f = plant(s, boom, freeTile(s), 'thorn');
+  growOnce(s, boom, f);
+  clearNextWave(s); // wave 2 done, break before 3 saved
+  const coins = s.players.map((p) => p.coins), lives = s.lives;
+  tick(s, { ready: true });
+  for (let i = 0; i < 120; i++) tick(s);
+  s.players[0].coins = 0; s.lives = 0; s.over = true;
+  sim.retryWave(s);
+  ok(!s.over && s.phase === 'prep' && !s.endless, 'back in the break');
+  eq(s.wave, 2, 'wave before the retried one');
+  eq(s.lives, lives, 'cottage');
+  s.players.forEach((p, i) => eq(p.coins, coins[i], `P${i + 1} coins`));
+  eq(s.flowers.length, 1, 'garden');
+  eq(s.retries.join(), '3', 'the log remembers the retry');
+  tick(s, { ready: true });
+  eq(s.wave, 3, 'the retried wave starts');
+});
+
+test('Retry', 'from the pause screen mid-wave or in a break, never after a win', () => {
+  const s = game();
+  clearNextWave(s);
+  tick(s, { ready: true });
+  for (let i = 0; i < 60; i++) tick(s);
+  ok(s.phase === 'wave' && s.wave === 2, 'in wave 2');
+  sim.retryWave(s); // paused mid-wave
+  ok(s.phase === 'prep' && s.wave === 1, 'back in the break before wave 2');
+  sim.retryWave(s); // paused in that break
+  ok(s.phase === 'prep' && s.wave === 1, 'the same break again');
+  eq(s.retries.join(), '2,2', 'both retries logged');
+  const won = wonGame();
+  ok(!sim.canRetry(won), 'nothing to retry after a win');
+});
+
 // ---- whole games ----------------------------------------------------------------
 test('Games', 'the same seed plays out the same game', () => {
   const a = runBot({ players: 2, seed: 11, map: 1, maxMinutes: 4 });

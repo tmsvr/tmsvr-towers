@@ -19,6 +19,8 @@
 //  - flowers: every flower ever planted, with its tile, who planted it when,
 //    each level reached [t, lvl, by], how it ended, and its own damage and kills
 //    (in total and per wave), so placement can be judged flower by flower.
+//  - result.retries: every wave the players tried again, in order. A retry
+//    rewinds the log with the game, so only the last attempt of a wave is in it.
 // t is game seconds; tiles are map tile coordinates.
 //
 // Per wave (and in totals) for the features being playtested (IDEAS R1-R3):
@@ -122,7 +124,7 @@ export function finishLog(s, how) {
   if (!s.stats) return null;
   if (cur(s) && cur(s).waveStartT != null) logWaveEnd(s, how);
   const st = s.stats;
-  st.result = { how, wave: s.wave, won: !!s.won, cottage: r1(s.lives), kills: s.kills, seconds: Math.round(s.t) };
+  st.result = { how, wave: s.wave, won: !!s.won, cottage: r1(s.lives), kills: s.kills, seconds: Math.round(s.t), retries: s.retries || [] };
   const totals = { damage: {}, kills: {}, cottageDamage: {}, cottageDamageByRoad: {}, coins: s.players.map(() => ({ earned: 0, plant: 0, upgrade: 0, heal: 0, refund: 0 })), bloom: { damage: {}, triggers: {} },
     elites: { spawned: {}, killed: 0 }, items: { dropped: {}, picked: {}, used: {}, expired: {} },
     shields: { raised: 0, broken: 0, bombHits: 0 }, perks: [] };
