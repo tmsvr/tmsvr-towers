@@ -82,7 +82,7 @@ perk at most twice per run.
 
 | Perk | Effect |
 |---|---|
-| 🏠 Patch the roof | Cottage +30 health and +10 max health |
+| 🏠 Patch the roof | Cottage +30 health (up to its max) |
 | 🌿 Deep roots | All flowers wear 30% slower |
 | 🪴 Hardy stems | Aphids chew half as hard |
 | 🌸 Fourth flower | A 4th flower type joins your loadout |

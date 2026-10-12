@@ -843,7 +843,7 @@ test('Boss chests', 'every perk does what it says', () => {
   const s = game({ cats: ['gardener', 'scout'] }), [a, b] = s.players, P = CHEST.perks;
   const lives = (s.lives = 100), max = s.maxLives;
   sim.applyPerk(s, a, 'roof');
-  eq(s.maxLives, max + P.roof.maxCottage, 'max health'); eq(s.lives, lives + P.roof.cottage, 'health');
+  eq(s.maxLives, max, 'max health'); eq(s.lives, Math.min(max, lives + P.roof.cottage), 'health');
   const price = sim.plantPrice(a, 'thorn'), other = sim.plantPrice(b, 'thorn'), grow = sim.catStats(a).grow;
   sim.applyPerk(s, a, 'thumb'); sim.applyPerk(s, a, 'paws'); sim.applyPerk(s, a, 'pouch');
   ok(sim.plantPrice(a, 'thorn') < price, 'cheaper planting');

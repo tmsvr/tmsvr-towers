@@ -680,7 +680,7 @@ export function applyPerk(s, p, offer) {
   const P = CHEST.perks[id];
   if (P.team) s.perks[id] = (s.perks[id] || 0) + 1;
   else { p.perks ??= {}; p.perks[id] = (p.perks[id] || 0) + 1; }
-  if (id === 'roof') { s.maxLives += P.maxCottage; s.lives = Math.min(s.maxLives, s.lives + P.cottage); }
+  if (id === 'roof') s.lives = Math.min(s.maxLives, s.lives + P.cottage);
   if (id === 'fourth' && FLOWERS[arg] && !p.loadout.includes(arg)) p.loadout.push(arg);
   text(s, p.x, p.y - T * 0.8, `${P.name}!`, '#ffe27a');
   log.logPerk(s, p, offer);
