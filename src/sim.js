@@ -161,9 +161,11 @@ export function spawnEnemy(s, type, from, path = 0) {
   // The last boss is the big one. Bosses also shrink on maps with split-up
   // defences (smaller waveSize), since only some flowers will ever see them.
   const finale = d.boss ? (s.wave >= TOTAL_WAVES ? TUNE.finalBossHp || 1 : 1) * Math.sqrt(s.m.waveSize) : 1;
+  // endless bosses stack the finale's bonus with endless toughening, so they get trimmed
+  const endlessBoss = d.boss && s.wave > TOTAL_WAVES ? TUNE.endlessBossHp ?? 1 : 1;
   // after the breather, endless monsters toughen up faster than the crowds grow
   const endless = 1 + (TUNE.endlessHpPerWave ?? 0) * Math.max(0, s.wave - TOTAL_WAVES - 1);
-  const hpScale = (TUNE.enemyHp ?? 1) * (1 + w * TUNE.hpPerWave + w * w * TUNE.hpPerWaveSquared) * (solo ? (d.boss ? TUNE.soloBossHp : 1) : TUNE.coopEnemyHp) * finale * endless;
+  const hpScale = (TUNE.enemyHp ?? 1) * (1 + w * TUNE.hpPerWave + w * w * TUNE.hpPerWaveSquared) * (solo ? (d.boss ? TUNE.soloBossHp : 1) : TUNE.coopEnemyHp) * finale * endless * endlessBoss;
   const j = () => (rnd(s) - 0.5) * 18 * U;
   const id = s.nextId++;
   const road = s.m.paths[from ? from.path : path];

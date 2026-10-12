@@ -412,6 +412,14 @@ test('Endless', 'monsters after the breather get extra health each wave', () => 
   near(gruntIn(n) / gruntIn(TOTAL_WAVES + 1), (base(n) / base(TOTAL_WAVES + 1)) * extra, 1e-9, 'wave 20 grunt vs wave 11 grunt');
 });
 
+test('Endless', 'endless bosses have endlessBossHp of the health they would have', () => {
+  const s = wonGame(), D = BALANCE.difficulty;
+  const bossIn = (n) => { s.wave = n; sim.spawnEnemy(s, 'boss', null, 0); return s.enemies.at(-1).maxhp; };
+  const base = (n) => 1 + (n - 1) * D.hpPerWave + (n - 1) ** 2 * D.hpPerWaveSquared;
+  const n = TOTAL_WAVES + 5, extra = 1 + D.endlessHpPerWave * (n - TOTAL_WAVES - 1);
+  near(bossIn(n) / bossIn(TOTAL_WAVES), (base(n) / base(TOTAL_WAVES)) * extra * D.endlessBossHp, 1e-9, 'wave 15 boss vs wave 10 boss');
+});
+
 test('Endless', 'a lost endless wave can be retried from the break before it', () => {
   const s = wonGame();
   sim.continueEndless(s);
