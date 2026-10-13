@@ -323,6 +323,20 @@ test('Monsters', 'Snapdragon bites the toughest monster in reach, not the critte
   ok(!swarm.dead, 'the critter went first');
 });
 
+test('Monsters', 'Sunflowers shoot the tough monster nearest the cottage, not the toughest one', () => {
+  const { s, f, road } = flowerByRoad('sunflower');
+  // a hurt Mole King at the cottage, a fresh (tougher) Boss far away, and a grunt even closer
+  const king = monsterOn(s, 'moleking', road), boss = monsterOn(s, 'boss', road), grunt = monsterOn(s, 'grunt', road);
+  ok(boss.maxhp > king.maxhp, 'the Boss is the tougher one');
+  for (const [e, left] of [[king, T], [boss, T * 20], [grunt, 1]]) { e.left = left; e.stun = 30; } // stunned, so they stay put
+  const hp = () => [king, boss, grunt].map((e) => e.hp);
+  const before = hp();
+  f.cd = 0; tick(s);
+  const after = hp();
+  ok(after[0] < before[0], 'the Mole King at the cottage was hit');
+  eq(after.slice(1).join(' '), before.slice(1).join(' '), 'the far Boss and the grunt were not');
+});
+
 test('Monsters', 'Sunflowers spread their beams out instead of all firing at once', () => {
   const s = game({ loadout: ['sunflower', 'frost', 'daisy'] }), [p] = s.players;
   const used = [];

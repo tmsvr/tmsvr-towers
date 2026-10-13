@@ -1017,14 +1017,20 @@ function updateFlowers(s, dt) {
       if (!hittable(e) || (st.groundOnly && airborne(e)) || (st.kind === 'cloud' && e.def.poisonImmune)) continue;
       if (dist(e, f) <= st.range + e.def.r) {
         inRange.push(e);
-        // 'strong' locks onto the toughest monster (by max health), so a nearly
-        // dead boss isn't abandoned for its fresh minions
         // 'big' bites the toughest monster in reach, the one furthest along if several are as tough
-        const better = st.target === 'strong' ? !best || e.maxhp > best.maxhp || (e.maxhp === best.maxhp && e.hp < best.hp)
-          : st.target === 'big' ? !best || e.maxhp > best.maxhp || (e.maxhp === best.maxhp && e.left < best.left)
+        // ('strong' is picked below, once every monster in reach is known)
+        const better = st.target === 'big' ? !best || e.maxhp > best.maxhp || (e.maxhp === best.maxhp && e.left < best.left)
           : !best || e.left < best.left;
         if (better) best = e;
       }
+    }
+    // 'strong' (Sunflower) shoots the tough ones, at least toughShare of the toughest
+    // monster's max health (so any boss before its minions), and of those the one closest
+    // to the cottage: a boss chewing on the house beats a fresh, slightly tougher one
+    if (st.target === 'strong' && inRange.length) {
+      const top = Math.max(...inRange.map((e) => e.maxhp)) * (st.toughShare ?? 1);
+      best = null;
+      for (const e of inRange) if (e.maxhp >= top && (!best || e.left < best.left || (e.left === best.left && e.hp < best.hp))) best = e;
     }
     if (!best) continue;
     f.cd = st.rate / (f.sunT > 0 ? ELITES.items.sun.fireRate : 1); // a sun orb speeds it up

@@ -10,7 +10,7 @@
     "flowers.bossDamage": "Sunflower beams do this many times their damage to bosses: they are the boss killers.",
     "flowers.maxHpBite": "Snapdragon bites also take this share of the target's max health (bossMaxHpBite on bosses), so big monsters lose big chunks.",
     "enemies.poisonImmune": "Stinkbloom poison doesn't affect it (and Stinkblooms don't aim at it).",
-    "flowers.target": "first = enemy furthest along the path (default), strong = the toughest enemy (highest max health), kept until it dies, big = the toughest enemy (highest max health), the one furthest along if several are as tough. Flowers that reach the whole map (Sunflower) spread their shots out at the start of each wave instead of all firing at once.",
+    "flowers.target": "first = enemy furthest along the path (default), strong = of the tough monsters (at least toughShare of the toughest one's max health), the one closest to the cottage, big = the toughest enemy (highest max health), the one furthest along if several are as tough. Flowers that reach the whole map (Sunflower) spread their shots out at the start of each wave instead of all firing at once.",
     "flowerLevels.prices": "A flower's cost is its base price. Planting it (seedling to level 1) costs cost x plantPrice; going from level L to L+1 costs cost x upgradeCostMultipliers[L-1] x upgradePrice. Healing is priced off the base cost (fullHealCostFraction). Planting and upgrade prices are rounded to the nearest priceStep (never below one step).",
     "flowerLevels.perLevel": "Bonus added per level above 1, e.g. damage 0.5 means +50% damage per level.",
     "flowerLevels.wearPerSecond": "Health every flower loses per second while a wave is running (the same for all flower types, none between waves), times wearMultiplierByLevel for its level. Flowers have 100 health; upgrading refills it.",
@@ -226,7 +226,7 @@
 
   "flowers": {
     "daisy":     { "name": "Daisy",      "desc": "Rapid little seeds", "cost": 20, "range": 2.2, "damage": 5, "flyerDamage": 1.25, "rate": 0.3, "kind": "single", "color": "#ffffff" },
-    "sunflower": { "name": "Sunflower",  "desc": "Blasts the toughest monster anywhere", "cost": 60, "range": 99, "damage": 315, "bossDamage": 1.3, "rate": 12, "kind": "beam", "target": "strong", "color": "#ffd23f" },
+    "sunflower": { "name": "Sunflower",  "desc": "Blasts the toughest monster nearest the cottage", "cost": 60, "range": 99, "damage": 315, "bossDamage": 1.3, "rate": 12, "kind": "beam", "target": "strong", "toughShare": 0.5, "color": "#ffd23f" },
     "firelily":  { "name": "Fire Lily",  "desc": "Fireballs pierce a line of monsters", "cost": 45, "range": 3, "damage": 19, "rate": 1.5, "kind": "bolt", "pierce": 3, "color": "#ff7a2f" },
     "stink":     { "name": "Stinkbloom", "desc": "Stacking poison clouds that ignore armour (ground)", "cost": 45, "range": 2.6, "damage": 2.1, "rate": 2.4, "kind": "cloud", "cloudRadius": 0.95, "cloudSeconds": 3.5, "maxStacks": 5, "groundOnly": true, "color": "#9ad14b" },
     "frost":     { "name": "Frostbloom", "desc": "Cheap, slows everything nearby (no damage)", "cost": 16, "range": 2.3, "damage": 0, "rate": 2.75, "kind": "pulse", "slow": 0.45, "slowSeconds": 2.5, "color": "#8fe3ff" },
