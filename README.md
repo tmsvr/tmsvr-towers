@@ -53,8 +53,8 @@ them.
   nothing can hit it, and shakes the flowers around it each time it comes up)
   and the **Bramble Witch** (heals the monsters around it and withers the
   flowers it walks past). Max-level flowers shrug off the quake and the
-  withering.
-- **Bosses raise a shield** at 60% health (the last boss and endless bosses at
+  withering. Only the Boss raises a shield; the other two have their own tricks.
+- **The Boss raises a shield** at 60% health (the last boss and endless bosses at
   70% and 35%). It blocks 90% of all damage except bombs: 3 bomb hits break it
   (in co-op or alone), and Boom's bombs count double. A broken shield leaves the
   boss stunned and taking 50% more damage for 3 s. Bosses also shrug off half

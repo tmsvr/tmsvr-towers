@@ -269,6 +269,15 @@ test('Bosses', 'every kind of boss turns up, picked at random', () => {
   eq([...seen].sort().join(' '), Object.keys(BALANCE.difficulty.bossTypes).sort().join(' '), 'boss kinds seen');
 });
 
+test('Bosses', 'only bosses without noShield raise shields', () => {
+  const s = wonGame(), { road } = tileByRoad(s);
+  for (const t of Object.keys(BALANCE.difficulty.bossTypes)) {
+    const e = monsterOn(s, t, road);
+    sim.damage(s, e, e.maxhp * 0.5, true, true);
+    eq(e.shield > 0, !ENEMIES[t].noShield, `${t} shield`);
+  }
+});
+
 test('Bosses', 'the Mole King shakes the flowers around it when it comes up', () => {
   const { s, f, road } = flowerByRoad('frost');
   const king = monsterOn(s, 'moleking', road), q = ENEMIES.moleking.quake;

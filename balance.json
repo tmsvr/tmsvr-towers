@@ -31,6 +31,7 @@
     "enemies.unslowable": "Frostbloom can't slow it.",
     "enemies.slowResist": "Share of a Frostbloom's slow it shrugs off (0.5 = half as slowed: a slow to 25% speed becomes 62.5%).",
     "enemies.dash.leap": "During each dash it is in the air: ground-only flowers and poison clouds can't touch it.",
+    "enemies.noShield": "A boss that never raises a boss shield (its own abilities are enough).",
     "enemies.heals": "Mends monsters within radius tiles: perSecond health a second plus share of their max health a second.",
     "enemies.quake": "Each time it comes up from underground, flowers within radius tiles lose damage health (times wearMultiplierByLevel for their level; max level is immune).",
     "enemies.withers": "Flowers within radius tiles lose perSecond health a second (times wearMultiplierByLevel; max level is immune).",
@@ -249,8 +250,8 @@
     "charger":  { "hp": 90,   "speed": 1.3,  "coins": 5,  "bite": 3, "size": 0.34, "armor": 2, "enrage": { "maxSpeedMultiplier": 2.6 } },
     "hive":     { "hp": 150,  "speed": 1.05, "coins": 7,  "bite": 4, "size": 0.43, "armor": 1, "spawns": { "type": "swarm", "every": 4.5, "count": 2 } },
     "boss":     { "hp": 800,  "speed": 0.98, "coins": 40, "bite": 8,  "size": 0.6,  "armor": 3, "boss": true, "slowResist": 0.5, "spawns": { "type": "grunt", "every": 6, "count": 2 } },
-    "moleking": { "hp": 620,  "speed": 0.98, "coins": 40, "bite": 8,  "size": 0.6,  "armor": 3, "boss": true, "slowResist": 0.5, "burrow": { "aboveSeconds": 5, "belowSeconds": 1.6, "speedMultiplier": 1.2 }, "quake": { "radius": 1.8, "damage": 18 } },
-    "witch":    { "hp": 720,  "speed": 0.95, "coins": 40, "bite": 8,  "size": 0.55, "armor": 2, "boss": true, "slowResist": 0.5, "heals": { "radius": 2.5, "perSecond": 0, "share": 0.02 }, "withers": { "radius": 1.6, "perSecond": 6 } }
+    "moleking": { "hp": 620,  "speed": 0.98, "coins": 40, "bite": 8,  "size": 0.6,  "armor": 3, "boss": true, "noShield": true, "slowResist": 0.5, "burrow": { "aboveSeconds": 5, "belowSeconds": 1.6, "speedMultiplier": 1.2 }, "quake": { "radius": 1.8, "damage": 18 } },
+    "witch":    { "hp": 720,  "speed": 0.95, "coins": 40, "bite": 8,  "size": 0.55, "armor": 2, "boss": true, "noShield": true, "slowResist": 0.5, "heals": { "radius": 2.5, "perSecond": 0, "share": 0.02 }, "withers": { "radius": 1.6, "perSecond": 6 } }
   },
 
   "intros": {

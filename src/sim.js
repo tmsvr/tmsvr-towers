@@ -182,7 +182,7 @@ export function spawnEnemy(s, type, from, path = 0) {
   });
   const e = s.enemies[s.enemies.length - 1];
   // boss shields (IDEAS R3): the health shares at which this boss will raise one
-  if (d.boss && SHIELD.enabled) { e.shieldAt = [...(s.wave >= TOTAL_WAVES ? SHIELD.atBig : SHIELD.at)]; e.shield = 0; e.shieldMax = 0; e.exposedT = 0; }
+  if (d.boss && SHIELD.enabled && !d.noShield) { e.shieldAt = [...(s.wave >= TOTAL_WAVES ? SHIELD.atBig : SHIELD.at)]; e.shield = 0; e.shieldMax = 0; e.exposedT = 0; }
   if (!from) maybeElite(s, e);
 }
 
