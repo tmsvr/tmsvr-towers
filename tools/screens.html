@@ -8,7 +8,7 @@
 <style>
   :root { --bg: #141b22; --text: #e8f1f7; --muted: #8fa5b3; }
   body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
-  main { max-width: 1040px; margin: 0 auto; }
+  main { max-width: 1600px; margin: 0 auto; }
   h1 { margin: 0 0 4px; font-size: 24px; }
   h2 { margin: 28px 0 8px; font-size: 17px; }
   p { color: var(--muted); margin: 0 0 16px; }
@@ -18,11 +18,11 @@
 <body>
 <main>
   <h1>Screens</h1>
-  <p>Every screen of the game, drawn with the game's own code on made-up but realistic games (late endless waves, big numbers, every perk), so text that doesn't fit shows up at a glance. Edit <code>src/render.js</code> and reload. <code>?only=pause</code> shows just the screens whose name contains that word.</p>
+  <p>Every screen of the game, drawn with the game's own code on made-up but realistic games (late endless waves, big numbers, every perk), so text that doesn't fit shows up at a glance. Edit <code>src/render.js</code> and reload. <code>?only=pause</code> shows just the screens whose name contains that word; <code>?size=1500x656</code> draws them as a window of that shape shows them (the base is 1008x656).</p>
   <div id="out"></div>
 </main>
 <script type="module">
-import { render } from '../src/render.js';
+import { render, setView, BASE_W, BASE_H } from '../src/render.js';
 import * as sim from '../src/sim.js';
 import { MAPS, FLOWER_ORDER } from '../src/data.js';
 import { spawnEffect, resetEffects, updateEffects } from '../src/fx.js';
@@ -35,7 +35,10 @@ const KEYS = [
   { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', atk: 'Comma', bomb: 'Period', build: 'Slash', heal: 'Quote', cycle: 'KeyM', sprint: 'ShiftRight', use: 'Semicolon' },
 ];
 const DEFAULT_LABELS = { ShiftLeft: 'Shift', ShiftRight: 'R-Shift', Comma: ',', Period: '.', Slash: '/', Quote: "'", ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Semicolon: ';' };
-const VIEW_W = 1008, VIEW_H = 656, dpr = Math.min(2, devicePixelRatio || 1);
+// ?size=1500x656 draws every screen as a window of that shape would show it
+const [VIEW_W, VIEW_H] = (new URLSearchParams(location.search).get('size') || `${BASE_W}x${BASE_H}`).split('x').map(Number);
+setView(VIEW_W, VIEW_H);
+const dpr = Math.min(2, devicePixelRatio || 1);
 const only = new URLSearchParams(location.search).get('only');
 const ui = (o = {}) => ({
   cam: { x: 0, y: 0 }, menuMap: MAPS[0], paused: false, shake: 0, dpr, netLabel: '', disconnected: false, guide: null, online: null, summary: null,

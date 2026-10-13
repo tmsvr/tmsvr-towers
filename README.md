@@ -81,6 +81,7 @@ them.
   - **C** on the victory screen keeps going in endless mode
 - **O** on the main menu loads a saved game (solo, local co-op or online) and carries on from the moment it was saved, paused. Online, the host saves and loads; a loaded online game starts once P2 joins.
 - Beat all 10 waves and press C on the victory screen to keep going in **endless mode**: wave after wave, each tougher than the last. Wave 11, right after the big boss, is a smaller one to catch your breath; after that the monsters come in about the same numbers but get much tougher, and every 5 waves brings one more boss (wave 15 has two, wave 20 three, wave 25 four…). From wave 21 the waves in between bring bosses too (one each until wave 25, then two…).
+- The game fills the browser window: a wider or taller window shows more of the map (things stay the same size), so there are no black bars.
 - I (in the menu or while picking) opens the flower guide: every flower's stats at each level, worked out from `balance.json`.
 - L downloads the game logs (see below).
 - Online, both players use the P1 keys on their own keyboard. Your friend needs

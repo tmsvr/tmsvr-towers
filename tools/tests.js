@@ -9,7 +9,7 @@ import {
 } from '../src/data.js';
 import { encodeSnapshot, encodeInputs, decodeFast } from '../src/schema.js';
 import { gameSummary } from '../src/stats.js';
-import { render, num, clock } from '../src/render.js';
+import { render, num, clock, setView, BASE_W, BASE_H, VIEW_W, MAP_H } from '../src/render.js';
 import { runBot } from './bot.js';
 import { saveGame, loadGame } from '../src/save.js';
 
@@ -1124,6 +1124,23 @@ test('Drawing', 'pick screen, a game in progress and the end screen draw without
   const r = runBot({ players: 2, seed: 2, map: 0, maxMinutes: 3 });
   s.over = true; ui.summary = gameSummary(r.game);
   render(c, s, ui);
+});
+
+test('Drawing', 'a wide or tall window shows more map, and every screen still draws', () => {
+  const ui = { cam: { x: 0, y: 0 }, menuMap: MAPS[0], paused: false, shake: 0, dpr: 1, netLabel: '', disconnected: false, guide: null, keys: [], keysFor: () => ({}), keyLabel: (k) => String(k), mode: () => 'local', summary: null };
+  const s = game({ cats: ['bomber', 'gardener'] });
+  try {
+    for (const [w, h] of [[1600, BASE_H], [BASE_W, 1100]]) {
+      setView(w, h);
+      eq(`${VIEW_W}x${MAP_H}`, `${w}x${h - (BASE_H - 560)}`, 'view size');
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      const c = cv.getContext('2d');
+      render(c, null, ui); // menu
+      render(c, s, ui); // game
+      render(c, s, { ...ui, paused: true });
+      render(c, sim.createState(2, 1, { map: 0 }), ui); // pick screen
+    }
+  } finally { setView(BASE_W, BASE_H); }
 });
 
 test('Drawing', 'big numbers and long games read the way games show them', () => {

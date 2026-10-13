@@ -6,7 +6,7 @@
 //   guest     – this browser only sends inputs and draws snapshots from the host (guest.js)
 import { createState, step, continueEndless, retryWave, canRetry } from './sim.js';
 import { finishLog, currentLog, gameSummary } from './stats.js';
-import { render, VIEW_W, VIEW_H } from './render.js';
+import { render, setView, VIEW_W, MAP_H, BASE_W, BASE_H } from './render.js';
 import { initAudio, play, toggleMute, setMusicMood } from './audio.js';
 import { juiceEvent, hitStopping } from './juice.js';
 import { hostGame, joinGame } from './net.js';
@@ -16,7 +16,7 @@ import { createHostLink } from './host.js';
 import { createGuestLink } from './guest.js';
 import { saveGame, loadGame } from './save.js';
 import { spawnEffect, spawnTrails, updateEffects, resetEffects } from './fx.js';
-import { MAPS, MAP_H, DATA_HASH, FLOWER_ORDER } from './data.js';
+import { MAPS, HUD_H, DATA_HASH, FLOWER_ORDER } from './data.js';
 
 const canvas = document.getElementById('game');
 const lobby = document.getElementById('lobby');
@@ -33,20 +33,27 @@ const snap = (v, step) => Math.round(v / step) * step || v; // never snap a tiny
 const { scale, rotate } = CanvasRenderingContext2D.prototype;
 ctx.scale = (x, y) => scale.call(ctx, snap(x, SCALE_STEP), snap(y, SCALE_STEP));
 ctx.rotate = (a) => rotate.call(ctx, snap(a, TURN_STEP));
-// The game is laid out at VIEW_W x VIEW_H and stretched to fit the window; the
-// canvas gets as many real pixels as it is shown at, so it stays sharp at any
-// size. Steps of 0.25 keep resizing from rebuilding the caches every frame.
-// The 2x cap matters: past it the pre-drawn map background gets huge, and
-// Firefox in particular slows right down copying from it every frame.
-function pixelScale() {
-  const shown = canvas.getBoundingClientRect().width || VIEW_W;
-  return Math.min(2, Math.max(1, Math.round(((shown * (window.devicePixelRatio || 1)) / VIEW_W) * 4) / 4));
-}
+// The canvas fills the window. The game is laid out for BASE_W x BASE_H and
+// zoomed so that size just fits; a window of another shape then shows more of
+// the map, wider or taller (setView), so things stay the same size and there
+// are no black bars. The view never grows past the smallest map, so the camera
+// always has map to show; only a very long or tall window gets bars past that.
+// The canvas gets as many real pixels as it is shown at, so it stays sharp.
+// Steps of 0.25 keep resizing from rebuilding the caches every frame. The 2x
+// cap matters: past it the pre-drawn map background gets huge, and Firefox in
+// particular slows right down copying from it every frame.
+const MAX_W = Math.min(...MAPS.map((m) => m.worldW)), MAX_H = Math.min(...MAPS.map((m) => m.worldH)) + HUD_H;
 function fitCanvas() {
-  const k = pixelScale();
-  if (k === ui.dpr && canvas.width === Math.round(VIEW_W * k)) return;
-  canvas.width = Math.round(VIEW_W * k);
-  canvas.height = Math.round(VIEW_H * k);
+  const ww = window.innerWidth || BASE_W, wh = window.innerHeight || BASE_H;
+  const zoom = Math.min(ww / BASE_W, wh / BASE_H); // screen pixels per game pixel
+  const w = Math.round(Math.min(MAX_W, ww / zoom)), h = Math.round(Math.min(MAX_H, wh / zoom));
+  const k = Math.min(2, Math.max(1, Math.round(zoom * (window.devicePixelRatio || 1) * 4) / 4));
+  canvas.style.width = `${Math.round(w * zoom)}px`;
+  canvas.style.height = `${Math.round(h * zoom)}px`;
+  if (k === ui.dpr && canvas.width === Math.round(w * k) && canvas.height === Math.round(h * k)) return;
+  setView(w, h);
+  canvas.width = Math.round(w * k);
+  canvas.height = Math.round(h * k);
   ctx.setTransform(k, 0, 0, k, 0, 0);
   ui.dpr = k;
 }
@@ -75,7 +82,9 @@ const ui = {
   mode: () => mode,
 };
 fitCanvas();
-addEventListener('resize', fitCanvas);
+// While the window is being resized the browser can swallow key releases, so a
+// cat would keep walking; forget the held keys, like when the window loses focus.
+addEventListener('resize', () => { held.clear(); fitCanvas(); });
 
 // Keys are bound by physical position; show what is printed on this keyboard layout.
 navigator.keyboard?.getLayoutMap?.().then((map) => {

@@ -83,11 +83,19 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
   events on the state (`ev(s, 'chomp')`, banners, fx requests).
 - **Units.** JSON is in tiles and seconds; `data.js` converts to pixels (`T` =
   56 px per tile, `U` scales art). Positions in the sim are pixels.
-- **Fixed logical screen.** Everything is laid out for `VIEW_W × VIEW_H`
-  (1008 × 656: an 18 × 10 tile map view plus a 96 px HUD). CSS scales the
-  canvas to fit the window; `fitCanvas()` in `main.js` gives the backing store
-  as many real pixels as it is shown at (capped at 2×: bigger makes Firefox
-  slow). Online, the top-left label shows ping, frames per second counted on the
+- **Screen size follows the window.** Everything is laid out for the base
+  size `BASE_W × BASE_H` (1008 × 656: an 18 × 10 tile map view plus a 96 px
+  HUD), zoomed so that just fits the window. A window of another shape shows
+  more map instead of black bars: `fitCanvas()` in `main.js` sets the live
+  `VIEW_W × VIEW_H` (`setView` in `render.js`), never smaller than the base
+  and never bigger than the smallest map. The world, HUD (cat cards centred),
+  minimap and banners use the live size; the panel screens (menu, pick, chest,
+  pause, end, guide) keep the base layout in a centred frame (`inFrame`, with
+  `dim()` for their full-screen backdrop). The sim only knows the base size
+  (it keeps local co-op cats within one base screen of each other). The
+  backing store gets as many real pixels as the canvas is shown at (capped
+  at 2×: bigger makes Firefox slow). Check other shapes with
+  `/tools/screens.html?size=1500x656`. Online, the top-left label shows ping, frames per second counted on the
   wall clock, the slowest frame of the last second, and game updates received
   (guest) or dropped because the connection is backed up (host); see
   `measureFrame` in `main.js`. Caches (map background,

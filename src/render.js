@@ -9,7 +9,7 @@
 //   players, flowers, enemies (each with its def), drops, projs, bombs, clouds,
 // with each entity carrying the fields schema.js sends for it.
 import {
-  T, U, VIEW_W, MAP_H, HUD_H, TOTAL_WAVES, MAPS,
+  T, U, VIEW_W as BASE_W, MAP_H as BASE_MAP_H, HUD_H, TOTAL_WAVES, MAPS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, GLOBAL_RANGE, ENEMIES, INTROS,
   BLOOM, bloomOf, ELITES, CHEST, ECONOMY,
 } from './data.js';
@@ -19,8 +19,24 @@ import { observeJuice, drawJuiceWorld, drawJuiceScreen, hitSquash, swingSquash, 
 import { liveEffects } from './fx.js';
 import { clamp, seededRandom } from './util.js';
 
-export { VIEW_W };
-export const VIEW_H = MAP_H + HUD_H;
+// The screen. Everything is laid out for the base size, BASE_W x BASE_H (an
+// 18 x 10 tile view plus the HUD); a window of another shape makes the view
+// bigger in that direction (setView, from main.js), never smaller. The world,
+// HUD, minimap and banners use the whole view; the panel screens (menu, pick,
+// chest, pause, end, guide) keep their base layout in a frame in the middle.
+export { BASE_W };
+export const BASE_H = BASE_MAP_H + HUD_H;
+export let VIEW_W = BASE_W, VIEW_H = BASE_H, MAP_H = BASE_MAP_H;
+export function setView(w, h) { VIEW_W = w; VIEW_H = h; MAP_H = h - HUD_H; }
+// Draw a panel screen in a base-size frame centred in the view (or in the map
+// area above the HUD); dim() still covers the whole view from inside it.
+let frame = { x: 0, y: 0 };
+function inFrame(c, fn, overMap = false) {
+  frame = { x: Math.round((VIEW_W - BASE_W) / 2), y: Math.round(overMap ? (MAP_H - BASE_MAP_H) / 2 : (VIEW_H - BASE_H) / 2) };
+  c.save(); c.translate(frame.x, frame.y);
+  try { fn(); } finally { c.restore(); frame = { x: 0, y: 0 }; }
+}
+function dim(c, col, all = true) { c.fillStyle = col; c.fillRect(-frame.x, -frame.y, VIEW_W, all ? VIEW_H : MAP_H); }
 
 const FONT = '"Fredoka", system-ui, -apple-system, sans-serif';
 const OUT = '#2b2118';
@@ -1670,7 +1686,7 @@ function drawIntros(c, ui, time) {
 }
 
 // ---- minimap ---------------------------------------------------------------
-const MM_W = 216, MM_X = VIEW_W - MM_W - 10, MM_Y = 10;
+const MM_W = 216, MM_Y = 10; // pinned to the top-right corner, wherever that is
 // The minimap's picture of the map never changes, so it is shrunk from the big
 // background once per map. Shrinking that ~4000 px image every frame was the
 // most expensive thing in the whole frame on a computer without GPU canvas.
@@ -1702,6 +1718,7 @@ function drawMinimap(c, s, ui) {
   const m = s.m, base = m.base;
   const MM_H = minimapH(m);
   const sx = MM_W / m.worldW, sy = MM_H / m.worldH;
+  const MM_X = VIEW_W - MM_W - 10;
   const mx = (x) => MM_X + x * sx, my = (y) => MM_Y + y * sy;
   c.save();
   rrect(c, MM_X - 3, MM_Y - 3, MM_W + 6, MM_H + 6, 8, 'rgba(20,28,36,0.8)', 'rgba(255,255,255,0.35)', 1.5);
@@ -1787,9 +1804,10 @@ function drawHud(c, s, time, ui) {
   label(c, status, 14, y0 + 78, 12, '#a9bccb', 'left', 500, null);
   label(c, isMuted() ? '🔇' : '', 220, y0 + 30, 14, '#fff', 'center', 500, null);
 
-  const pw = 370;
+  // the cats' cards, centred in the space right of the cottage on a wide screen
+  const pw = 370, cards = s.players.length * (pw + 12) - 12, left = 250 + Math.max(0, Math.round((VIEW_W - 260 - cards) / 2));
   s.players.forEach((p, i) => {
-    const x0 = 250 + i * (pw + 12);
+    const x0 = left + i * (pw + 12);
     const pc = PLAYER.scarves[i];
     rrect(c, x0, y0 + 9, pw, HUD_H - 18, 12, 'rgba(255,255,255,0.06)', pc, 2);
     rrect(c, x0 + 10, y0 + 17, 30, 18, 9, pc);
@@ -1850,14 +1868,14 @@ function drawPause(c, s) {
   if (team.length) cols.push(['Team', '#8dff9a', team]);
   const rows = Math.max(0, ...cols.map(([, , list]) => list.length));
   if (!rows) { drawOverlay(c, 'Paused', ['P or Esc: resume  ·  S: save the game', stopKeys(s)], '#ffffff'); return; }
-  c.fillStyle = 'rgba(12,18,26,0.78)'; c.fillRect(0, 0, VIEW_W, VIEW_H);
-  const ph = 74 + rows * 36, py = Math.min(VIEW_H - ph - 24, 262);
-  label(c, 'Paused', VIEW_W / 2, py - 150, 60, '#ffffff', 'center', 700, OUT);
-  label(c, 'P or Esc: resume  ·  S: save the game', VIEW_W / 2, py - 88, 20, '#fff', 'center', 500, null);
-  label(c, stopKeys(s), VIEW_W / 2, py - 58, 20, '#fff', 'center', 500, null);
-  const pw = Math.min(VIEW_W - 64, 300 * cols.length), px = (VIEW_W - pw) / 2, w = pw / cols.length;
+  dim(c, 'rgba(12,18,26,0.78)');
+  const ph = 74 + rows * 36, py = Math.min(BASE_H - ph - 24, 262);
+  label(c, 'Paused', BASE_W / 2, py - 150, 60, '#ffffff', 'center', 700, OUT);
+  label(c, 'P or Esc: resume  ·  S: save the game', BASE_W / 2, py - 88, 20, '#fff', 'center', 500, null);
+  label(c, stopKeys(s), BASE_W / 2, py - 58, 20, '#fff', 'center', 500, null);
+  const pw = Math.min(BASE_W - 64, 300 * cols.length), px = (BASE_W - pw) / 2, w = pw / cols.length;
   rrect(c, px, py, pw, ph, 14, 'rgba(30,38,48,0.94)', 'rgba(255,255,255,0.2)', 1.5);
-  label(c, 'Perks from boss chests', VIEW_W / 2, py + 22, 16, '#ffe27a', 'center', 700, null);
+  label(c, 'Perks from boss chests', BASE_W / 2, py + 22, 16, '#ffe27a', 'center', 700, null);
   cols.forEach(([who, col, list], i) => {
     const cx = px + w * (i + 0.5);
     label(c, who, cx, py + 50, 14, col, 'center', 700, null);
@@ -1936,7 +1954,7 @@ function drawMapCarousel(c, s, ui, time) {
   for (let i = 0; i < N; i++) {
     const k = wrap(i - ui.mapPos);
     if (Math.abs(k) > 2.6) continue;
-    const m = MAPS[i], x = VIEW_W / 2 + k * step - mw / 2, sel = s.map === i;
+    const m = MAPS[i], x = BASE_W / 2 + k * step - mw / 2, sel = s.map === i;
     c.globalAlpha = Math.abs(k) <= 1.5 ? 1 : Math.max(0, 1 - (Math.abs(k) - 1.5) / 1.1);
     rrect(c, x, y, mw, mh, 12, sel ? 'rgba(255,226,122,0.16)' : 'rgba(255,255,255,0.05)', sel ? '#ffe27a' : 'rgba(255,255,255,0.18)', sel ? 3 : 1.5);
     drawMapThumb(c, m, x + 8, y + 6, mw - 16, mh - 42);
@@ -1947,7 +1965,7 @@ function drawMapCarousel(c, s, ui, time) {
   }
   // arrows at both ends: there are always more maps either way
   for (const dir of [-1, 1]) {
-    const ax = dir < 0 ? 22 : VIEW_W - 22, ay = y + mh / 2;
+    const ax = dir < 0 ? 22 : BASE_W - 22, ay = y + mh / 2;
     circle(c, ax, ay, 15, 'rgba(20,28,36,0.9)', 'rgba(255,255,255,0.35)', 1.5);
     c.fillStyle = '#ffe27a'; c.beginPath();
     c.moveTo(ax + dir * 6, ay); c.lineTo(ax - dir * 4, ay - 7); c.lineTo(ax - dir * 4, ay + 7); c.closePath(); c.fill();
@@ -1955,12 +1973,12 @@ function drawMapCarousel(c, s, ui, time) {
 }
 
 function drawPick(c, s, ui, time) {
-  c.fillStyle = 'rgba(12,18,26,0.85)'; c.fillRect(0, 0, VIEW_W, MAP_H);
-  label(c, `Choose a map, a cat and ${LOADOUT_SIZE} flowers`, VIEW_W / 2, 20, 22, '#ffe27a', 'center', 700, OUT);
-  label(c, 'I: flower guide', VIEW_W - 16, 20, 13, '#8fa5b3', 'right', 600, null);
+  dim(c, 'rgba(12,18,26,0.85)', false);
+  label(c, `Choose a map, a cat and ${LOADOUT_SIZE} flowers`, BASE_W / 2, 20, 22, '#ffe27a', 'center', 700, OUT);
+  label(c, 'I: flower guide', BASE_W - 16, 20, 13, '#8fa5b3', 'right', 600, null);
   drawMapCarousel(c, s, ui, time);
   // cats: each one can only be taken by one player
-  const cw0 = 232, cgap = 12, ch0 = 98, cx0 = (VIEW_W - (CAT_ORDER.length * cw0 + (CAT_ORDER.length - 1) * cgap)) / 2, cy0 = 148;
+  const cw0 = 232, cgap = 12, ch0 = 98, cx0 = (BASE_W - (CAT_ORDER.length * cw0 + (CAT_ORDER.length - 1) * cgap)) / 2, cy0 = 148;
   CAT_ORDER.forEach((id, i) => {
     const K = CATS[id], x = cx0 + i * (cw0 + cgap);
     const owner = s.players.find((p) => p.cat === id);
@@ -1981,7 +1999,7 @@ function drawPick(c, s, ui, time) {
     pickCursor(c, s, x, cy0, cw0, ch0, 15, 1, (p) => p.cat === id, time);
   });
   // flowers
-  const N = FLOWER_ORDER.length, cw = 130, gap = 8, x0 = (VIEW_W - (N * cw + (N - 1) * gap)) / 2, y0 = 260, ch = 222;
+  const N = FLOWER_ORDER.length, cw = 130, gap = 8, x0 = (BASE_W - (N * cw + (N - 1) * gap)) / 2, y0 = 260, ch = 222;
   FLOWER_ORDER.forEach((t, i) => {
     const F = FLOWERS[t];
     const x = x0 + i * (cw + gap), cx = x + cw / 2;
@@ -2020,9 +2038,9 @@ function drawPick(c, s, ui, time) {
       : `[${L(k.left)}/${L(k.right)}] move · [${L(k.build)}] pick · [${L(k.up)}] cats · [${L(k.atk)}] ready`;
     const who = `${CATS[p.cat].name}, `;
     const msg = p.pick.ready ? `Ready with ${CATS[p.cat].name}! ✓` : n < LOADOUT_SIZE ? `${who}${n}/${LOADOUT_SIZE} flowers   ${keys}` : `${who}${LOADOUT_SIZE}/${LOADOUT_SIZE} — [${L(k.atk)}] when ready   ${keys}`;
-    rrect(c, VIEW_W / 2 - 360, y - 11, 32, 22, 11, PLAYER.scarves[p.id]);
-    label(c, `P${p.id + 1}`, VIEW_W / 2 - 344, y + 0.5, 12, '#fff', 'center', 700, null);
-    label(c, fitText(c, msg, 700, 14, 600), VIEW_W / 2 - 318, y + 1, 14, p.pick.ready ? '#8dff9a' : '#e8f1f7', 'left', 600, null);
+    rrect(c, BASE_W / 2 - 360, y - 11, 32, 22, 11, PLAYER.scarves[p.id]);
+    label(c, `P${p.id + 1}`, BASE_W / 2 - 344, y + 0.5, 12, '#fff', 'center', 700, null);
+    label(c, fitText(c, msg, 700, 14, 600), BASE_W / 2 - 318, y + 1, 14, p.pick.ready ? '#8dff9a' : '#e8f1f7', 'left', 600, null);
   });
 }
 
@@ -2050,10 +2068,10 @@ const heldPerks = (s, p) => [
 
 function drawChest(c, s, ui, time) {
   const ch = s.chest;
-  c.fillStyle = 'rgba(12,18,26,0.72)'; c.fillRect(0, 0, VIEW_W, MAP_H);
-  label(c, 'Boss chest!', VIEW_W / 2, 52, 36, '#ffe27a', 'center', 700, OUT);
-  label(c, 'Each cat takes one perk for the rest of the run', VIEW_W / 2, 86, 15, '#cfe0ea', 'center', 500, null);
-  const n = s.players.length, colW = VIEW_W / n;
+  dim(c, 'rgba(12,18,26,0.72)', false);
+  label(c, 'Boss chest!', BASE_W / 2, 52, 36, '#ffe27a', 'center', 700, OUT);
+  label(c, 'Each cat takes one perk for the rest of the run', BASE_W / 2, 86, 15, '#cfe0ea', 'center', 500, null);
+  const n = s.players.length, colW = BASE_W / n;
   s.players.forEach((p, i) => {
     const offers = ch.offers[i] || [], picked = ch.picked[i], cx = colW * (i + 0.5), pc = PLAYER.scarves[i];
     label(c, `P${i + 1}`, cx, 122, 16, pc, 'center', 700, OUT);
@@ -2081,14 +2099,14 @@ function drawChest(c, s, ui, time) {
   const k = (id) => ui.keyLabel(ui.keysFor(id).build), a = (id) => ui.keyLabel(ui.keysFor(id).atk);
   const L = (id) => ui.keysFor(id), pair = (id) => `${ui.keyLabel(L(id).left)}/${ui.keyLabel(L(id).right)}`;
   const keys = ui.mode() === 'local' && n > 1 ? `P1: ${pair(0)} choose, ${k(0)} or ${a(0)} take  ·  P2: ${pair(1)} choose, ${k(1)} or ${a(1)} take` : `${pair(0)} or ←/→ to choose  ·  ${k(0)} or ${a(0)} to take it`;
-  label(c, keys, VIEW_W / 2, MAP_H - 40, 15, '#fff', 'center', 600, null);
-  if (ch.picked.some((x) => x != null) && ch.picked.some((x) => x == null)) label(c, 'Waiting for the other cat…', VIEW_W / 2, MAP_H - 18, 13, '#a9bccb', 'center', 500, null);
+  label(c, keys, BASE_W / 2, BASE_MAP_H - 40, 15, '#fff', 'center', 600, null);
+  if (ch.picked.some((x) => x != null) && ch.picked.some((x) => x == null)) label(c, 'Waiting for the other cat…', BASE_W / 2, BASE_MAP_H - 18, 13, '#a9bccb', 'center', 500, null);
 }
 
 function drawOverlay(c, title, sub, col) {
-  c.fillStyle = 'rgba(12,18,26,0.72)'; c.fillRect(0, 0, VIEW_W, VIEW_H);
-  label(c, title, VIEW_W / 2, VIEW_H / 2 - 40, 60, col, 'center', 700, OUT);
-  sub.forEach((l, i) => label(c, l, VIEW_W / 2, VIEW_H / 2 + 20 + i * 32, 20, '#fff', 'center', 500, null));
+  dim(c, 'rgba(12,18,26,0.72)');
+  label(c, title, BASE_W / 2, BASE_H / 2 - 40, 60, col, 'center', 700, OUT);
+  sub.forEach((l, i) => label(c, l, BASE_W / 2, BASE_H / 2 + 20 + i * 32, 20, '#fff', 'center', 500, null));
 }
 
 // The victory / defeat screen with the game's numbers (ui.summary, made by
@@ -2109,14 +2127,14 @@ function drawEndScreen(c, s, ui, time) {
   const keys = stopKeys(s, '  ·  L: game log');
   const head = won ? `All ${TOTAL_WAVES} waves defended  ·  ${num(s.kills)} monsters bonked` : `You reached ${s.endless ? 'endless ' : ''}wave ${s.wave}  ·  ${num(s.kills)} monsters bonked`;
   if (!S) { drawOverlay(c, won ? 'Victory!' : 'The garden fell…', [head, keys], col); return; }
-  c.fillStyle = 'rgba(12,18,26,0.88)'; c.fillRect(0, 0, VIEW_W, VIEW_H);
+  dim(c, 'rgba(12,18,26,0.88)');
   // the two panels are as tall as their contents (a solo game has one cat, few flowers), centred
   const rowH = 46, blockH = 150;
   const h = clamp(Math.max(70 + S.flowers.length * rowH + (S.best ? 34 : 0), 52 + S.cats.length * (blockH + 8)), 250, 430);
-  const top = Math.round((VIEW_H - h) / 2) + 6;
-  label(c, won ? 'Victory!' : 'The garden fell…', VIEW_W / 2, top - 72, 46, col, 'center', 700, OUT);
+  const top = Math.round((BASE_H - h) / 2) + 6;
+  label(c, won ? 'Victory!' : 'The garden fell…', BASE_W / 2, top - 72, 46, col, 'center', 700, OUT);
   const where = won ? `All ${TOTAL_WAVES} waves` : S.wave > TOTAL_WAVES ? `Endless wave ${S.wave}` : `Wave ${S.wave}/${TOTAL_WAVES}`;
-  label(c, `${where}  ·  ${clock(S.seconds)}  ·  ${num(S.kills)} monsters bonked  ·  cottage ${S.cottage}/${S.maxCottage}`, VIEW_W / 2, top - 28, 18, '#e8f1f7', 'center', 500, null);
+  label(c, `${where}  ·  ${clock(S.seconds)}  ·  ${num(S.kills)} monsters bonked  ·  cottage ${S.cottage}/${S.maxCottage}`, BASE_W / 2, top - 28, 18, '#e8f1f7', 'center', 500, null);
 
   // flowers: damage per type, biggest first
   const fx = 32, fw = 540;
@@ -2144,7 +2162,7 @@ function drawEndScreen(c, s, ui, time) {
   }
 
   // cats: coins and damage each
-  const cx = fx + fw + 16, cw = VIEW_W - cx - 32;
+  const cx = fx + fw + 16, cw = BASE_W - cx - 32;
   rrect(c, cx, top, cw, h, 14, 'rgba(255,255,255,0.06)', 'rgba(255,255,255,0.15)', 1.5);
   label(c, 'Cats', cx + 18, top + 24, 20, '#ffe27a', 'left', 700, null);
   S.cats.forEach((k, i) => {
@@ -2161,8 +2179,8 @@ function drawEndScreen(c, s, ui, time) {
     });
   });
   const bitten = S.bitten.map(([t, v]) => `${monsterName(t)} (${num(v)})`).join('  ·  ');
-  label(c, fitText(c, S.bitten.length ? `Bit the cottage most: ${bitten}` : 'Nothing bit the cottage!', VIEW_W - 64, 16, 600), VIEW_W / 2, top + h + 26, 16, S.bitten.length ? '#ffb3a8' : '#8dff9a', 'center', 600, null);
-  label(c, keys, VIEW_W / 2, Math.min(VIEW_H - 24, top + h + 60), 18, '#fff', 'center', 500, null);
+  label(c, fitText(c, S.bitten.length ? `Bit the cottage most: ${bitten}` : 'Nothing bit the cottage!', BASE_W - 64, 16, 600), BASE_W / 2, top + h + 26, 16, S.bitten.length ? '#ffb3a8' : '#8dff9a', 'center', 600, null);
+  label(c, keys, BASE_W / 2, Math.min(BASE_H - 24, top + h + 60), 18, '#fff', 'center', 500, null);
 }
 
 // The flower guide (I in the menu or while picking): one flower at a time,
@@ -2211,10 +2229,10 @@ function bloomText(type) {
 }
 
 function drawGuide(c, time, sel) {
-  c.fillStyle = 'rgba(12,18,26,0.94)'; c.fillRect(0, 0, VIEW_W, VIEW_H);
-  label(c, 'Flower guide', VIEW_W / 2, 28, 28, '#ffe27a', 'center', 700, OUT);
+  dim(c, 'rgba(12,18,26,0.94)');
+  label(c, 'Flower guide', BASE_W / 2, 28, 28, '#ffe27a', 'center', 700, OUT);
   // every flower along the top; the chosen one lit up
-  const N = FLOWER_ORDER.length, w = Math.min(120, (VIEW_W - 40) / N), x0 = (VIEW_W - N * w) / 2;
+  const N = FLOWER_ORDER.length, w = Math.min(120, (BASE_W - 40) / N), x0 = (BASE_W - N * w) / 2;
   FLOWER_ORDER.forEach((t, i) => {
     const x = x0 + i * w, on = i === sel;
     rrect(c, x + 4, 52, w - 8, 92, 12, on ? 'rgba(255,226,122,0.16)' : 'rgba(255,255,255,0.04)', on ? '#ffe27a' : 'rgba(255,255,255,0.14)', on ? 2.5 : 1);
@@ -2251,8 +2269,8 @@ function drawGuide(c, time, sel) {
   for (const [n, col] of notes) for (const l of wrapText(c, n, 240, 12)) { label(c, l, lx, ny, 12, col, 'left', 500, null); ny += 16; }
   // right: the five levels side by side
   const rows = guideRows(t);
-  const tx = 300, lw = 150, cw = (VIEW_W - 30 - tx - lw) / MAX_LEVEL;
-  rrect(c, tx - 12, 160, VIEW_W - 30 - tx + 24, 150 + rows.length * 34, 14, 'rgba(255,255,255,0.04)', 'rgba(255,255,255,0.12)', 1);
+  const tx = 300, lw = 150, cw = (BASE_W - 30 - tx - lw) / MAX_LEVEL;
+  rrect(c, tx - 12, 160, BASE_W - 30 - tx + 24, 150 + rows.length * 34, 14, 'rgba(255,255,255,0.04)', 'rgba(255,255,255,0.12)', 1);
   for (let l = 1; l <= MAX_LEVEL; l++) {
     const cx = tx + lw + (l - 0.5) * cw;
     drawFlower(c, { id: sel * 7 + l, type: t, lvl: l, x: cx, y: 236, angle: Math.PI / 2, flash: 0, hurtT: 0, hp: FLOWER_HP, headIdx: 0 }, time);
@@ -2260,14 +2278,14 @@ function drawGuide(c, time, sel) {
   }
   rows.forEach(([name, vals], r) => {
     const y = 312 + r * 34;
-    if (r % 2 === 0) rrect(c, tx - 4, y - 15, VIEW_W - 30 - tx + 8, 30, 6, 'rgba(255,255,255,0.04)');
+    if (r % 2 === 0) rrect(c, tx - 4, y - 15, BASE_W - 30 - tx + 8, 30, 6, 'rgba(255,255,255,0.04)');
     label(c, name, tx + 4, y, 14, '#a9bccb', 'left', 600, null);
     vals.forEach((v, l) => {
       const up = l > 0 && v !== vals[l - 1];
       label(c, fitText(c, v, cw - 6, 15, 600), tx + lw + (l + 0.5) * cw, y, 15, r < 1 ? '#ffe27a' : up ? '#ffffff' : '#a9bccb', 'center', 600, null);
     });
   });
-  label(c, '←/→ or A/D: other flowers  ·  I or Esc: close', VIEW_W / 2, VIEW_H - 22, 14, '#8fa5b3', 'center', 500, null);
+  label(c, '←/→ or A/D: other flowers  ·  I or Esc: close', BASE_W / 2, BASE_H - 22, 14, '#8fa5b3', 'center', 500, null);
 }
 
 // A key drawn as a little keycap with what it does next to it; returns the width used.
@@ -2287,8 +2305,8 @@ const chipsWidth = (c, list, size, gap) => list.reduce((a, [key, txt]) => {
 }, -gap);
 
 function drawMenu(c, time, ui) {
-  c.fillStyle = 'rgba(12,18,26,0.55)'; c.fillRect(0, 0, VIEW_W, MAP_H);
-  const cx = VIEW_W / 2;
+  dim(c, 'rgba(12,18,26,0.55)', false);
+  const cx = BASE_W / 2;
   rrect(c, cx - 370, 24, 740, 512, 24, 'rgba(30,38,48,0.93)', 'rgba(255,255,255,0.25)', 2);
   label(c, 'Petal Patrol', cx, 84, 64, '#ffe27a', 'center', 700, OUT);
   label(c, 'Two cats. One garden. Many, many monsters.', cx, 130, 18, '#cfe0ea', 'center', 500, null);
@@ -2327,7 +2345,11 @@ function drawMenu(c, time, ui) {
   ];
   tips.forEach((t, i) => label(c, t, cx, 462 + i * 24, 14, '#cfe0ea', 'center', 500, null));
   label(c, `Defend the cottage for ${TOTAL_WAVES} waves, then keep going in endless mode.`, cx, 512, 13, '#8fa5b3', 'center', 500, null);
-  // the strip under the map: the keys every screen shares
+}
+
+// The strip under the map on the menu: the keys every screen shares, across the whole width.
+function drawMenuKeys(c) {
+  const cx = VIEW_W / 2;
   const g = c.createLinearGradient(0, MAP_H, 0, VIEW_H);
   g.addColorStop(0, '#2c3a45'); g.addColorStop(1, '#1b242c');
   c.fillStyle = g; c.fillRect(0, MAP_H, VIEW_W, VIEW_H - MAP_H);
@@ -2373,7 +2395,8 @@ export function render(c, s, ui) {
     for (const o of m.obstacles) if (o.type === 'tree') drawTree(c, o, time);
     drawCottage(c, m.base.x, m.base.y, 1, 1, 0, time);
     c.restore();
-    if (ui.guide != null) drawGuide(c, time, ui.guide); else drawMenu(c, time, ui);
+    if (ui.guide != null) inFrame(c, () => drawGuide(c, time, ui.guide));
+    else { inFrame(c, () => drawMenu(c, time, ui), true); drawMenuKeys(c); }
     if (ui.note && performance.now() < ui.note.until) label(c, ui.note.txt, VIEW_W / 2, MAP_H - 10, 16, '#ffffff', 'center', 700); // between the menu and its key strip
     return;
   }
@@ -2425,11 +2448,11 @@ export function render(c, s, ui) {
     circle(c, 22, 20, 4, ui.netLabel.includes('disconnected') ? '#ff6a5a' : '#6be06b');
     label(c, txt, 32, 20.5, 13, '#e8f1f7', 'left', 600, null);
   }
-  if (s.phase === 'pick' && !ui.disconnected) drawPick(c, s, ui, time);
-  if (s.chest && !ui.disconnected) drawChest(c, s, ui, time);
-  if (ui.guide != null) drawGuide(c, time, ui.guide);
-  if (ui.disconnected) drawOverlay(c, 'Disconnected', ['The connection to the host was lost', 'M or Esc: menu'], '#ff7a6a');
-  else if (ui.paused) drawPause(c, s);
-  else if (s.over || s.won) drawEndScreen(c, s, ui, time);
+  if (s.phase === 'pick' && !ui.disconnected) inFrame(c, () => drawPick(c, s, ui, time), true);
+  if (s.chest && !ui.disconnected) inFrame(c, () => drawChest(c, s, ui, time), true);
+  if (ui.guide != null) inFrame(c, () => drawGuide(c, time, ui.guide));
+  if (ui.disconnected) inFrame(c, () => drawOverlay(c, 'Disconnected', ['The connection to the host was lost', 'M or Esc: menu'], '#ff7a6a'));
+  else if (ui.paused) inFrame(c, () => drawPause(c, s));
+  else if (s.over || s.won) inFrame(c, () => drawEndScreen(c, s, ui, time));
   if (ui.note && performance.now() < ui.note.until) label(c, ui.note.txt, VIEW_W / 2, MAP_H - 24, 16, '#ffffff', 'center', 700);
 }
