@@ -445,6 +445,46 @@ test('Endless', 'later endless waves stay small but bring more bosses', () => {
   ok(w20.size < w12.size * 1.6, `wave 20 has ${w20.size} monsters, wave 12 ${w12.size}`);
 });
 
+test('Endless', 'from packCutFromWave, swarm and wasp packs are endlessPackSize as big', () => {
+  const D = BALANCE.difficulty, old = D.endlessPackSize;
+  const packs = (mul) => {
+    D.endlessPackSize = mul;
+    const s = wonGame();
+    sim.continueEndless(s);
+    s.wave = D.packCutFromWave + 3; s.phase = 'prep'; s.queue = []; s.enemies = [];
+    tick(s, { ready: true });
+    return s.queue.filter((e) => e.type === 'swarm' || e.type === 'wasp').length;
+  };
+  try {
+    const full = packs(1), small = packs(old);
+    ok(full > 0, 'no packs');
+    near(small / full, old, 0.06, `${small} pack monsters instead of ${full}`);
+  } finally { D.endlessPackSize = old; }
+});
+
+test('Endless', 'from packCutFromWave, swarm and wasp packs come less often', () => {
+  const D = BALANCE.difficulty, old = D.endlessPackWeight;
+  // the share of pack monsters in wave n over a few seeds, with packs `mul` times as likely
+  const packShare = (n, mul) => {
+    D.endlessPackWeight = mul;
+    let packs = 0, all = 0;
+    for (let seed = 1; seed <= 6; seed++) {
+      const s = game({ cats: ['bomber', 'gardener'], seed });
+      s.wave = TOTAL_WAVES; s.won = true; s.phase = 'wave';
+      sim.continueEndless(s);
+      s.wave = n - 1; s.phase = 'prep'; s.queue = []; s.enemies = [];
+      tick(s, { ready: true });
+      for (const e of s.queue) { all++; if (e.type === 'swarm' || e.type === 'wasp') packs++; }
+    }
+    return packs / all;
+  };
+  try {
+    const late = D.packCutFromWave + 2, early = D.packCutFromWave - 2;
+    ok(packShare(late, old) < packShare(late, 1), `packs are a smaller share of wave ${late}`);
+    near(packShare(early, old), packShare(early, 1), 1e-9, `wave ${early} is untouched`);
+  } finally { D.endlessPackWeight = old; }
+});
+
 test('Endless', 'monsters after the breather get extra health each wave', () => {
   const s = wonGame(), D = BALANCE.difficulty;
   const gruntIn = (n) => { s.wave = n; sim.spawnEnemy(s, 'grunt', null, 0); return s.enemies.at(-1).maxhp; };

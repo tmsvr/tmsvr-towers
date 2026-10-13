@@ -549,7 +549,7 @@ function buildQueue(s, n) {
   // Monsters that just arrived get the spotlight; older ones slowly make room.
   const weightOf = (u) => {
     const age = n - u.fromWave;
-    return u.weight * (age <= 1 ? TUNE.newEnemyBoost ?? 1 : Math.max(TUNE.oldEnemyMin ?? 1, 1 - (TUNE.oldEnemyFade ?? 0) * (age - 1)));
+    return u.weight * (u.group > 1 && n >= (TUNE.packCutFromWave ?? Infinity) ? TUNE.endlessPackWeight ?? 1 : 1) * (age <= 1 ? TUNE.newEnemyBoost ?? 1 : Math.max(TUNE.oldEnemyMin ?? 1, 1 - (TUNE.oldEnemyFade ?? 0) * (age - 1)));
   };
   const total = avail.reduce((a, u) => a + weightOf(u), 0);
   while (budget > 0) {
@@ -557,8 +557,8 @@ function buildQueue(s, n) {
     for (const u of avail) { r -= weightOf(u); if (r <= 0) { pick = u; break; } }
     const path = Math.floor(rnd(s) * s.m.paths.length); // a group sticks together on one road
     const [lo, hi] = TUNE.spawnGap || [0.4, 1.2];
-    // packs (swarms, wasps) get bigger every wave after they first appear
-    const group = pick.group > 1 ? Math.round(pick.group * (1 + (TUNE.packGrowthPerWave ?? 0) * (n - pick.fromWave))) : 1;
+    // packs (swarms, wasps) get bigger every wave after they first appear, a bit less so late in endless mode
+    const group = pick.group > 1 ? Math.round(pick.group * (1 + (TUNE.packGrowthPerWave ?? 0) * (n - pick.fromWave)) * (n >= (TUNE.packCutFromWave ?? Infinity) ? TUNE.endlessPackSize ?? 1 : 1)) : 1;
     for (let i = 0; i < group; i++) q.push({ type: pick.enemy, path, wait: group > 1 ? 0.18 : lo + rnd(s) * (hi - lo) });
     budget -= pick.cost;
   }
