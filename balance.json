@@ -65,8 +65,8 @@
   "cats": {
     "brawler":  { "name": "Brick", "desc": "Slow bruiser, clumsy gardener", "speed": 0.75, "batonDamage": 2.6, "batonCooldown": 1.3, "batonRange": 1.2, "growSpeed": 0.6, "upgradeCost": 1.15, "bombRecharge": 1, "bombRadius": 1, "bombDamage": 1, "sprintSeconds": 1,   "fur": "#b07d52", "dark": "#7a5232" },
     "scout":    { "name": "Zip",   "desc": "Very fast, light taps, endless sprint", "speed": 1.55, "batonDamage": 0.6, "batonCooldown": 0.7, "batonRange": 0.95, "growSpeed": 1, "upgradeCost": 1, "bombRecharge": 1, "bombRadius": 1, "bombDamage": 1, "sprintSeconds": 2.2, "fur": "#ff9a3c", "dark": "#c4600f" },
-    "gardener": { "name": "Fern",  "desc": "Grows 2.5x faster, 30% cheaper, weak", "speed": 1, "batonDamage": 0.4, "batonCooldown": 1.2, "batonRange": 1, "growSpeed": 2.5, "upgradeCost": 0.7, "bombRecharge": 1, "bombRadius": 1, "bombDamage": 1, "sprintSeconds": 1,   "fur": "#efe4cf", "dark": "#b3a284" },
-    "bomber":   { "name": "Boom",  "desc": "Huge bombs, 2.5x faster recharge", "speed": 0.95, "batonDamage": 1.2, "batonCooldown": 1, "batonRange": 1, "growSpeed": 0.9, "upgradeCost": 1, "bombRecharge": 0.4, "bombRadius": 1.4, "bombDamage": 4, "sprintSeconds": 1,   "fur": "#5d5f6e", "dark": "#383945" }
+    "gardener": { "name": "Fern",  "desc": "Grows 2.5× faster, 30% cheaper, weak", "speed": 1, "batonDamage": 0.4, "batonCooldown": 1.2, "batonRange": 1, "growSpeed": 2.5, "upgradeCost": 0.7, "bombRecharge": 1, "bombRadius": 1, "bombDamage": 1, "sprintSeconds": 1,   "fur": "#efe4cf", "dark": "#b3a284" },
+    "bomber":   { "name": "Boom",  "desc": "Huge bombs, 2.5× faster recharge", "speed": 0.95, "batonDamage": 1.2, "batonCooldown": 1, "batonRange": 1, "growSpeed": 0.9, "upgradeCost": 1, "bombRecharge": 0.4, "bombRadius": 1.4, "bombDamage": 4, "sprintSeconds": 1,   "fur": "#5d5f6e", "dark": "#383945" }
   },
 
   "economy": {
@@ -205,9 +205,9 @@
       "roots": { "name": "Deep roots", "icon": "🌿", "desc": "All flowers wear 30% slower", "team": true, "wear": 0.7 },
       "stems": { "name": "Hardy stems", "icon": "🪴", "desc": "Aphids chew half as hard", "team": true, "aphids": 0.5 },
       "fourth": { "name": "Another flower", "icon": "🌸", "desc": "One more flower type in your loadout" },
-      "thumb": { "name": "Green thumb", "icon": "💰", "desc": "Your planting, upgrades and healing cost 15% less", "price": 0.85 },
-      "paws": { "name": "Quick paws", "icon": "🐾", "desc": "You grow and heal 40% faster", "growSpeed": 1.4 },
-      "pouch": { "name": "Bomb pouch", "icon": "💣", "desc": "One more bomb, and they recharge 25% faster", "bombs": 1, "recharge": 0.75 }
+      "thumb": { "name": "Green thumb", "icon": "💰", "desc": "Your flowers cost 15% less to plant, grow and heal", "price": 0.85 },
+      "paws": { "name": "Quick paws", "icon": "⚡", "desc": "You grow and heal 40% faster", "growSpeed": 1.4 },
+      "pouch": { "name": "Bomb pouch", "icon": "💣", "desc": "One more bomb, and bombs recharge 25% faster", "bombs": 1, "recharge": 0.75 }
     }
   },
 
@@ -226,12 +226,12 @@
 
   "flowers": {
     "daisy":     { "name": "Daisy",      "desc": "Rapid little seeds", "cost": 20, "range": 2.2, "damage": 5, "flyerDamage": 1.25, "rate": 0.3, "kind": "single", "color": "#ffffff" },
-    "sunflower": { "name": "Sunflower",  "desc": "Superweapon. Blasts the strongest monster on the map.", "cost": 60, "range": 99, "damage": 315, "bossDamage": 1.3, "rate": 12, "kind": "beam", "target": "strong", "color": "#ffd23f" },
-    "firelily":  { "name": "Fire Lily",  "desc": "Fireball pierces a few monsters in a line", "cost": 45, "range": 3, "damage": 19, "rate": 1.5, "kind": "bolt", "pierce": 3, "color": "#ff7a2f" },
-    "stink":     { "name": "Stinkbloom", "desc": "Poison clouds stack, ignore armor (ground)", "cost": 45, "range": 2.6, "damage": 2.1, "rate": 2.4, "kind": "cloud", "cloudRadius": 0.95, "cloudSeconds": 3.5, "maxStacks": 5, "groundOnly": true, "color": "#9ad14b" },
-    "frost":     { "name": "Frostbloom", "desc": "Cheap. No damage, slows everything nearby", "cost": 16, "range": 2.3, "damage": 0, "rate": 2.75, "kind": "pulse", "slow": 0.45, "slowSeconds": 2.5, "color": "#8fe3ff" },
+    "sunflower": { "name": "Sunflower",  "desc": "Blasts the toughest monster anywhere", "cost": 60, "range": 99, "damage": 315, "bossDamage": 1.3, "rate": 12, "kind": "beam", "target": "strong", "color": "#ffd23f" },
+    "firelily":  { "name": "Fire Lily",  "desc": "Fireballs pierce a line of monsters", "cost": 45, "range": 3, "damage": 19, "rate": 1.5, "kind": "bolt", "pierce": 3, "color": "#ff7a2f" },
+    "stink":     { "name": "Stinkbloom", "desc": "Stacking poison clouds that ignore armour (ground)", "cost": 45, "range": 2.6, "damage": 2.1, "rate": 2.4, "kind": "cloud", "cloudRadius": 0.95, "cloudSeconds": 3.5, "maxStacks": 5, "groundOnly": true, "color": "#9ad14b" },
+    "frost":     { "name": "Frostbloom", "desc": "Cheap, slows everything nearby (no damage)", "cost": 16, "range": 2.3, "damage": 0, "rate": 2.75, "kind": "pulse", "slow": 0.45, "slowSeconds": 2.5, "color": "#8fe3ff" },
     "thorn":     { "name": "Thornrose",  "desc": "Spiky pulse hits everything close (ground)", "cost": 42, "range": 1.5, "damage": 8, "rate": 1.2, "kind": "pulse", "groundOnly": true, "color": "#ff4d5e" },
-    "snap":      { "name": "Snapdragon", "desc": "Gulps critters, bites chunks off big monsters (ground)", "cost": 40, "range": 1.5, "damage": 45, "rate": 2.0, "kind": "chomp", "maxHpBite": 0.05, "bossMaxHpBite": 0.015, "target": "big", "groundOnly": true, "color": "#e0569b" }
+    "snap":      { "name": "Snapdragon", "desc": "Gulps critters, bites chunks off big ones (ground)", "cost": 40, "range": 1.5, "damage": 45, "rate": 2.0, "kind": "chomp", "maxHpBite": 0.05, "bossMaxHpBite": 0.015, "target": "big", "groundOnly": true, "color": "#e0569b" }
   },
 
   "enemies": {
@@ -274,8 +274,8 @@
     "hopper":   ["Grasshoppers!", "They leap over ground flowers. Daisy and Fire Lily hit them mid-air"],
     "charger":  ["Stag beetles!", "Armoured, and they run faster when hurt. Stinkbloom poison seeps through; Snapdragon, Fire Lily and Sunflower crack them"],
     "boss":     ["The boss!", "Huge and armoured: small hits do little. Sunflower and Snapdragon bite through"],
-    "moleking": ["The Mole King!", "A boss that digs under your flowers and shakes them when it comes up. Bomb it while it's above ground"],
-    "witch":    ["The Bramble Witch!", "A boss that heals the monsters around it and withers the flowers it walks past. Heal your flowers and strike it down fast"]
+    "moleking": ["The Mole King!", "A boss that digs underground and shakes the flowers near it when it comes up"],
+    "witch":    ["The Bramble Witch!", "A boss that heals monsters near it and withers your flowers. Take it down fast"]
   },
 
   "waves": [

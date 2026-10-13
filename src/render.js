@@ -11,7 +11,7 @@
 import {
   T, U, VIEW_W, MAP_H, HUD_H, TOTAL_WAVES, MAPS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, GLOBAL_RANGE, ENEMIES, INTROS,
-  BLOOM, bloomOf, ELITES, CHEST,
+  BLOOM, bloomOf, ELITES, CHEST, ECONOMY,
 } from './data.js';
 import { tileOf, canBuildAt, uprootRefund, catStats, plantPrice, upgradeLeft, healLeft } from './sim.js';
 import { isMuted } from './audio.js';
@@ -61,6 +61,20 @@ function fitText(c, txt, maxW, size, weight = 500) {
   while (txt.length > 4 && c.measureText(txt + '…').width > maxW) txt = txt.slice(0, -1);
   return txt + '…';
 }
+// Numbers the way games show them: 9,425 · 91.1k · 117k · 1.3M · 17M.
+function num(v) {
+  const a = Math.abs(v = Math.round(v));
+  if (a < 1e4) return v.toLocaleString('en-US');
+  if (a < 999500) return `${+(v / 1e3).toFixed(a < 99950 ? 1 : 0)}k`;
+  return `${+(v / 1e6).toFixed(a < 99950000 ? 1 : 0)}M`;
+}
+// Small stats (seconds, damage, tiles): whole numbers from 100, one decimal from 1, two below.
+const fmt = (v) => String(v >= 100 ? Math.round(v) : +v.toFixed(v >= 1 ? 1 : 2));
+// m:ss, or h:mm:ss for an hour or more
+const clock = (sec) => {
+  const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60, s = String(Math.floor(sec % 60)).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
+};
 // Blend two #rrggbb colours. Withering flowers ask for this every frame, so
 // results are remembered (t is rounded to 1/64, which nobody can see).
 const mixed = new Map();
@@ -1626,15 +1640,17 @@ function drawBanners(c) {
   }
 }
 
-// The first monster of a new kind: a small card down the left side with its
-// picture, its name and what stops it. Out of the way of the fighting, and up
-// long enough to read.
-const INTRO_W = 340, INTRO_H = 62;
+// The first monster of a new kind: a small card in the bottom-left corner with
+// its picture, its name and what stops it. Out of the way of the fighting and
+// of the wave banners, and up long enough to read. Cards stack upwards.
+const INTRO_W = 340;
 function drawIntros(c, ui, time) {
-  let y = ui.netLabel ? 42 : 12;
+  let y = MAP_H - 10;
   for (const f of liveEffects()) {
     if (f.kind !== 'intro' || !INTROS[f.type] || !ENEMIES[f.type]) continue;
     const [title, hint] = INTROS[f.type];
+    const lines = wrapText(c, hint, INTRO_W - 72, 12, 500).slice(0, 3), INTRO_H = Math.max(62, 30 + lines.length * 14 + 6);
+    y -= INTRO_H;
     const age = f.max - f.life;
     const slide = Math.min(1, age * 5);
     c.globalAlpha = Math.min(1, f.life / 0.8);
@@ -1647,9 +1663,9 @@ function drawIntros(c, ui, time) {
     drawEnemy(c, { id: 0, type: f.type, def: d, x: 0, y: 0, ang: 0, wob: time * 8, hp: 1, maxhp: 1, flash: 0, psn: 0, slowT: 0, stun: 0, under: false, atBase: false, chew: null, dashing: false }, time);
     c.restore();
     label(c, title, x + 62, y + 17, 15, '#ffd27a', 'left', 700, null);
-    wrapText(c, hint, INTRO_W - 72, 12, 500).slice(0, 2).forEach((l, i) => label(c, l, x + 62, y + 35 + i * 14, 12, '#f2e8dc', 'left', 500, null));
+    lines.forEach((l, i) => label(c, l, x + 62, y + 35 + i * 14, 12, '#f2e8dc', 'left', 500, null));
     c.globalAlpha = 1;
-    y += INTRO_H + 8;
+    y -= 8;
   }
 }
 
@@ -1741,16 +1757,16 @@ function contextText(s, p, ui) {
     if (m.yard.has(k)) return 'Cottage yard · no planting here';
     if (m.blocked.has(k)) return "Something's in the way";
     const F = FLOWERS[p.loadout[p.sel]];
-    return `[${key}] plant ${F.name} (${plantPrice(p, p.loadout[p.sel])}) · [${cyc}] next · ${F.desc}`;
+    return `[${key}] plant ${F.name} (${plantPrice(p, p.loadout[p.sel])}) · [${cyc}] next flower`;
   }
   const name = FLOWERS[f.type].name;
   const midLevel = f.lvl > 0 && f.lvl < MAX_LEVEL;
-  if (p.mode === 'dig') return `Hold [${key}] dig up ${name} · get back ${uprootRefund(f)} · [${cyc}] ${midLevel ? 'upgrade' : 'back'}`;
-  if (f.lvl === 0) return `Hold [${key}] to grow ${name} (${upgradeLeft(p, f)}) · [${cyc}] dig up`;
-  if (f.lvl >= MAX_LEVEL) return `${name} · max level, never wilts · [${cyc}] dig up`;
-  const up = `[${key}] upgrade to Lv${f.lvl + 1} (${upgradeLeft(p, f)})`;
-  if (f.hp >= FLOWER_HP - 0.5) return `${up} · healthy · [${cyc}] dig up`;
-  return `${up} · [${hk}] heal ${Math.floor(f.hp)}%→100 (${healLeft(p, f)}) · [${cyc}] dig`;
+  if (p.mode === 'dig') return `Hold [${key}] dig up ${name} (+${uprootRefund(f)}) · [${cyc}] ${midLevel ? 'upgrade' : 'back'}`;
+  if (f.lvl === 0) return `Hold [${key}] grow ${name} (${upgradeLeft(p, f)}) · [${cyc}] dig up`;
+  if (f.lvl >= MAX_LEVEL) return `${name} · max level · [${cyc}] dig up`;
+  const up = `[${key}] upgrade (${upgradeLeft(p, f)})`;
+  if (f.hp >= FLOWER_HP - 0.5) return `${up} · [${cyc}] dig up`;
+  return `${up} · [${hk}] heal ${Math.floor(f.hp)}% (${healLeft(p, f)}) · [${cyc}] dig`;
 }
 
 function drawHud(c, s, time, ui) {
@@ -1826,22 +1842,30 @@ function drawHud(c, s, time, ui) {
   });
 }
 
-// The pause screen's list of chest perks: each cat's own, then the team's, with what they add up to.
-function drawPerkList(c, s, y) {
+// The pause screen: the keys, then (once there are any) a panel with every
+// cat's chest perks and the team's, each with what it adds up to.
+function drawPause(c, s) {
   const cols = s.players.map((p, i) => [`P${i + 1}`, PLAYER.scarves[i], heldPerks({}, p)]);
   const team = heldPerks(s, null);
   if (team.length) cols.push(['Team', '#8dff9a', team]);
-  if (!cols.some(([, , list]) => list.length)) return;
-  label(c, 'Perks from boss chests', VIEW_W / 2, y, 16, '#ffe27a', 'center', 700, null);
-  const w = VIEW_W / cols.length;
+  const rows = Math.max(0, ...cols.map(([, , list]) => list.length));
+  if (!rows) { drawOverlay(c, 'Paused', ['P or Esc: resume  ·  S: save the game', stopKeys(s)], '#ffffff'); return; }
+  c.fillStyle = 'rgba(12,18,26,0.78)'; c.fillRect(0, 0, VIEW_W, VIEW_H);
+  const ph = 74 + rows * 36, py = Math.min(VIEW_H - ph - 24, 262);
+  label(c, 'Paused', VIEW_W / 2, py - 150, 60, '#ffffff', 'center', 700, OUT);
+  label(c, 'P or Esc: resume  ·  S: save the game', VIEW_W / 2, py - 88, 20, '#fff', 'center', 500, null);
+  label(c, stopKeys(s), VIEW_W / 2, py - 58, 20, '#fff', 'center', 500, null);
+  const pw = Math.min(VIEW_W - 64, 300 * cols.length), px = (VIEW_W - pw) / 2, w = pw / cols.length;
+  rrect(c, px, py, pw, ph, 14, 'rgba(30,38,48,0.94)', 'rgba(255,255,255,0.2)', 1.5);
+  label(c, 'Perks from boss chests', VIEW_W / 2, py + 22, 16, '#ffe27a', 'center', 700, null);
   cols.forEach(([who, col, list], i) => {
-    const cx = w * (i + 0.5);
-    label(c, who, cx, y + 28, 14, col, 'center', 700, null);
-    if (!list.length) label(c, 'none yet', cx, y + 50, 12, '#8fa5b3', 'center', 500, null);
+    const cx = px + w * (i + 0.5);
+    label(c, who, cx, py + 50, 14, col, 'center', 700, null);
+    if (!list.length) label(c, 'none yet', cx, py + 74, 12, '#8fa5b3', 'center', 500, null);
     list.forEach(([id, n], j) => {
-      const P = CHEST.perks[id];
-      label(c, fitText(c, `${P.icon} ${P.name}${n > 1 ? ` ×${n}` : ''}`, w - 24, 13, 600), cx, y + 50 + j * 34, 13, '#fff', 'center', 600, null);
-      label(c, fitText(c, perkTotal(id, n), w - 24, 11.5), cx, y + 66 + j * 34, 11.5, '#a9bccb', 'center', 500, null);
+      const P = CHEST.perks[id], y = py + 74 + j * 36;
+      label(c, fitText(c, `${P.icon} ${P.name}${n > 1 ? ` ×${n}` : ''}`, w - 24, 14, 600), cx, y, 14, '#fff', 'center', 600, null);
+      label(c, fitText(c, perkTotal(id, n), w - 24, 12), cx, y + 16, 12, '#a9bccb', 'center', 500, null);
     });
   });
 }
@@ -1970,11 +1994,11 @@ function drawPick(c, s, ui, time) {
     wrapText(c, F.desc, cw - 14, 11.5).slice(0, 3).forEach((l, j) => label(c, l, cx, y0 + 142 + j * 13, 11.5, '#cfe0ea', 'center', 500, null));
     const st = flowerStats(t, 1);
     // every card: range, damage, how often (the poison cloud says how it works)
-    const lines = [st.range >= GLOBAL_RANGE ? 'Range: whole map' : `Range ${(st.range / T).toFixed(1)}`];
-    if (F.kind === 'cloud') lines.push(`${st.dmg} dmg/s per stack (x${st.stacks})`, `cloud every ${+st.rate.toFixed(2)}s`);
+    const lines = [st.range >= GLOBAL_RANGE ? 'Range: whole map' : `Range ${fmt(st.range / T)}`];
+    if (F.kind === 'cloud') lines.push(`${fmt(st.dmg)}/s per stack, ×${st.stacks}`, `cloud every ${fmt(st.rate)}s`);
     else {
-      lines.push(F.kind === 'chomp' ? `${st.dmg} + ${Math.round((st.maxHpBite || 0) * 100)}% max hp bite` : F.kind === 'bolt' ? `${st.dmg} dmg, pierces ${st.pierce}` : F.kind === 'pulse' ? (st.slow ? `slows to ${Math.round(st.slow * 100)}% for ${+st.slowSeconds.toFixed(1)}s` : `${st.dmg} dmg to all near`) : `${st.dmg} dmg`);
-      lines.push(`every ${+st.rate.toFixed(2)}s`);
+      lines.push(F.kind === 'chomp' ? `${fmt(st.dmg)} + ${pct(st.maxHpBite || 0)} max health` : F.kind === 'bolt' ? `${fmt(st.dmg)} dmg, pierces ${st.pierce}` : F.kind === 'pulse' ? (st.slow ? `slows to ${pct(st.slow)} for ${fmt(st.slowSeconds)}s` : `${fmt(st.dmg)} dmg to all near`) : `${fmt(st.dmg)} dmg`);
+      lines.push(`every ${fmt(st.rate)}s`);
     }
     lines.forEach((t, j) => label(c, fitText(c, t, cw - 8, 11), cx, y0 + 215 - (lines.length - 1 - j) * 13, 11, j ? '#cfe0ea' : '#8fa5b3', 'center', 500, null));
     pickedBy.forEach((p) => {
@@ -2037,7 +2061,7 @@ function drawChest(c, s, ui, time) {
     const cw = Math.min(150, (colW - 40) / offers.length - 10), x0 = cx - (offers.length * (cw + 10) - 10) / 2;
     offers.forEach((offer, j) => {
       const [id, arg] = offer.split(':'), P = CHEST.perks[id] || {};
-      const x = x0 + j * (cw + 10), y = 140, h = 190, on = ch.cursor[i] === j, took = picked === offer;
+      const x = x0 + j * (cw + 10), y = 136, h = 212, on = ch.cursor[i] === j, took = picked === offer;
       const dim = picked != null && !took;
       c.globalAlpha = dim ? 0.35 : 1;
       rrect(c, x, y, cw, h, 14, took ? 'rgba(141,255,154,0.16)' : on ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.06)', took ? '#8dff9a' : on ? pc : 'rgba(255,255,255,0.18)', on || took ? 3 : 1.5);
@@ -2052,10 +2076,11 @@ function drawChest(c, s, ui, time) {
       if (again) wrapText(c, `Then: ${perkTotal(id, have + 1)}`, cw - 14, 10.5).slice(0, 2).forEach((l, k) => label(c, l, x + cw / 2, y + h - 28 + k * 13, 10.5, '#ffe27a', 'center', 500, null));
       c.globalAlpha = 1;
     });
-    if (picked != null) label(c, 'Picked!', cx, 352, 15, '#8dff9a', 'center', 700, null);
+    if (picked != null) label(c, 'Picked!', cx, 372, 15, '#8dff9a', 'center', 700, null);
   });
   const k = (id) => ui.keyLabel(ui.keysFor(id).build), a = (id) => ui.keyLabel(ui.keysFor(id).atk);
-  const keys = ui.mode() === 'local' && n > 1 ? `P1: A/D, ${k(0)} or ${a(0)} · P2: ←/→, ${k(1)} or ${a(1)}` : `←/→ to choose · ${k(0)} or ${a(0)} to take it`;
+  const L = (id) => ui.keysFor(id), pair = (id) => `${ui.keyLabel(L(id).left)}/${ui.keyLabel(L(id).right)}`;
+  const keys = ui.mode() === 'local' && n > 1 ? `P1: ${pair(0)} choose, ${k(0)} or ${a(0)} take  ·  P2: ${pair(1)} choose, ${k(1)} or ${a(1)} take` : `${pair(0)} or ←/→ to choose  ·  ${k(0)} or ${a(0)} to take it`;
   label(c, keys, VIEW_W / 2, MAP_H - 40, 15, '#fff', 'center', 600, null);
   if (ch.picked.some((x) => x != null) && ch.picked.some((x) => x == null)) label(c, 'Waiting for the other cat…', VIEW_W / 2, MAP_H - 18, 13, '#a9bccb', 'center', 500, null);
 }
@@ -2069,7 +2094,6 @@ function drawOverlay(c, title, sub, col) {
 // The victory / defeat screen with the game's numbers (ui.summary, made by
 // gameSummary in stats.js; online the host sends it to the guest). Until it
 // is there, just the title and keys.
-const short = (v) => (v >= 1e5 ? `${Math.round(v / 1000)}k` : v >= 1e4 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`);
 const monsterName = (t) => (INTROS[t]?.[0] || t[0].toUpperCase() + t.slice(1) + 's').replace(/!$/, ''); // intro titles are already plural
 // The keys on every screen that stops the game, the same everywhere (main.js
 // handles them): R retries the wave, T starts a new game, M goes to the menu.
@@ -2083,13 +2107,16 @@ function drawEndScreen(c, s, ui, time) {
   const won = s.won, S = ui.summary;
   const col = won ? '#8dff9a' : '#ff7a6a';
   const keys = stopKeys(s, '  ·  L: game log');
-  const head = won ? `All ${TOTAL_WAVES} waves defended  ·  ${s.kills} monsters bonked` : `You reached ${s.endless ? 'endless ' : ''}wave ${s.wave}  ·  ${s.kills} monsters bonked`;
+  const head = won ? `All ${TOTAL_WAVES} waves defended  ·  ${num(s.kills)} monsters bonked` : `You reached ${s.endless ? 'endless ' : ''}wave ${s.wave}  ·  ${num(s.kills)} monsters bonked`;
   if (!S) { drawOverlay(c, won ? 'Victory!' : 'The garden fell…', [head, keys], col); return; }
-  c.fillStyle = 'rgba(12,18,26,0.86)'; c.fillRect(0, 0, VIEW_W, VIEW_H);
-  label(c, won ? 'Victory!' : 'The garden fell…', VIEW_W / 2, 50, 46, col, 'center', 700, OUT);
-  const mins = Math.floor(S.seconds / 60), secs = String(S.seconds % 60).padStart(2, '0');
-  label(c, `${won ? `All ${TOTAL_WAVES} waves` : S.wave > TOTAL_WAVES ? `Endless wave ${S.wave}` : `Wave ${S.wave}/${TOTAL_WAVES}`}  ·  ${mins}:${secs}  ·  ${S.kills} monsters bonked  ·  cottage ${S.cottage}/${S.maxCottage}`, VIEW_W / 2, 96, 18, '#e8f1f7', 'center', 500, null);
-  const top = 124, h = 444;
+  c.fillStyle = 'rgba(12,18,26,0.88)'; c.fillRect(0, 0, VIEW_W, VIEW_H);
+  // the two panels are as tall as their contents (a solo game has one cat, few flowers), centred
+  const rowH = 46, blockH = 150;
+  const h = clamp(Math.max(70 + S.flowers.length * rowH + (S.best ? 34 : 0), 52 + S.cats.length * (blockH + 8)), 250, 430);
+  const top = Math.round((VIEW_H - h) / 2) + 6;
+  label(c, won ? 'Victory!' : 'The garden fell…', VIEW_W / 2, top - 72, 46, col, 'center', 700, OUT);
+  const where = won ? `All ${TOTAL_WAVES} waves` : S.wave > TOTAL_WAVES ? `Endless wave ${S.wave}` : `Wave ${S.wave}/${TOTAL_WAVES}`;
+  label(c, `${where}  ·  ${clock(S.seconds)}  ·  ${num(S.kills)} monsters bonked  ·  cottage ${S.cottage}/${S.maxCottage}`, VIEW_W / 2, top - 28, 18, '#e8f1f7', 'center', 500, null);
 
   // flowers: damage per type, biggest first
   const fx = 32, fw = 540;
@@ -2097,50 +2124,50 @@ function drawEndScreen(c, s, ui, time) {
   label(c, 'Flowers', fx + 18, top + 24, 20, '#ffe27a', 'left', 700, null);
   label(c, 'damage', fx + fw - 18, top + 24, 13, '#8fa5b3', 'right', 600, null);
   const maxDmg = Math.max(1, ...S.flowers.map((f) => f.dmg));
-  const rowH = Math.min(52, (h - 120) / Math.max(1, S.flowers.length));
   S.flowers.forEach((f, i) => {
-    const y = top + 62 + i * rowH, F = FLOWERS[f.type];
+    const y = top + 66 + i * rowH, F = FLOWERS[f.type];
     c.save(); c.translate(fx + 34, y + 8); c.scale(0.5, 0.5);
     drawFlower(c, { id: i, type: f.type, lvl: 3, x: 0, y: 0, angle: -Math.PI / 2, flash: 0, hurtT: 0, hp: 100, headIdx: 0, grow: null }, time);
     c.restore();
     label(c, F?.name || f.type, fx + 62, y - 6, 16, '#fff', 'left', 600, null);
-    label(c, `${f.planted} planted  ·  ${f.kills} kills`, fx + 62, y + 13, 12, '#8fa5b3', 'left', 500, null);
-    const bx = fx + 220, bw = fw - 220 - 80;
+    label(c, `${num(f.planted)} planted  ·  ${num(f.kills)} kills`, fx + 62, y + 13, 12, '#8fa5b3', 'left', 500, null);
+    const bx = fx + 220, bw = fw - 220 - 86;
     rrect(c, bx, y - 7, bw, 14, 7, 'rgba(255,255,255,0.08)');
+    // flowers that only slow monsters down did their job without damage
+    if (!f.dmg && F?.slow) { label(c, 'slowed them down', bx + 10, y, 12, '#8fa5b3', 'left', 500, null); label(c, 'support', fx + fw - 18, y, 13, '#8fa5b3', 'right', 600, null); return; }
     rrect(c, bx, y - 7, Math.max(14, bw * f.dmg / maxDmg), 14, 7, F?.color || '#fff', OUT, 1.2);
-    label(c, short(f.dmg), fx + fw - 18, y, 15, '#fff', 'right', 600, null);
+    label(c, num(f.dmg), fx + fw - 18, y, 15, '#fff', 'right', 600, null);
   });
   if (S.best) {
     const F = FLOWERS[S.best.type];
-    label(c, `Star flower: ${F?.name || S.best.type} (level ${S.best.lvl})  ·  ${short(S.best.dmg)} damage  ·  ${S.best.kills} kills`, fx + 18, top + h - 22, 14, '#ffe27a', 'left', 600, null);
+    label(c, fitText(c, `Star flower: ${F?.name || S.best.type} (level ${S.best.lvl})  ·  ${num(S.best.dmg)} damage  ·  ${num(S.best.kills)} kills`, fw - 36, 14, 600), fx + 18, top + h - 22, 14, '#ffe27a', 'left', 600, null);
   }
 
   // cats: coins and damage each
   const cx = fx + fw + 16, cw = VIEW_W - cx - 32;
   rrect(c, cx, top, cw, h, 14, 'rgba(255,255,255,0.06)', 'rgba(255,255,255,0.15)', 1.5);
   label(c, 'Cats', cx + 18, top + 24, 20, '#ffe27a', 'left', 700, null);
-  const blockH = S.cats.length > 1 ? 150 : 170;
   S.cats.forEach((k, i) => {
-    const y = top + 50 + i * (blockH + 8), K = CATS[k.cat] || {};
-    c.save(); c.translate(cx + 40, y + 34); c.scale(1.1, 1.1);
+    const y = top + 48 + i * (blockH + 8), K = CATS[k.cat] || {}, tx = cx + 88;
+    c.save(); c.translate(cx + 42, y + 40); c.scale(1.1, 1.1);
     drawCat(c, { id: i, cat: k.cat, noTag: true, x: 0, y: 0, dir: 0, moving: false, stun: 0, swingT: 0, swingDir: 0 }, time);
     c.restore();
-    label(c, `P${i + 1}  ${K.name || k.cat}`, cx + 76, y + 14, 18, ['#8fc3ff', '#ff9ab8'][i], 'left', 700, null); // scarf colours, lightened
-    const rows = [['Coins earned', k.earned], ['Spent on flowers', k.spent], ['Baton damage', short(k.baton)], ['Bomb damage', short(k.bomb)], ['Monsters bonked', k.kills], ['Their flowers dealt', short(k.garden)]];
+    label(c, `P${i + 1}  ${K.name || k.cat}`, tx, y + 14, 18, ['#8fc3ff', '#ff9ab8'][i], 'left', 700, null); // scarf colours, lightened
+    const rows = [['Coins earned', k.earned], ['Spent on flowers', k.spent], ['Baton damage', k.baton], ['Bomb damage', k.bomb], ['Monsters bonked', k.kills], ['Their flowers dealt', k.garden]];
     rows.forEach(([name, v], j) => {
-      const colX = cx + 76 + (j % 2) * ((cw - 90) / 2), ry = y + 44 + Math.floor(j / 2) * 30;
-      label(c, name, colX, ry, 12, '#8fa5b3', 'left', 500, null);
-      label(c, `${v}`, colX, ry + 15, 16, '#fff', 'left', 600, null);
+      const colX = tx + (j % 2) * ((cx + cw - tx - 8) / 2), ry = y + 42 + Math.floor(j / 2) * 34;
+      label(c, name, colX, ry, 11.5, '#8fa5b3', 'left', 500, null);
+      label(c, num(v), colX, ry + 15, 16, '#fff', 'left', 600, null);
     });
   });
-  label(c, S.bitten.length ? `Bit the cottage most: ${S.bitten.map(([t, v]) => `${monsterName(t)} ${v}`).join('  ·  ')}` : 'Nothing bit the cottage!', VIEW_W / 2, top + h + 24, 16, S.bitten.length ? '#ffb3a8' : '#8dff9a', 'center', 600, null);
-  label(c, keys, VIEW_W / 2, VIEW_H - 30, 18, '#fff', 'center', 500, null);
+  const bitten = S.bitten.map(([t, v]) => `${monsterName(t)} (${num(v)})`).join('  ·  ');
+  label(c, fitText(c, S.bitten.length ? `Bit the cottage most: ${bitten}` : 'Nothing bit the cottage!', VIEW_W - 64, 16, 600), VIEW_W / 2, top + h + 26, 16, S.bitten.length ? '#ffb3a8' : '#8dff9a', 'center', 600, null);
+  label(c, keys, VIEW_W / 2, Math.min(VIEW_H - 24, top + h + 60), 18, '#fff', 'center', 500, null);
 }
 
 // The flower guide (I in the menu or while picking): one flower at a time,
 // what each level costs and what it improves. The numbers come straight from
 // the balance data, so the guide never goes stale.
-const fmt = (v) => (v >= 100 ? Math.round(v) : +v.toFixed(v >= 10 ? 1 : 2)).toString();
 function guideRows(t) {
   const F = FLOWERS[t];
   const lv = Array.from({ length: MAX_LEVEL }, (_, i) => i + 1);
@@ -2243,40 +2270,72 @@ function drawGuide(c, time, sel) {
   label(c, '←/→ or A/D: other flowers  ·  I or Esc: close', VIEW_W / 2, VIEW_H - 22, 14, '#8fa5b3', 'center', 500, null);
 }
 
+// A key drawn as a little keycap with what it does next to it; returns the width used.
+function keyChip(c, x, y, key, txt, size = 20) {
+  c.font = `700 ${size * 0.8}px ${FONT}`;
+  const kw = Math.max(size * 1.3, c.measureText(key).width + 14);
+  c.font = `600 ${size}px ${FONT}`;
+  const tw = c.measureText(txt).width;
+  rrect(c, x, y - size * 0.7, kw, size * 1.4, 7, '#ffe27a', OUT, 2);
+  label(c, key, x + kw / 2, y + 1, size * 0.8, '#2a2030', 'center', 700, null);
+  label(c, txt, x + kw + 8, y + 1, size, '#ffffff', 'left', 600, null);
+  return kw + 8 + tw;
+}
+const chipsWidth = (c, list, size, gap) => list.reduce((a, [key, txt]) => {
+  c.font = `700 ${size * 0.8}px ${FONT}`; const kw = Math.max(size * 1.3, c.measureText(key).width + 14);
+  c.font = `600 ${size}px ${FONT}`; return a + kw + 8 + c.measureText(txt).width + gap;
+}, -gap);
+
 function drawMenu(c, time, ui) {
-  c.fillStyle = 'rgba(12,18,26,0.55)'; c.fillRect(0, 0, VIEW_W, VIEW_H);
+  c.fillStyle = 'rgba(12,18,26,0.55)'; c.fillRect(0, 0, VIEW_W, MAP_H);
   const cx = VIEW_W / 2;
-  rrect(c, cx - 360, 40, 720, 570, 24, 'rgba(30,38,48,0.92)', 'rgba(255,255,255,0.25)', 2);
-  label(c, 'Petal Patrol', cx, 100, 64, '#ffe27a', 'center', 700, OUT);
-  label(c, 'Two cats. One garden. Many, many monsters.', cx, 146, 18, '#cfe0ea', 'center', 500, null);
-  drawCat(c, { id: 0, cat: 'scout', x: cx - 250, y: 100, dir: 0, moving: true, swingT: 0, stun: 0 }, time);
-  drawCat(c, { id: 1, cat: 'gardener', x: cx + 250, y: 100, dir: Math.PI, moving: true, swingT: 0, stun: 0 }, time);
+  rrect(c, cx - 370, 24, 740, 512, 24, 'rgba(30,38,48,0.93)', 'rgba(255,255,255,0.25)', 2);
+  label(c, 'Petal Patrol', cx, 84, 64, '#ffe27a', 'center', 700, OUT);
+  label(c, 'Two cats. One garden. Many, many monsters.', cx, 130, 18, '#cfe0ea', 'center', 500, null);
+  drawCat(c, { id: 0, cat: 'scout', x: cx - 250, y: 84, dir: 0, moving: true, swingT: 0, stun: 0 }, time);
+  drawCat(c, { id: 1, cat: 'gardener', x: cx + 250, y: 84, dir: Math.PI, moving: true, swingT: 0, stun: 0 }, time);
   FLOWER_ORDER.forEach((t, i) => {
-    const lvl = [1, 3, 2, 2, 4, 3, 2][i];
-    const x = cx - 285 + i * 95;
-    drawFlower(c, { id: i, type: t, lvl, x, y: 236, angle: Math.PI / 2, flash: 0, hurtT: 0, hp: FLOWER_HP, headIdx: 0 }, time);
-    label(c, FLOWERS[t].name, x, 278, 13, '#ffffff', 'center', 600, null);
+    const lvl = [1, 3, 2, 2, 4, 3, 2][i] || 2;
+    const x = cx + (i - (FLOWER_ORDER.length - 1) / 2) * 95;
+    drawFlower(c, { id: i, type: t, lvl, x, y: 214, angle: Math.PI / 2, flash: 0, hurtT: 0, hp: FLOWER_HP, headIdx: 0 }, time);
+    label(c, FLOWERS[t].name, x, 256, 13, '#ffffff', 'center', 600, null);
   });
-  const pulse = 0.75 + Math.sin(time * 4) * 0.25;
-  c.globalAlpha = pulse;
-  if (ui.online) label(c, `Still online with ${ui.online === 'host' ? 'P2' : 'the host'}  ·  3 or Enter: play again together  ·  Esc: leave`, cx, 318, 19, '#8dff9a', 'center', 600, null);
-  else label(c, '1 Solo    2 Local co-op    3 Host online    4 Join online    O Load game', cx, 318, 22, '#ffffff', 'center', 600, null);
-  c.globalAlpha = 1;
+  // how to start: one keycap per mode
+  if (ui.online) {
+    c.globalAlpha = 0.75 + Math.sin(time * 4) * 0.25;
+    label(c, `Still online with ${ui.online === 'host' ? 'P2' : 'the host'}  ·  3 or Enter: play again together  ·  Esc: leave`, cx, 304, 19, '#8dff9a', 'center', 600, null);
+    c.globalAlpha = 1;
+  } else {
+    const modes = [['1', 'Solo'], ['2', 'Local co-op'], ['3', 'Host online'], ['4', 'Join online'], ['O', 'Load game']];
+    let x = cx - chipsWidth(c, modes, 19, 22) / 2;
+    for (const [key, txt] of modes) x += keyChip(c, x, 304, key, txt, 19) + 22;
+  }
   const rows = [
-    ['', 'Move', 'Sprint', 'Baton', 'Bomb', 'Power-up', 'Plant / upgrade', 'Heal', 'Next / mode'],
+    ['', 'Move', 'Sprint', 'Baton', 'Bomb', 'Power-up', 'Plant / grow', 'Heal', 'Next / dig'],
     ...ui.keys.map((k, i) => [`P${i + 1}`, i === 0 ? [k.up, k.left, k.down, k.right].map(ui.keyLabel).join('') : 'Arrows',
       ui.keyLabel(k.sprint), ui.keyLabel(k.atk), ui.keyLabel(k.bomb), ui.keyLabel(k.use), ui.keyLabel(k.build), ui.keyLabel(k.heal), ui.keyLabel(k.cycle)]),
   ];
   const cols = [cx - 310, cx - 245, cx - 182, cx - 128, cx - 78, cx - 18, cx + 70, cx + 152, cx + 238];
-  rows.forEach((r, ri) => r.forEach((t, ci) => label(c, t, cols[ci], 358 + ri * 28, ri ? 16 : 13, ri ? '#fff' : '#8fa5b3', 'center', ri ? 600 : 500, null)));
+  rrect(c, cx - 340, 336, 680, 96, 12, 'rgba(255,255,255,0.05)');
+  rows.forEach((r, ri) => r.forEach((t, ci) => {
+    if (ci === 0 && ri) { rrect(c, cols[0] - 16, 352 + ri * 26 - 10, 32, 20, 10, PLAYER.scarves[ri - 1]); label(c, t, cols[0], 352 + ri * 26 + 0.5, 12, '#fff', 'center', 700, null); return; }
+    label(c, t, cols[ci], 352 + ri * 26, ri ? 16 : 12, ri ? '#fff' : '#8fa5b3', 'center', ri ? 600 : 500, null);
+  }));
   const tips = [
-    'Plant key: build mode, again to plant a seedling, then HOLD to pour coins in. Next-flower key cycles.',
-    'Flowers wear out as they fight: stand on one and HOLD the heal key. Mode key on a flower: dig it up for 60% back.',
-    `Each player picks a different cat and ${LOADOUT_SIZE} of the ${FLOWER_ORDER.length} flowers. In co-op, each cat keeps the coins it picks up.`,
+    'Build mode, then hold the plant key to grow a flower; hold heal on a worn one.',
+    `Each cat picks ${LOADOUT_SIZE} of the ${FLOWER_ORDER.length} flowers · Dig a flower up for ${Math.round(ECONOMY.uprootRefund * 100)}% of its coins back.`,
   ];
-  tips.forEach((t, i) => label(c, t, cx, 455 + i * 24, 13.5, '#cfe0ea', 'center', 500, null));
-  label(c, 'Enter: early wave  ·  P or Esc: pause  ·  N: sound  ·  I: flower guide  ·  L: game logs', cx, 545, 14, '#8fa5b3', 'center', 500, null);
-  label(c, 'Online, both players use the P1 keys (or arrows) on their own keyboard.', cx, 570, 13, '#8fa5b3', 'center', 500, null);
+  tips.forEach((t, i) => label(c, t, cx, 462 + i * 24, 14, '#cfe0ea', 'center', 500, null));
+  label(c, `Defend the cottage for ${TOTAL_WAVES} waves, then keep going in endless mode.`, cx, 512, 13, '#8fa5b3', 'center', 500, null);
+  // the strip under the map: the keys every screen shares
+  const g = c.createLinearGradient(0, MAP_H, 0, VIEW_H);
+  g.addColorStop(0, '#2c3a45'); g.addColorStop(1, '#1b242c');
+  c.fillStyle = g; c.fillRect(0, MAP_H, VIEW_W, VIEW_H - MAP_H);
+  c.fillStyle = '#4c6070'; c.fillRect(0, MAP_H, VIEW_W, 3);
+  const keys = [['Enter', 'next wave early'], ['P', 'pause'], ['N', 'sound'], ['I', 'flower guide'], ['L', 'game logs']];
+  let x = cx - chipsWidth(c, keys, 14, 20) / 2;
+  for (const [key, txt] of keys) x += keyChip(c, x, MAP_H + 34, key, txt, 14) + 20;
+  label(c, 'Online, both players use the P1 keys (or the arrows) on their own keyboard.', cx, MAP_H + 68, 13, '#8fa5b3', 'center', 500, null);
 }
 
 // The depth-sorted draw list, reused every frame.
@@ -2291,6 +2350,7 @@ const byY = (a, b) => a.y - b.y;
 
 // For tools/gallery.html and tools/maps.html: drawn exactly as in the game.
 export { drawFlower, drawCat, drawEnemy, getBg, drawTree, drawCottage };
+export { num, clock }; // for the tests
 
 export function render(c, s, ui) {
   const time = performance.now() / 1000;
@@ -2314,7 +2374,7 @@ export function render(c, s, ui) {
     drawCottage(c, m.base.x, m.base.y, 1, 1, 0, time);
     c.restore();
     if (ui.guide != null) drawGuide(c, time, ui.guide); else drawMenu(c, time, ui);
-    if (ui.note && performance.now() < ui.note.until) label(c, ui.note.txt, VIEW_W / 2, VIEW_H - 24, 16, '#ffffff', 'center', 700);
+    if (ui.note && performance.now() < ui.note.until) label(c, ui.note.txt, VIEW_W / 2, MAP_H - 10, 16, '#ffffff', 'center', 700); // between the menu and its key strip
     return;
   }
   observeJuice(s);
@@ -2369,7 +2429,7 @@ export function render(c, s, ui) {
   if (s.chest && !ui.disconnected) drawChest(c, s, ui, time);
   if (ui.guide != null) drawGuide(c, time, ui.guide);
   if (ui.disconnected) drawOverlay(c, 'Disconnected', ['The connection to the host was lost', 'M or Esc: menu'], '#ff7a6a');
-  else if (ui.paused) { drawOverlay(c, 'Paused', ['P or Esc: resume  ·  S: save the game', stopKeys(s)], '#ffffff'); drawPerkList(c, s, VIEW_H / 2 + 78); }
+  else if (ui.paused) drawPause(c, s);
   else if (s.over || s.won) drawEndScreen(c, s, ui, time);
   if (ui.note && performance.now() < ui.note.until) label(c, ui.note.txt, VIEW_W / 2, MAP_H - 24, 16, '#ffffff', 'center', 700);
 }

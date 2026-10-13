@@ -58,6 +58,7 @@ Claude Code users: `.claude/launch.json` defines this server as `towers`
 | `tools/bot.js` | Autopilot that plays whole games through the real sim, copying real co-op habits (`HABITS` at the top) |
 | `tools/balance-test.html` | UI for running the autopilot over many seeds and maps |
 | `tools/gallery.html` | Every flower at every level, every cat (standing and swinging) and every monster, drawn with the real render code. `?zoom=5` for close-ups |
+| `tools/screens.html` | Every screen (menu, guide, pick, game, chest, pause, end screens, overlays) drawn with the real render code on realistic games, including a long endless run with huge numbers, so text that doesn't fit shows at a glance. `?only=pause` filters by name |
 | `tools/tests.html`, `tools/tests.js` | The test suite: prices, maps, monsters, endless mode, whole autopilot games, saved games, online encoding, drawing. Runs in the browser |
 | `tools/maps.html` | Every map from `maps.json` drawn whole with the real render code (roads, ponds, bridges, scatter, cottage, entrances) |
 | `serve.py` | No-cache local server |
@@ -142,6 +143,7 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
 | Give a map its own monsters | Add a list to `balance.json → waveSets` and name it with `waveSet` in the map's `maps.json` entry. Maps without one use `waves`. `fromWave: [lo, hi]` makes a type arrive in a random wave in that range (rolled once per game) |
 | Add a key | `KEYS` in `main.js` (P1 and P2 layouts); show it in the menu (`drawMenu`) and README. Online inputs are flags in `schema.js` (`INPUT_FLAGS`, bump `PROTOCOL`) |
 | Change art | `render.js`, then check `tools/gallery.html` |
+| Change a screen or its text | `render.js`, then check `tools/screens.html` (every screen at once, long texts and big numbers included) |
 | Log more for balancing | Add a hook in `stats.js` and call it from `sim.js` |
 
 ## Testing
@@ -177,7 +179,9 @@ Check changes like this:
    watches it play). Solo play is less tuned (the logs are all co-op). From
    the console: `(await import('/tools/bot.js')).runBot({ players: 2, seed: 1, map: 0 })`
    returns `{ won, wave, lives, log, game }`.
-4. **Art**: `/tools/gallery.html` (add `?zoom=5`).
+4. **Art and screens**: `/tools/gallery.html` (add `?zoom=5`) for sprites, and
+   `/tools/screens.html` for every screen's layout and text. Big numbers go
+   through `num` (9,425 · 91.1k · 1.3M) and times through `clock` in `render.js`.
 5. **Real playtest logs**: players press **L** to download the last 20 games
    as JSON (per wave: monsters, cottage damage by type and by road, coins
    earned/spent per cat, time spent per activity, damage and kills per flower

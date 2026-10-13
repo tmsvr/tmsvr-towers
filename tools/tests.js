@@ -9,7 +9,7 @@ import {
 } from '../src/data.js';
 import { encodeSnapshot, encodeInputs, decodeFast } from '../src/schema.js';
 import { gameSummary } from '../src/stats.js';
-import { render } from '../src/render.js';
+import { render, num, clock } from '../src/render.js';
 import { runBot } from './bot.js';
 import { saveGame, loadGame } from '../src/save.js';
 
@@ -1124,6 +1124,13 @@ test('Drawing', 'pick screen, a game in progress and the end screen draw without
   const r = runBot({ players: 2, seed: 2, map: 0, maxMinutes: 3 });
   s.over = true; ui.summary = gameSummary(r.game);
   render(c, s, ui);
+});
+
+test('Drawing', 'big numbers and long games read the way games show them', () => {
+  const cases = [[0, '0'], [812, '812'], [9425, '9,425'], [9999.6, '10k'], [10000, '10k'], [91149, '91.1k'], [99960, '100k'], [117300, '117k'],
+    [999400, '999k'], [999600, '1M'], [1300000, '1.3M'], [8756000, '8.8M'], [17058000, '17.1M'], [123456789, '123M']];
+  for (const [v, want] of cases) eq(num(v), want, `num(${v})`);
+  eq(clock(59), '0:59', 'under a minute'); eq(clock(1046), '17:26', 'minutes'); eq(clock(3725), '1:02:05', 'over an hour');
 });
 
 // ---- runner -----------------------------------------------------------------------

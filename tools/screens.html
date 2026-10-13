@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Screens</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #141b22; --text: #e8f1f7; --muted: #8fa5b3; }
+  body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; }
+  h1 { margin: 0 0 4px; font-size: 24px; }
+  h2 { margin: 28px 0 8px; font-size: 17px; }
+  p { color: var(--muted); margin: 0 0 16px; }
+  canvas { width: 100%; height: auto; border-radius: 12px; display: block; background: #000; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Screens</h1>
+  <p>Every screen of the game, drawn with the game's own code on made-up but realistic games (late endless waves, big numbers, every perk), so text that doesn't fit shows up at a glance. Edit <code>src/render.js</code> and reload. <code>?only=pause</code> shows just the screens whose name contains that word.</p>
+  <div id="out"></div>
+</main>
+<script type="module">
+import { render } from '../src/render.js';
+import * as sim from '../src/sim.js';
+import { MAPS, FLOWER_ORDER } from '../src/data.js';
+import { spawnEffect, resetEffects, updateEffects } from '../src/fx.js';
+import { gameSummary } from '../src/stats.js';
+import { runBot } from './bot.js';
+
+// the key layouts from main.js (which can't be imported: it starts the game)
+const KEYS = [
+  { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', atk: 'KeyF', bomb: 'KeyG', build: 'KeyE', heal: 'KeyR', cycle: 'KeyQ', sprint: 'ShiftLeft', use: 'KeyV' },
+  { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', atk: 'Comma', bomb: 'Period', build: 'Slash', heal: 'Quote', cycle: 'KeyM', sprint: 'ShiftRight', use: 'Semicolon' },
+];
+const DEFAULT_LABELS = { ShiftLeft: 'Shift', ShiftRight: 'R-Shift', Comma: ',', Period: '.', Slash: '/', Quote: "'", ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Semicolon: ';' };
+const VIEW_W = 1008, VIEW_H = 656, dpr = Math.min(2, devicePixelRatio || 1);
+const only = new URLSearchParams(location.search).get('only');
+const ui = (o = {}) => ({
+  cam: { x: 0, y: 0 }, menuMap: MAPS[0], paused: false, shake: 0, dpr, netLabel: '', disconnected: false, guide: null, online: null, summary: null,
+  keys: KEYS, keysFor: (pid) => KEYS[pid] || KEYS[0], keyLabel: (code) => DEFAULT_LABELS[code] || code.replace(/^Key|^Digit/, ''), mode: () => 'local', ...o,
+});
+
+// A real garden: the autopilot plays until a busy moment of wave `waves`, and we keep its state.
+function playUntil(players, waves, seed = 3) {
+  let st = null;
+  try { runBot({ players, seed, map: 0, maxMinutes: 30, onTick: (s) => { st = s; if (s.wave >= waves && s.phase === 'wave' && s.enemies.length > 8) throw new Error('stop'); } }); } catch (e) { if (e.message !== 'stop') throw e; }
+  return st;
+}
+// Every perk, the late-game way: two of most, plus a fourth flower.
+function givePerks(s) {
+  s.perks = { roots: 2, stems: 1, roof: 2 };
+  s.players.forEach((p, i) => {
+    p.perks = i ? { thumb: 2, paws: 1 } : { pouch: 2, paws: 2, thumb: 1, fourth: 1 };
+    if (!i && p.loadout.length < 4) p.loadout.push(FLOWER_ORDER.find((t) => !p.loadout.includes(t)));
+    p.item = ['fertiliser', 'water'][i] || null;
+  });
+}
+const camOn = (s, p) => ({ x: Math.max(0, Math.min(s.m.worldW - VIEW_W, p.x - VIEW_W / 2)), y: Math.max(0, Math.min(s.m.worldH - (VIEW_H - 96), p.y - (VIEW_H - 96) / 2)) });
+// The end screen's numbers, scaled up to what a long endless run reaches.
+function bigSummary(S, k) {
+  const m = (v) => Math.round(v * k);
+  return { ...S, wave: 34, seconds: 3725, kills: m(S.kills), cottage: 37, flowers: S.flowers.map((f) => ({ ...f, dmg: m(f.dmg) * 3, kills: m(f.kills), planted: f.planted * 3 })),
+    best: S.best && { ...S.best, dmg: m(S.best.dmg) * 3, kills: m(S.best.kills), lvl: 5 }, cats: S.cats.map((c) => ({ ...c, earned: m(c.earned), spent: m(c.spent), baton: m(c.baton) * 4, bomb: m(c.bomb) * 4, kills: m(c.kills), garden: m(c.garden) * 3 })),
+    bitten: [['swarm', 812], ['moleking', 433], ['charger', 97]] };
+}
+
+const out = document.getElementById('out');
+function show(name, s, u, before) {
+  if (only && !name.toLowerCase().includes(only.toLowerCase())) return;
+  const h = document.createElement('h2'); h.textContent = name; out.append(h);
+  const cv = document.createElement('canvas'); cv.width = VIEW_W * dpr; cv.height = VIEW_H * dpr; out.append(cv);
+  const c = cv.getContext('2d'); c.scale(dpr, dpr);
+  resetEffects();
+  before?.();
+  render(c, s, u);
+  resetEffects();
+}
+
+const duo = playUntil(2, 7), solo = playUntil(1, 5, 5);
+// shown as a late endless wave, so the HUD gets its longest texts
+Object.assign(duo, { over: false, won: false, endless: true, wave: 27 });
+
+show('Menu', null, ui());
+show('Menu, still online after a game', null, ui({ online: 'host' }));
+show('Flower guide', null, ui({ guide: 1 }));
+show('Pick screen, co-op', sim.createState(2, 1, { map: 0 }), ui());
+show('Pick screen, solo', sim.createState(1, 1, { map: 0 }), ui());
+
+givePerks(duo);
+show('Game, co-op, with a banner and intro cards', duo, ui({ cam: camOn(duo, duo.players[0]) }), () => {
+  spawnEffect({ kind: 'banner', txt: `Wave ${duo.wave} — 2 BOSSES!` });
+  spawnEffect({ kind: 'intro', type: 'moleking' }); spawnEffect({ kind: 'intro', type: 'witch' });
+  updateEffects(0.5); // past their slide-in
+});
+show('Game, online (status label)', duo, ui({ cam: camOn(duo, duo.players[0]), netLabel: 'Online · room HDPM · P2 connected', perf: '42 ms · 60 fps · 18 ms', mode: () => 'host' }));
+show('Game, solo', solo, ui({ cam: camOn(solo, solo.players[0]) }));
+
+const chestOf = (s) => ({ offers: s.players.map((p, i) => i ? ['thumb', 'roof', 'pouch'] : ['paws', 'roots', `fourth:${FLOWER_ORDER.find((t) => !p.loadout.includes(t))}`]), cursor: s.players.map(() => 1), picked: s.players.map(() => null) });
+duo.chest = chestOf(duo); show('Boss chest, co-op', duo, ui({ cam: camOn(duo, duo.players[0]) })); duo.chest = null;
+solo.chest = chestOf(solo); show('Boss chest, solo', solo, ui({ cam: camOn(solo, solo.players[0]) })); solo.chest = null;
+show('Pause, co-op with perks', duo, ui({ cam: camOn(duo, duo.players[0]), paused: true }));
+show('Pause, solo without perks', solo, ui({ cam: camOn(solo, solo.players[0]), paused: true }));
+
+// end screens: a real summary, and the same blown up to a long endless run
+const full = runBot({ players: 2, seed: 2, map: 0, maxMinutes: 40 });
+const S = gameSummary(full.game);
+duo.won = true; duo.endless = false;
+show('Victory, co-op', duo, ui({ cam: camOn(duo, duo.players[0]), summary: { ...S, won: true, wave: 10 } }));
+duo.won = false; duo.over = true; duo.endless = true; duo.wave = 34;
+show('Defeat, co-op, endless wave 34 (big numbers)', duo, ui({ cam: camOn(duo, duo.players[0]), summary: bigSummary(S, 25) }));
+const sSolo = gameSummary(runBot({ players: 1, seed: 4, map: 0, maxMinutes: 40 }).game);
+solo.over = true;
+show('Defeat, solo', solo, ui({ cam: camOn(solo, solo.players[0]), summary: sSolo }));
+show('Defeat, summary not there yet (online guest)', solo, ui({ cam: camOn(solo, solo.players[0]) }));
+show('Disconnected', solo, ui({ cam: camOn(solo, solo.players[0]), disconnected: true }));
+</script>
+</body>
+</html>

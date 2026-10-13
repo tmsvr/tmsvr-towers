@@ -402,7 +402,7 @@ function welcomeGuest(m) {
   if (m.protocol !== VERSION.protocol || m.data !== VERSION.data) {
     net.send({ t: 'reject', ...VERSION });
     net.kick();
-    if (mode === 'hostWait') showLobby(`<h2>Waiting for player 2…</h2><p>Room code</p><div class="code">${roomCode}</div><p>Someone tried to join with a different version of the game. You both need the same files.</p><p class="hint">Esc to cancel</p>`);
+    if (mode === 'hostWait') showLobby(`<h2>Waiting for player 2…</h2><p>Room code</p><div class="code">${roomCode}</div><p>Someone tried to join with a different version of the game. Both of you: reload the page (Cmd/Ctrl+Shift+R) to get the latest one.</p><p class="hint">Esc to cancel</p>`);
     else ui.netLabel = `P2 has a different version of the game — room ${roomCode}`;
     return;
   }
@@ -482,7 +482,7 @@ function startJoin(code) {
         ui.netLabel = `Online · room ${code} · ${Math.round(performance.now() - m.at)} ms`;
       } else if (m.t === 'reject') {
         rejected = true;
-        showLobby(`<h2>Different game versions</h2><p>The host has a different version of the game${m.protocol !== VERSION.protocol ? '' : ' (different balance or maps)'}. You both need the same files.</p><p class="hint">Esc to go back</p>`);
+        showLobby(`<h2>Different game versions</h2><p>The host has a different version of the game${m.protocol !== VERSION.protocol ? '' : ' (different balance or maps)'}. Both of you: reload the page (Cmd/Ctrl+Shift+R) to get the latest one.</p><p class="hint">Esc to go back</p>`);
       }
     },
     onClose: () => {
@@ -677,4 +677,4 @@ const invite = new URLSearchParams(location.search).get('join');
 if (invite) showJoin(invite.toUpperCase().slice(0, 4));
 
 // Debug hooks for automated play-testing.
-window.__game = { get state() { return state; }, get mode() { return mode; }, get net() { return net; }, get pred() { return guest && guest.pred; }, startLocal, held, pressed };
+window.__game = { get state() { return state; }, get mode() { return mode; }, get net() { return net; }, get pred() { return guest && guest.pred; }, ui, startLocal, held, pressed };
