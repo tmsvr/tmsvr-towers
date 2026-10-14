@@ -549,7 +549,9 @@ function buildQueue(s, n) {
   // Monsters that just arrived get the spotlight; older ones slowly make room.
   const weightOf = (u) => {
     const age = n - u.fromWave;
-    return u.weight * (u.group > 1 && n >= (TUNE.packCutFromWave ?? Infinity) ? TUNE.endlessPackWeight ?? 1 : 1) * (age <= 1 ? TUNE.newEnemyBoost ?? 1 : Math.max(TUNE.oldEnemyMin ?? 1, 1 - (TUNE.oldEnemyFade ?? 0) * (age - 1)));
+    // late packs come less often, flying ones (wasps) even less: only some flowers can hit them
+    const late = u.group > 1 && n >= (TUNE.packCutFromWave ?? Infinity);
+    return u.weight * (late ? (TUNE.endlessPackWeight ?? 1) * (ENEMIES[u.enemy]?.flying ? TUNE.flyingPackWeight ?? 1 : 1) : 1) * (age <= 1 ? TUNE.newEnemyBoost ?? 1 : Math.max(TUNE.oldEnemyMin ?? 1, 1 - (TUNE.oldEnemyFade ?? 0) * (age - 1)));
   };
   const total = avail.reduce((a, u) => a + weightOf(u), 0);
   while (budget > 0) {

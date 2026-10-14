@@ -499,6 +499,30 @@ test('Endless', 'from packCutFromWave, swarm and wasp packs come less often', ()
   } finally { D.endlessPackWeight = old; }
 });
 
+test('Endless', 'from packCutFromWave, flying packs (wasps) come even less often', () => {
+  const D = BALANCE.difficulty, old = D.flyingPackWeight;
+  // wasps in a late wave over a few seeds, with flying packs `mul` times as likely
+  const wasps = (n, mul) => {
+    D.flyingPackWeight = mul;
+    let count = 0;
+    for (let seed = 1; seed <= 12; seed++) {
+      const s = game({ cats: ['bomber', 'gardener'], seed });
+      s.wave = TOTAL_WAVES; s.won = true; s.phase = 'wave';
+      sim.continueEndless(s);
+      s.wave = n - 1; s.phase = 'prep'; s.queue = []; s.enemies = [];
+      tick(s, { ready: true });
+      count += s.queue.filter((e) => e.type === 'wasp').length;
+    }
+    return count;
+  };
+  try {
+    const late = D.packCutFromWave + 2, early = D.packCutFromWave - 2;
+    const cut = wasps(late, old), full = wasps(late, 1);
+    ok(old < 1 && cut < full * (old + 0.15), `wave ${late}: ${cut} wasps instead of ${full}`);
+    eq(wasps(early, old), wasps(early, 1), `wave ${early} is untouched`);
+  } finally { D.flyingPackWeight = old; }
+});
+
 test('Endless', 'monsters after the breather get extra health each wave', () => {
   const s = wonGame(), D = BALANCE.difficulty;
   const gruntIn = (n) => { s.wave = n; sim.spawnEnemy(s, 'grunt', null, 0); return s.enemies.at(-1).maxhp; };
