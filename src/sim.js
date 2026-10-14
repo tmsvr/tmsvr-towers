@@ -27,18 +27,20 @@ const EDGE = 14;
 
 // Difficulty knobs from balance.json (exported so balance can be swept from the console).
 export const TUNE = DIFFICULTY;
+// Hard mode multiplies monster health and how many come (chosen on the pick screen).
+const HARD = { enemyHp: 1, waveSize: 1, ...DIFFICULTY.hard };
 
 // sharedScreen: both cats share one camera, so they can't wander further apart than the view.
-// loadouts / cats: last game's flower picks and characters, pre-selected on the pick screen.
+// loadouts / cats / hard: last game's flower picks, characters and difficulty, pre-selected on the pick screen.
 // The map lives on the state (s.m, one of MAPS), so any number of games can
 // exist side by side: the balance bot's, a guest's view, the real one.
-export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, loadouts = [], cats = [], map = 0 } = {}) {
+export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, loadouts = [], cats = [], map = 0, hard = false } = {}) {
   const m = MAPS[map] || MAPS[0];
   const s = {
     m,
     t: 0, nextId: 1, rng: seed, wave: 0, phase: 'pick', timer: DIFFICULTY.firstWaveDelay, queue: [], spawnWait: 0,
     lives: DIFFICULTY.cottageHealth, maxLives: DIFFICULTY.cottageHealth, baseHitT: 0, lastAlarm: -99, players: [], flowers: [], enemies: [], drops: [], bombs: [], projs: [], clouds: [],
-    fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, sharedScreen, map: m.index,
+    fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, sharedScreen, map: m.index, hard: !!hard,
     items: [], // power-ups dropped by elites, waiting to be picked up
     perks: {}, chest: null, chestDue: false, // boss chests: the team's perks, the open chest, one is owed
     seen: {}, // monster types met so far (each gets one warning banner)
@@ -163,9 +165,10 @@ export function spawnEnemy(s, type, from, path = 0) {
   const finale = d.boss ? (s.wave >= TOTAL_WAVES ? TUNE.finalBossHp || 1 : 1) * Math.sqrt(s.m.waveSize) : 1;
   // endless bosses stack the finale's bonus with endless toughening, so they get trimmed
   const endlessBoss = d.boss && s.wave > TOTAL_WAVES ? TUNE.endlessBossHp ?? 1 : 1;
-  // after the breather, endless monsters toughen up faster than the crowds grow
-  const endless = 1 + (TUNE.endlessHpPerWave ?? 0) * Math.max(0, s.wave - TOTAL_WAVES - 1);
-  const hpScale = (TUNE.enemyHp ?? 1) * (1 + w * TUNE.hpPerWave + w * w * TUNE.hpPerWaveSquared) * (solo ? (d.boss ? TUNE.soloBossHp : 1) : TUNE.coopEnemyHp) * finale * endless * endlessBoss;
+  // One curve for every wave, endless included: each wave is hpGrowth tougher than
+  // the last, so there is no jump anywhere and a full garden meets a clear wall.
+  const grow = Math.pow(1 + TUNE.hpGrowth, w);
+  const hpScale = (TUNE.enemyHp ?? 1) * grow * (solo ? (d.boss ? TUNE.soloBossHp : 1) : TUNE.coopEnemyHp) * finale * endlessBoss * (s.hard ? HARD.enemyHp : 1);
   const j = () => (rnd(s) - 0.5) * 18 * U;
   const id = s.nextId++;
   const road = s.m.paths[from ? from.path : path];
@@ -539,7 +542,7 @@ function buildQueue(s, n) {
   // easy crowds for pulse flowers); their monsters get tougher instead.
   const endless = n > TOTAL_WAVES + 1;
   let budget = (endless ? size(TOTAL_WAVES) * (1 + (TUNE.endlessWaveSizePerWave ?? 0) * (n - TOTAL_WAVES)) : size(n))
-    * (s.players.length > 1 ? TUNE.coopWaveSize : TUNE.soloWaveSize) * s.m.waveSize;
+    * (s.players.length > 1 ? TUNE.coopWaveSize : TUNE.soloWaveSize) * s.m.waveSize * (s.hard ? HARD.waveSize : 1);
   const avail = s.m.waves.map((u, i) => ({ ...u, fromWave: from[i] })).filter((u) => u.fromWave <= n);
   const bossWave = n % TUNE.bossEvery === 0;
   if (bossWave) budget *= TUNE.bossWaveBudget;
@@ -549,9 +552,7 @@ function buildQueue(s, n) {
   // Monsters that just arrived get the spotlight; older ones slowly make room.
   const weightOf = (u) => {
     const age = n - u.fromWave;
-    // late packs come less often, flying ones (wasps) even less: only some flowers can hit them
-    const late = u.group > 1 && n >= (TUNE.packCutFromWave ?? Infinity);
-    return u.weight * (late ? (TUNE.endlessPackWeight ?? 1) * (ENEMIES[u.enemy]?.flying ? TUNE.flyingPackWeight ?? 1 : 1) : 1) * (age <= 1 ? TUNE.newEnemyBoost ?? 1 : Math.max(TUNE.oldEnemyMin ?? 1, 1 - (TUNE.oldEnemyFade ?? 0) * (age - 1)));
+    return u.weight * (age <= 1 ? TUNE.newEnemyBoost ?? 1 : Math.max(TUNE.oldEnemyMin ?? 1, 1 - (TUNE.oldEnemyFade ?? 0) * (age - 1)));
   };
   const total = avail.reduce((a, u) => a + weightOf(u), 0);
   while (budget > 0) {
@@ -559,10 +560,12 @@ function buildQueue(s, n) {
     for (const u of avail) { r -= weightOf(u); if (r <= 0) { pick = u; break; } }
     const path = Math.floor(rnd(s) * s.m.paths.length); // a group sticks together on one road
     const [lo, hi] = TUNE.spawnGap || [0.4, 1.2];
-    // packs (swarms, wasps) get bigger every wave after they first appear, a bit less so late in endless mode
-    const group = pick.group > 1 ? Math.round(pick.group * (1 + (TUNE.packGrowthPerWave ?? 0) * (n - pick.fromWave)) * (n >= (TUNE.packCutFromWave ?? Infinity) ? TUNE.endlessPackSize ?? 1 : 1)) : 1;
+    // packs (swarms, wasps) get bigger every wave after they first appear, up to packMaxGrowth
+    // times their size, and pay for every member: bigger packs come less often, not for free
+    const growth = Math.min(TUNE.packMaxGrowth ?? Infinity, 1 + (TUNE.packGrowthPerWave ?? 0) * (n - pick.fromWave));
+    const group = pick.group > 1 ? Math.round(pick.group * growth) : 1;
     for (let i = 0; i < group; i++) q.push({ type: pick.enemy, path, wait: group > 1 ? 0.18 : lo + rnd(s) * (hi - lo) });
-    budget -= pick.cost;
+    budget -= pick.cost * (group / pick.group);
   }
   // endless brings more bosses every bossEvery waves; the extra ones come mid-wave. Ordinary
   // waves get them bossFreeCycles cycles later, so bosses don't come every wave too soon
@@ -1243,7 +1246,8 @@ function nextCat(s, p, dir) {
 }
 
 // Pick screen rows: 0 = map, 1 = cat, 2 = flowers. Up/down switches rows,
-// left/right moves, the plant key picks a flower, the baton key locks in.
+// left/right moves, the plant key picks a flower (on the map row it switches
+// Normal / Hard), the baton key locks in.
 function updatePick(s, inputs) {
   const N = FLOWER_ORDER.length;
   for (const p of s.players) {
@@ -1261,7 +1265,8 @@ function updatePick(s, inputs) {
     p.prevMx = mx;
     if (inp.buildTap) {
       if (pk.ready) { pk.ready = false; ev(s, 'cycle'); }
-      else if (pk.row < 2) { pk.row++; ev(s, 'cycle'); }
+      else if (pk.row === 0) { s.hard = !s.hard; s.players.forEach((o) => { o.pick.ready = false; }); ev(s, 'cycle'); } // like a new map, everyone confirms again
+      else if (pk.row === 1) { pk.row++; ev(s, 'cycle'); }
       else {
         const t = FLOWER_ORDER[pk.cursor];
         const i = pk.chosen.indexOf(t);

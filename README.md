@@ -34,7 +34,9 @@ them.
 - **1** solo · **2** local co-op (one keyboard) · **3** host online · **4** join online
 - Before each game, pick a map, a cat and 3 of the 7 flowers. Two players can't
   pick the same cat: Brick (slow, big hits), Zip (fast, light hits), Fern
-  (grows and heals faster) or Boom (faster, bigger bombs).
+  (grows and heals faster) or Boom (faster, bigger bombs). On the map row, E
+  switches between **Normal** and **Hard** (more monsters, and tougher: for
+  players whose gardens hold Normal with lots to spare).
 - Standing on a flower, hold E to upgrade it and R to heal it. Q switches E to
   dig-up mode, which removes the flower and refunds part of what was spent on it.
 - At level 5 every flower **blooms**: it sparkles and gains a special ability
@@ -80,7 +82,7 @@ them.
   - **M** goes back to the menu (Esc too, after the game)
   - **C** on the victory screen keeps going in endless mode
 - **O** on the main menu loads a saved game (solo, local co-op or online) and carries on from the moment it was saved, paused. Online, the host saves and loads; a loaded online game starts once P2 joins.
-- Beat all 10 waves and press C on the victory screen to keep going in **endless mode**: wave after wave, each tougher than the last. Wave 11, right after the big boss, is a smaller one to catch your breath; after that the monsters come in about the same numbers but get much tougher, and every 5 waves brings one more boss (wave 15 has two, wave 20 three, wave 25 four…). From wave 21 the waves in between bring bosses too (one each until wave 25, then two…).
+- Beat all 10 waves and press C on the victory screen to keep going in **endless mode**: wave after wave, each tougher than the last. Every wave's monsters are 20% tougher than the last, endless ones too, so sooner or later even a garden full of level-5 flowers meets a wave it can't hold. Wave 11, right after the big boss, is a smaller one to catch your breath; after that the monsters come in about the same numbers, and every 5 waves brings one more boss (wave 15 has two, wave 20 three, wave 25 four…). From wave 21 the waves in between bring bosses too (one each until wave 25, then two…).
 - The game fills the browser window: a wider or taller window shows more of the map (things stay the same size), so there are no black bars.
 - I (in the menu or while picking) opens the flower guide: every flower's stats at each level, worked out from `balance.json`.
 - L downloads the game logs (see below).

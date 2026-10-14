@@ -77,6 +77,7 @@ export function loadGame(data) {
   };
   const s = back(data.state);
   s.items ??= []; // saved before elites dropped power-ups
+  s.hard ??= false; // saved before hard mode
   if (s.chest) s.chest.lock ??= 0; // saved before chests had a lock
   s.map = s.m.index; // where that map sits in today's list
   if (s.checkpoint) s.checkpoint.map = s.map;

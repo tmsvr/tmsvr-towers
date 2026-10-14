@@ -224,7 +224,7 @@ function flashNote(txt) { ui.note = { txt, until: performance.now() + 2500 }; }
 
 // ---- modes ------------------------------------------------------------------
 let lastLoadouts = [], lastCats = [];
-let lastMap = 0;
+let lastMap = 0, lastHard = false;
 function togglePause() {
   if (mode === 'guest') net.send({ t: 'pause' });
   else if (mode === 'local' || mode === 'host') ui.paused = !ui.paused;
@@ -233,8 +233,8 @@ function togglePause() {
 // A new game starts on the pick screen with the last map, cats and flowers chosen.
 function newGame() {
   saveGameLog('quit');
-  if (state && state.players) { lastLoadouts = state.players.map((p) => p.loadout || p.pick.chosen); lastCats = state.players.map((p) => p.cat); lastMap = state.map; }
-  state = createState(nPlayers, (Math.random() * 1e9) | 0, { sharedScreen: mode === 'local' && nPlayers > 1, loadouts: lastLoadouts, cats: lastCats, map: lastMap });
+  if (state && state.players) { lastLoadouts = state.players.map((p) => p.loadout || p.pick.chosen); lastCats = state.players.map((p) => p.cat); lastMap = state.map; lastHard = !!state.hard; }
+  state = createState(nPlayers, (Math.random() * 1e9) | 0, { sharedScreen: mode === 'local' && nPlayers > 1, loadouts: lastLoadouts, cats: lastCats, map: lastMap, hard: lastHard });
   ui.cam.snap = true;
   ui.paused = false;
   ui.summary = null;
@@ -306,7 +306,7 @@ function startSaved({ state: s, mode: how, sameVersion }) {
 
 function resumeGame(s) {
   state = s;
-  lastLoadouts = s.players.map((p) => p.loadout || p.pick.chosen); lastCats = s.players.map((p) => p.cat); lastMap = s.map;
+  lastLoadouts = s.players.map((p) => p.loadout || p.pick.chosen); lastCats = s.players.map((p) => p.cat); lastMap = s.map; lastHard = !!s.hard;
   ui.cam.snap = true;
   ui.paused = true; // everyone gets their hands on the keys first
   ui.summary = null;
@@ -336,7 +336,7 @@ function backToMenu() {
 
 function menuTogether(note) {
   saveGameLog('quit');
-  if (mode === 'host' && state?.players) { lastLoadouts = state.players.map((p) => p.loadout || p.pick.chosen); lastCats = state.players.map((p) => p.cat); lastMap = state.map; }
+  if (mode === 'host' && state?.players) { lastLoadouts = state.players.map((p) => p.loadout || p.pick.chosen); lastCats = state.players.map((p) => p.cat); lastMap = state.map; lastHard = !!state.hard; }
   ui.online = mode === 'host' ? 'host' : 'guest';
   awaitingStart = ui.online === 'guest'; // snapshots of the old game may still be on the way
   mode = 'menu';

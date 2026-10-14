@@ -1800,7 +1800,7 @@ function drawHud(c, s, time, ui) {
   rrect(c, 40, y0 + 22, 150, 16, 8, 'rgba(0,0,0,0.45)', s.baseHitT > 0 ? '#ff6a5a' : OUT, 2);
   rrect(c, 42, y0 + 24, Math.max(0, 146 * hr), 12, 6, hr > 0.5 ? '#6be06b' : hr > 0.25 ? '#ffd23f' : '#ff6a5a');
   label(c, `${Math.ceil(s.lives)} / ${s.maxLives}`, 115, y0 + 30.5, 12, '#ffffff', 'center', 700);
-  label(c, s.endless ? `Wave ${s.wave} · endless` : `Wave ${Math.max(1, s.wave)}/${TOTAL_WAVES}`, 14, y0 + 58, 16, s.endless ? '#ffb86b' : '#e8f1f7', 'left', 600, null);
+  label(c, (s.endless ? `Wave ${s.wave} · endless` : `Wave ${Math.max(1, s.wave)}/${TOTAL_WAVES}`) + (s.hard ? ' · hard' : ''), 14, y0 + 58, 16, s.endless || s.hard ? '#ffb86b' : '#e8f1f7', 'left', 600, null);
   const status = s.phase === 'pick' ? 'Choosing flowers' : s.phase === 'prep' ? `Next in ${Math.ceil(s.timer)}s · Enter` : `${s.enemies.length + s.queue.length} enemies left`;
   label(c, status, 14, y0 + 78, 12, '#a9bccb', 'left', 500, null);
   label(c, isMuted() ? '🔇' : '', 220, y0 + 30, 14, '#fff', 'center', 500, null);
@@ -1952,6 +1952,10 @@ function drawMapCarousel(c, s, ui, time) {
   pos = Math.abs(d) < 0.01 ? s.map : pos + d * Math.min(1, dt * 12);
   ui.mapPos = ((pos % N) + N) % N;
   label(c, `Map ${s.map + 1} / ${N}`, 16, 20, 13, '#8fa5b3', 'left', 600, null);
+  // difficulty: the plant key on the map row switches it
+  const hw = 74, hx = 108;
+  rrect(c, hx, 10, hw, 20, 10, s.hard ? 'rgba(255,106,90,0.25)' : 'rgba(255,255,255,0.06)', s.hard ? '#ff6a5a' : 'rgba(255,255,255,0.25)', 1.5);
+  label(c, s.hard ? 'Hard' : 'Normal', hx + hw / 2, 20.5, 12, s.hard ? '#ffb3a8' : '#cfe0ea', 'center', 700, null);
   for (let i = 0; i < N; i++) {
     const k = wrap(i - ui.mapPos);
     if (Math.abs(k) > 2.6) continue;
@@ -2034,7 +2038,7 @@ function drawPick(c, s, ui, time) {
     const y = y0 + ch + 20 + i * 24;
     const n = p.pick.chosen.length;
     const L = ui.keyLabel;
-    const keys = p.pick.row === 0 ? `[${L(k.left)}/${L(k.right)}] change map · [${L(k.down)}] cats`
+    const keys = p.pick.row === 0 ? `[${L(k.left)}/${L(k.right)}] change map · [${L(k.build)}] ${s.hard ? 'normal' : 'hard'} mode · [${L(k.down)}] cats`
       : p.pick.row === 1 ? `[${L(k.left)}/${L(k.right)}] change cat · [${L(k.up)}] map · [${L(k.down)}] flowers`
       : `[${L(k.left)}/${L(k.right)}] move · [${L(k.build)}] pick · [${L(k.up)}] cats · [${L(k.atk)}] ready`;
     const who = `${CATS[p.cat].name}, `;

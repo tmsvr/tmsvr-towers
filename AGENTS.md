@@ -101,11 +101,19 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
   (guest) or dropped because the connection is backed up (host); see
   `measureFrame` in `main.js`. Caches (map background,
   sprite heads) are keyed by that scale (`ui.dpr`).
-- **Game phases.** Menu → pick screen (`s.phase === 'pick'`: map, cat, 3
-  flowers per player) → waves → won/over overlay. After a win, C carries on
-  into endless mode (`continueEndless`): wave 11 is a smaller breather, then
-  waves barely grow in number while health and boss count climb
-  (`breatherWaveSize`, `endless*` in `balance.json → difficulty`).
+- **Game phases.** Menu → pick screen (`s.phase === 'pick'`: map, Normal/Hard
+  (`s.hard`, plant key on the map row), cat, 3 flowers per player) → waves →
+  won/over overlay. After a win, C carries on into endless mode
+  (`continueEndless`): wave 11 is a smaller breather, then waves barely grow
+  in number while boss count climbs (`breatherWaveSize`, `endless*` in
+  `balance.json → difficulty`).
+- **The difficulty curve.** One rule for every wave, endless included: monster
+  health is ×(1 + `hpGrowth`) a wave, so there are no jumps and a full garden
+  meets a clear wall a few waves after it stops growing. Packs (swarms, wasps)
+  grow up to `packMaxGrowth` times their size but pay for every member, so they
+  don't flood late waves. Hard mode multiplies health and wave size
+  (`difficulty.hard`). Judge changes against these, not with exceptions for
+  particular waves or monsters.
 - **Stop screens.** Pause, defeat and victory share their keys (`keydown` in
   `main.js`, `stopKeys` in `render.js`): R retries the wave (`retryWave`
   rewinds to the checkpoint the sim saves at the start of every break), T
@@ -164,8 +172,8 @@ Check changes like this:
    modules: every price shown matches what each cat pays (planting, upgrades,
    half-paid levels, healing, digging), maps are well formed and every road
    is reachable on foot, monster rules (frost-proof, leaping, enrage, ranged
-   arrival waves, Snapdragon bites), endless mode (breather, wave size, extra
-   health and bosses), retrying a wave (lost or from the pause screen, early waves and endless), every Bloom ability, elite traits and
+   arrival waves, Snapdragon bites), endless mode (breather, wave size, bosses),
+   the health curve, pack sizes, hard mode, retrying a wave (lost or from the pause screen, early waves and endless), every Bloom ability, elite traits and
    each power-up, boss shields and chest perks (each with its switch off too), the same seed gives the same game, the
    autopilot plays every map, a game saved mid-wave and loaded plays on exactly
    like the original, snapshots and inputs survive encoding, and the screens

@@ -47,6 +47,7 @@ export function startLog(s) {
     version: DATA_HASH,
     date: new Date().toISOString(),
     map: s.m.id,
+    hard: !!s.hard, // hard mode (more, tougher monsters)
     players: s.players.map((p) => ({ id: p.id, cat: p.cat, catName: CATS[p.cat]?.name, loadout: p.loadout.slice() })),
     cottageHealth: s.maxLives,
     result: null,

@@ -459,84 +459,87 @@ test('Endless', 'later endless waves stay small but bring more bosses', () => {
   ok(w20.size < w12.size * 1.6, `wave 20 has ${w20.size} monsters, wave 12 ${w12.size}`);
 });
 
-test('Endless', 'from packCutFromWave, swarm and wasp packs are endlessPackSize as big', () => {
-  const D = BALANCE.difficulty, old = D.endlessPackSize;
-  const packs = (mul) => {
-    D.endlessPackSize = mul;
+test('Waves', 'packs grow up to packMaxGrowth times their size', () => {
+  const D = BALANCE.difficulty;
+  // the biggest run of swarm bugs in a row on one road, in a late wave
+  let biggest = 0;
+  for (let seed = 1; seed <= 4; seed++) {
     const s = wonGame();
+    s.rng = seed;
     sim.continueEndless(s);
-    s.wave = D.packCutFromWave + 3; s.phase = 'prep'; s.queue = []; s.enemies = [];
+    s.wave = 39; s.phase = 'prep'; s.queue = []; s.enemies = [];
     tick(s, { ready: true });
-    return s.queue.filter((e) => e.type === 'swarm' || e.type === 'wasp').length;
-  };
-  try {
-    const full = packs(1), small = packs(old);
-    ok(full > 0, 'no packs');
-    near(small / full, old, 0.06, `${small} pack monsters instead of ${full}`);
-  } finally { D.endlessPackSize = old; }
+    let run = 0;
+    s.queue.forEach((e, i) => { run = e.type === 'swarm' && i && s.queue[i - 1].type === 'swarm' && s.queue[i - 1].path === e.path && e.wait <= 0.181 ? run + 1 : 1; if (e.type === 'swarm') biggest = Math.max(biggest, run); });
+  }
+  ok(biggest > 0, 'no swarms in wave 40');
+  // two packs can land back to back on one road, so allow twice the cap
+  ok(biggest <= 2 * Math.round(5 * D.packMaxGrowth), `a run of ${biggest} swarm bugs`);
 });
 
-test('Endless', 'from packCutFromWave, swarm and wasp packs come less often', () => {
-  const D = BALANCE.difficulty, old = D.endlessPackWeight;
-  // the share of pack monsters in wave n over a few seeds, with packs `mul` times as likely
-  const packShare = (n, mul) => {
-    D.endlessPackWeight = mul;
-    let packs = 0, all = 0;
+test('Waves', 'packs pay for every member, so bigger packs use up the wave as fast as smaller ones', () => {
+  const D = BALANCE.difficulty, old = D.packGrowthPerWave;
+  // the wave budget the monsters of wave 9 use up (a pack member costs cost / group), over a few seeds
+  const used = (g) => {
+    D.packGrowthPerWave = g;
+    let n = 0;
     for (let seed = 1; seed <= 6; seed++) {
       const s = game({ cats: ['bomber', 'gardener'], seed });
-      s.wave = TOTAL_WAVES; s.won = true; s.phase = 'wave';
-      sim.continueEndless(s);
-      s.wave = n - 1; s.phase = 'prep'; s.queue = []; s.enemies = [];
+      s.wave = 8; s.phase = 'prep'; s.queue = []; s.enemies = [];
       tick(s, { ready: true });
-      for (const e of s.queue) { all++; if (e.type === 'swarm' || e.type === 'wasp') packs++; }
+      const unit = Object.fromEntries(s.m.waves.map((u) => [u.enemy, u.cost / u.group]));
+      for (const e of s.queue) n += unit[e.type];
     }
-    return packs / all;
+    return n;
   };
   try {
-    const late = D.packCutFromWave + 2, early = D.packCutFromWave - 2;
-    ok(packShare(late, old) < packShare(late, 1), `packs are a smaller share of wave ${late}`);
-    near(packShare(early, old), packShare(early, 1), 1e-9, `wave ${early} is untouched`);
-  } finally { D.endlessPackWeight = old; }
+    const flat = used(0), grown = used(old);
+    near(grown / flat, 1, 0.05, `wave budget used: ${grown.toFixed(0)} with growing packs, ${flat.toFixed(0)} without`);
+  } finally { D.packGrowthPerWave = old; }
 });
 
-test('Endless', 'from packCutFromWave, flying packs (wasps) come even less often', () => {
-  const D = BALANCE.difficulty, old = D.flyingPackWeight;
-  // wasps in a late wave over a few seeds, with flying packs `mul` times as likely
-  const wasps = (n, mul) => {
-    D.flyingPackWeight = mul;
-    let count = 0;
-    for (let seed = 1; seed <= 12; seed++) {
-      const s = game({ cats: ['bomber', 'gardener'], seed });
-      s.wave = TOTAL_WAVES; s.won = true; s.phase = 'wave';
-      sim.continueEndless(s);
-      s.wave = n - 1; s.phase = 'prep'; s.queue = []; s.enemies = [];
-      tick(s, { ready: true });
-      count += s.queue.filter((e) => e.type === 'wasp').length;
-    }
-    return count;
-  };
-  try {
-    const late = D.packCutFromWave + 2, early = D.packCutFromWave - 2;
-    const cut = wasps(late, old), full = wasps(late, 1);
-    ok(old < 1 && cut < full * (old + 0.15), `wave ${late}: ${cut} wasps instead of ${full}`);
-    eq(wasps(early, old), wasps(early, 1), `wave ${early} is untouched`);
-  } finally { D.flyingPackWeight = old; }
-});
-
-test('Endless', 'monsters after the breather get extra health each wave', () => {
+test('Waves', 'every wave is hpGrowth tougher than the last, endless too', () => {
   const s = wonGame(), D = BALANCE.difficulty;
   const gruntIn = (n) => { s.wave = n; sim.spawnEnemy(s, 'grunt', null, 0); return s.enemies.at(-1).maxhp; };
-  const base = (n) => 1 + (n - 1) * D.hpPerWave + (n - 1) ** 2 * D.hpPerWaveSquared;
-  const n = TOTAL_WAVES + 10, extra = 1 + D.endlessHpPerWave * (n - TOTAL_WAVES - 1);
-  near(gruntIn(n) / gruntIn(TOTAL_WAVES + 1), (base(n) / base(TOTAL_WAVES + 1)) * extra, 1e-9, 'wave 20 grunt vs wave 11 grunt');
+  for (const n of [2, 6, TOTAL_WAVES, TOTAL_WAVES + 1, TOTAL_WAVES + 2, TOTAL_WAVES + 15]) near(gruntIn(n) / gruntIn(n - 1), 1 + D.hpGrowth, 1e-9, `wave ${n} grunt vs wave ${n - 1}`);
 });
 
 test('Endless', 'endless bosses have endlessBossHp of the health they would have', () => {
   const s = wonGame(), D = BALANCE.difficulty;
   const bossIn = (n) => { s.wave = n; sim.spawnEnemy(s, 'boss', null, 0); return s.enemies.at(-1).maxhp; };
-  const base = (n) => 1 + (n - 1) * D.hpPerWave + (n - 1) ** 2 * D.hpPerWaveSquared;
-  const n = TOTAL_WAVES + 5, extra = 1 + D.endlessHpPerWave * (n - TOTAL_WAVES - 1);
-  near(bossIn(n) / bossIn(TOTAL_WAVES), (base(n) / base(TOTAL_WAVES)) * extra * D.endlessBossHp, 1e-9, 'wave 15 boss vs wave 10 boss');
+  const n = TOTAL_WAVES + 5;
+  near(bossIn(n) / bossIn(TOTAL_WAVES), (1 + D.hpGrowth) ** (n - TOTAL_WAVES) * D.endlessBossHp, 1e-9, 'wave 15 boss vs wave 10 boss');
+});
+
+test('Waves', 'hard mode: monsters have hard.enemyHp health and hard.waveSize as many come', () => {
+  const H = BALANCE.difficulty.hard;
+  const wave = (hard) => {
+    let n = 0, hp = 0;
+    for (let seed = 1; seed <= 6; seed++) {
+      const s = game({ cats: ['bomber', 'gardener'], seed });
+      s.hard = hard;
+      s.wave = 7; s.phase = 'prep'; s.queue = []; s.enemies = [];
+      tick(s, { ready: true });
+      n += s.queue.length;
+      sim.spawnEnemy(s, 'grunt', null, 0); hp = s.enemies.at(-1).maxhp;
+    }
+    return { n, hp };
+  };
+  const normal = wave(false), hard = wave(true);
+  near(hard.hp / normal.hp, H.enemyHp, 1e-9, 'grunt health');
+  near(hard.n / normal.n, H.waveSize, 0.12, `${hard.n} monsters instead of ${normal.n}`);
+});
+
+test('Waves', 'the plant key on the map row switches hard mode, and everyone confirms again', () => {
+  const s = sim.createState(2, 1, { map: 0 });
+  s.players.forEach((p) => { p.pick.chosen = ['thorn', 'frost', 'daisy']; });
+  s.players[1].pick.ready = true;
+  s.players[0].pick.row = 0;
+  eq(s.hard, false, 'starts on normal');
+  sim.step(s, [{ buildTap: true }, {}], DT);
+  eq(s.hard, true, 'hard after the plant key');
+  eq(s.players[1].pick.ready, false, 'the other cat is no longer ready');
+  eq(sim.createState(1, 1, { hard: true }).hard, true, 'last game\'s choice carries over');
 });
 
 test('Endless', 'a lost endless wave can be retried from the break before it', () => {
