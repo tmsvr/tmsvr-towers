@@ -55,6 +55,7 @@ Claude Code users: `.claude/launch.json` defines this server as `towers`
 | `src/predict.js` | Guest-side prediction of its own cat, reconciled with the host |
 | `src/save.js` | Saved games (S on the pause screen, O on the menu): the whole state as JSON, keeping shared references (`$id`/`$ref`) and naming shared data (monster types, maps) |
 | `src/util.js` | Seeded RNG, `clamp`, small helpers |
+| `src/version.js` | `BUILD`, the build number shown in the bottom-right corner of the menu and pause screen (the commit count) |
 | `tools/bot.js` | Autopilot that plays whole games through the real sim, copying real co-op habits (`HABITS` at the top) |
 | `tools/balance-test.html` | UI for running the autopilot over many seeds and maps |
 | `tools/gallery.html` | Every flower at every level, every cat (standing and swinging) and every monster, drawn with the real render code. `?zoom=5` for close-ups |
@@ -231,6 +232,9 @@ code listed (and its tests, `_help` entry and log fields), and bump
 
 ## Deploying
 
+- **Bump `BUILD` in `src/version.js` in every commit you push**, to what
+  `git rev-list --count HEAD` will be once that commit is made (today's count
+  + 1). The menu shows it, so players can see which version is live.
 - Push to `main` → GitHub Pages redeploys (about 1 minute). Live at
   https://tmsvr.github.io/tmsvr-towers/
 - Check the build: `gh api repos/tmsvr/tmsvr-towers/pages/builds/latest --jq .status`

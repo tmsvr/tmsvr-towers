@@ -18,6 +18,7 @@ import { isMuted } from './audio.js';
 import { observeJuice, drawJuiceWorld, drawJuiceScreen, hitSquash, swingSquash, coinScale } from './juice.js';
 import { liveEffects } from './fx.js';
 import { clamp, seededRandom } from './util.js';
+import { BUILD } from './version.js';
 
 // The screen. Everything is laid out for the base size, BASE_W x BASE_H (an
 // 18 x 10 tile view plus the HUD); a window of another shape makes the view
@@ -2355,6 +2356,9 @@ function drawMenu(c, time, ui) {
   label(c, `Defend the cottage for ${TOTAL_WAVES} waves, then keep going in endless mode.`, cx, 512, 13, '#8fa5b3', 'center', 500, null);
 }
 
+// Which version this is, small in the bottom-right corner (menu and pause screen).
+const drawBuild = (c) => label(c, `build ${BUILD}`, VIEW_W - 12, VIEW_H - 12, 11, '#6f8291', 'right', 500, null);
+
 // The strip under the map on the menu: the keys every screen shares, across the whole width.
 function drawMenuKeys(c) {
   const cx = VIEW_W / 2;
@@ -2404,7 +2408,7 @@ export function render(c, s, ui) {
     drawCottage(c, m.base.x, m.base.y, 1, 1, 0, time);
     c.restore();
     if (ui.guide != null) inFrame(c, () => drawGuide(c, time, ui.guide));
-    else { inFrame(c, () => drawMenu(c, time, ui), true); drawMenuKeys(c); }
+    else { inFrame(c, () => drawMenu(c, time, ui), true); drawMenuKeys(c); drawBuild(c); }
     if (ui.note && performance.now() < ui.note.until) label(c, ui.note.txt, VIEW_W / 2, MAP_H - 10, 16, '#ffffff', 'center', 700); // between the menu and its key strip
     return;
   }
@@ -2460,7 +2464,7 @@ export function render(c, s, ui) {
   if (s.chest && !ui.disconnected) inFrame(c, () => drawChest(c, s, ui, time), true);
   if (ui.guide != null) inFrame(c, () => drawGuide(c, time, ui.guide));
   if (ui.disconnected) inFrame(c, () => drawOverlay(c, 'Disconnected', ['The connection to the host was lost', 'M or Esc: menu'], '#ff7a6a'));
-  else if (ui.paused) inFrame(c, () => drawPause(c, s));
+  else if (ui.paused) { inFrame(c, () => drawPause(c, s)); drawBuild(c); }
   else if (s.over || s.won) inFrame(c, () => drawEndScreen(c, s, ui, time));
   if (ui.note && performance.now() < ui.note.until) label(c, ui.note.txt, VIEW_W / 2, MAP_H - 24, 16, '#ffffff', 'center', 700);
 }
