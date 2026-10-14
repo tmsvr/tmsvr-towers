@@ -100,8 +100,8 @@ show('Game, co-op, with a banner and intro cards', duo, ui({ cam: camOn(duo, duo
 show('Game, online (status label)', duo, ui({ cam: camOn(duo, duo.players[0]), netLabel: 'Online · room HDPM · P2 connected', perf: '42 ms · 60 fps · 18 ms', mode: () => 'host' }));
 show('Game, solo', solo, ui({ cam: camOn(solo, solo.players[0]) }));
 
-const chestOf = (s) => ({ offers: s.players.map((p, i) => i ? ['thumb', 'roof', 'pouch'] : ['paws', 'roots', `fourth:${FLOWER_ORDER.find((t) => !p.loadout.includes(t))}`]), cursor: s.players.map(() => 1), picked: s.players.map(() => null) });
-duo.chest = chestOf(duo); show('Boss chest, co-op', duo, ui({ cam: camOn(duo, duo.players[0]) })); duo.chest = null;
+const chestOf = (s) => ({ offers: s.players.map((p, i) => i ? ['thumb', 'roof', 'pouch'] : ['paws', 'roots', `fourth:${FLOWER_ORDER.find((t) => !p.loadout.includes(t))}`]), cursor: s.players.map(() => 1), picked: s.players.map(() => null), lock: 0 });
+duo.chest = { ...chestOf(duo), lock: 0.5 }; show('Boss chest, co-op, just opened (locked)', duo, ui({ cam: camOn(duo, duo.players[0]) })); duo.chest = null;
 solo.chest = chestOf(solo); show('Boss chest, solo', solo, ui({ cam: camOn(solo, solo.players[0]) })); solo.chest = null;
 show('Pause, co-op with perks', duo, ui({ cam: camOn(duo, duo.players[0]), paused: true }));
 show('Pause, solo without perks', solo, ui({ cam: camOn(solo, solo.players[0]), paused: true }));

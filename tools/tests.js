@@ -972,12 +972,15 @@ function clearBossWave(cats = ['gardener', 'scout']) {
   tick(s);
   return s;
 }
+// Let the chest's lock run out, nobody pressing anything.
+function waitOutLock(s) { while (s.chest?.lock > 0) sim.step(s, s.players.map(() => ({})), DT); }
 
 test('Boss chests', 'a wave with a boss kill ends with a chest; the game waits for every pick', () => {
   const s = clearBossWave();
   ok(s.chest, 'no chest');
   for (const o of s.chest.offers) eq(o.length, CHEST.choices, 'offers');
   const t0 = s.t;
+  waitOutLock(s);
   sim.step(s, [{ buildTap: true }, {}], DT);
   ok(s.chest && s.chest.picked[0] && s.chest.picked[1] == null, 'P1 picked, P2 not yet');
   for (let i = 0; i < 30; i++) sim.step(s, [{}, {}], DT);
@@ -989,6 +992,21 @@ test('Boss chests', 'a wave with a boss kill ends with a chest; the game waits f
   eq(s.stats.waves.at(-1).perks.length, 2, 'logged');
   eq(s.stats.waves.at(-1).perks[1][1], want, "P2's perk");
   withSwitch(CHEST, false, () => ok(!clearBossWave().chest, 'a chest while switched off'));
+});
+
+test('Boss chests', 'for a moment nothing can be picked, and keys held through it must be pressed again', () => {
+  const s = clearBossWave();
+  ok(CHEST.lockSeconds > 0 && s.chest.lock > 0, 'the chest opens locked');
+  // a cat still mashing plant and baton, and moving, as the chest pops up
+  for (let t = 0; t < CHEST.lockSeconds - 0.1; t += DT) sim.step(s, [{ buildTap: true, atk: true, mx: 1 }, { buildTap: true }], DT);
+  eq(s.chest.picked.join(','), ',', 'nothing picked while locked');
+  eq(s.chest.cursor.join(','), '0,0', 'cursors did not move');
+  while (s.chest.lock > 0) sim.step(s, [{ atk: true }, {}], DT);
+  sim.step(s, [{ atk: true }, {}], DT);
+  eq(s.chest.picked[0], null, 'a baton held through the lock does not pick');
+  sim.step(s, [{}, {}], DT);
+  sim.step(s, [{ atk: true }, {}], DT);
+  ok(s.chest.picked[0], 'pressed again, it picks');
 });
 
 test('Cats', 'two bombs need two presses at least a moment apart', () => {

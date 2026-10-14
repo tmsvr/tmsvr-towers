@@ -2097,6 +2097,14 @@ function drawChest(c, s, ui, time) {
     if (picked != null) label(c, 'Picked!', cx, 372, 15, '#8dff9a', 'center', 700, null);
   });
   const k = (id) => ui.keyLabel(ui.keysFor(id).build), a = (id) => ui.keyLabel(ui.keysFor(id).atk);
+  // while the chest is locked, a bar fills up instead of the keys
+  if (ch.lock > 0) {
+    const k = 1 - ch.lock / (CHEST.lockSeconds || 1), bw = 220, bx = BASE_W / 2 - bw / 2;
+    label(c, 'Have a look first…', BASE_W / 2, BASE_MAP_H - 46, 15, '#cfe0ea', 'center', 600, null);
+    rrect(c, bx, BASE_MAP_H - 30, bw, 8, 4, 'rgba(255,255,255,0.12)');
+    rrect(c, bx, BASE_MAP_H - 30, Math.max(8, bw * k), 8, 4, '#ffe27a');
+    return;
+  }
   const L = (id) => ui.keysFor(id), pair = (id) => `${ui.keyLabel(L(id).left)}/${ui.keyLabel(L(id).right)}`;
   const keys = ui.mode() === 'local' && n > 1 ? `P1: ${pair(0)} choose, ${k(0)} or ${a(0)} take  ·  P2: ${pair(1)} choose, ${k(1)} or ${a(1)} take` : `${pair(0)} or ←/→ to choose  ·  ${k(0)} or ${a(0)} to take it`;
   label(c, keys, BASE_W / 2, BASE_MAP_H - 40, 15, '#fff', 'center', 600, null);

@@ -9,7 +9,7 @@ import { ENEMIES, FLOWER_ORDER, CAT_ORDER, ELITE_TRAITS, ITEM_KINDS, PERKS } fro
 // so small numbers take one byte and a position in tenths of a pixel three.
 // Bump whenever a message changes shape, so mismatched copies refuse to play
 // together instead of misreading each other (checked when a guest joins).
-export const PROTOCOL = 11;
+export const PROTOCOL = 12;
 
 const utf8 = new TextEncoder(), fromUtf8 = new TextDecoder();
 
@@ -116,7 +116,7 @@ const itemKind = oneOf([null, ...ITEM_KINDS]);
 
 // ---- the snapshot -------------------------------------------------------------
 // A boss chest being opened: each cat's offers, where its cursor is, what it took.
-const CHEST = struct([['offers', listOf(listOf(text))], ['cursor', listOf(int)], ['picked', listOf(maybe(text))]]);
+const CHEST = struct([['offers', listOf(listOf(text))], ['cursor', listOf(int)], ['picked', listOf(maybe(text))], ['lock', r2]]);
 
 const GAME = struct([
   ['lives', r1], ['wave', int], ['phase', oneOf(PHASES)], ['timer', r1], ['queue', count], ['over', bool], ['won', bool],

@@ -683,14 +683,21 @@ function openChest(s) {
   s.chestDue = false;
   const offers = s.players.map((p) => rollOffers(s, p));
   if (offers.every((o) => !o.length)) return; // every perk taken as often as it can be
-  s.chest = { offers, cursor: s.players.map(() => 0), picked: offers.map((o) => (o.length ? null : '')) };
+  // lock: for a moment nothing can be picked, so a cat busy planting or bonking as the wave ends doesn't take a perk by accident
+  s.chest = { offers, cursor: s.players.map(() => 0), picked: offers.map((o) => (o.length ? null : '')), lock: CHEST.lockSeconds ?? 0 };
   for (const p of s.players) { p.prevAtk = true; p.prevMx = 0; } // a baton held as the wave ends doesn't pick
   ev(s, 'chest');
 }
 
-// Left/right moves along the cards; the plant or baton key takes one.
-function updateChest(s, inputs) {
+// Left/right moves along the cards; the plant or baton key takes one, once
+// the chest's lock is over (keys held through it have to be pressed again).
+function updateChest(s, inputs, dt) {
   const ch = s.chest;
+  if (ch.lock > 0) {
+    ch.lock = Math.max(0, ch.lock - dt);
+    for (const p of s.players) { const inp = inputs[p.id] || {}; p.prevAtk = !!inp.atk; p.prevMx = Math.sign(inp.mx || 0); }
+    return;
+  }
   for (const p of s.players) {
     const i = p.id, inp = inputs[i] || {}, n = ch.offers[i].length;
     const mx = Math.sign(inp.mx || 0), atkTap = inp.atk && !p.prevAtk;
@@ -1282,7 +1289,7 @@ function updatePick(s, inputs) {
 export function step(s, inputs, dt) {
   if (s.phase === 'pick') { updatePick(s, inputs); return; }
   if (s.over || s.won) return;
-  if (s.chest) { updateChest(s, inputs); return; } // everything waits for the picks
+  if (s.chest) { updateChest(s, inputs, dt); return; } // everything waits for the picks
   s.t += dt;
   s.baseHitT = Math.max(0, s.baseHitT - dt);
   const ready = updatePlayers(s, dt, inputs);
