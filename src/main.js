@@ -225,8 +225,11 @@ function flashNote(txt) { ui.note = { txt, until: performance.now() + 2500 }; }
 // ---- modes ------------------------------------------------------------------
 let lastLoadouts = [], lastCats = [];
 let lastMap = 0, lastHard = false;
+// Online the guest asks for the state it wants, not a flip: if both cats press
+// Esc at once, or the guest presses again before the pause reaches its screen,
+// two flips would cancel out and the game would flicker in and out of pause.
 function togglePause() {
-  if (mode === 'guest') net.send({ t: 'pause' });
+  if (mode === 'guest') net.send({ t: 'pause', on: !ui.paused });
   else if (mode === 'local' || mode === 'host') ui.paused = !ui.paused;
 }
 
@@ -432,7 +435,7 @@ function onGuestMessage(m) {
   if (m.t === 'hello') { welcomeGuest(m); return; }
   if (!guestOk) return;
   if (m.t === 'in') host.receiveInputs(m.inputs);
-  else if (m.t === 'pause') ui.paused = !ui.paused;
+  else if (m.t === 'pause') ui.paused = typeof m.on === 'boolean' ? m.on : !ui.paused;
   else if (m.t === 'restart' && state && (state.over || state.won || ui.paused)) newGame();
   else if (m.t === 'continue' && state?.won) keepGoing();
   else if (m.t === 'retry' && state && (state.over || ui.paused)) retry();
