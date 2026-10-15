@@ -35,8 +35,8 @@ them.
 - Before each game, pick a map, a cat and 3 of the 7 flowers. Two players can't
   pick the same cat: Brick (slow, big hits), Zip (fast, light hits), Fern
   (grows and heals faster) or Boom (faster, bigger bombs). On the map row, E
-  switches between **Normal** and **Hard** (more monsters, and tougher: for
-  players whose gardens hold Normal with lots to spare).
+  switches between **Normal** and **Hard** (more and much tougher monsters,
+  and fewer coins: for players whose gardens hold Normal with lots to spare).
 - Standing on a flower, hold E to upgrade it and R to heal it. Q switches E to
   dig-up mode, which removes the flower and refunds part of what was spent on it.
 - At level 5 every flower **blooms**: it sparkles and gains a special ability

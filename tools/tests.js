@@ -530,6 +530,24 @@ test('Waves', 'hard mode: monsters have hard.enemyHp health and hard.waveSize as
   near(hard.n / normal.n, H.waveSize, 0.12, `${hard.n} monsters instead of ${normal.n}`);
 });
 
+test('Waves', 'hard mode: monsters drop hard.coins as many coins', () => {
+  const coinsFrom = (hard) => {
+    let n = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const s = game({ cats: ['bomber'], seed });
+      s.hard = hard; s.wave = 1;
+      sim.spawnEnemy(s, 'tank', null, 0);
+      const e = s.enemies.at(-1);
+      s.drops.length = 0;
+      sim.damage(s, e, 1e9, true);
+      n += s.drops.reduce((a, d) => a + d.value, 0);
+    }
+    return n;
+  };
+  const normal = coinsFrom(false), hard = coinsFrom(true);
+  near(hard / normal, BALANCE.difficulty.hard.coins, 0.08, `${hard} coins instead of ${normal}`);
+});
+
 test('Waves', 'the plant key on the map row switches hard mode, and everyone confirms again', () => {
   const s = sim.createState(2, 1, { map: 0 });
   s.players.forEach((p) => { p.pick.chosen = ['thorn', 'frost', 'daisy']; });

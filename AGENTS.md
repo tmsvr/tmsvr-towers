@@ -111,8 +111,8 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
   health is ×(1 + `hpGrowth`) a wave, so there are no jumps and a full garden
   meets a clear wall a few waves after it stops growing. Packs (swarms, wasps)
   grow up to `packMaxGrowth` times their size but pay for every member, so they
-  don't flood late waves. Hard mode multiplies health and wave size
-  (`difficulty.hard`). Judge changes against these, not with exceptions for
+  don't flood late waves. Hard mode multiplies health, wave size and
+  coin drops (`difficulty.hard`). Judge changes against these, not with exceptions for
   particular waves or monsters.
 - **Stop screens.** Pause, defeat and victory share their keys (`keydown` in
   `main.js`, `stopKeys` in `render.js`): R retries the wave (`retryWave`
