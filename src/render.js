@@ -13,7 +13,8 @@ import {
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, GLOBAL_RANGE, ENEMIES, INTROS,
   BLOOM, bloomOf, ELITES, CHEST, ECONOMY,
 } from './data.js';
-import { tileOf, canBuildAt, uprootRefund, catStats, plantPrice, upgradeLeft, healLeft } from './sim.js';
+import { tileOf, canBuildAt, uprootRefund, catStats, plantPrice, upgradeLeft, healLeft, lastWave, modeName, scoreOf, wavesCleared } from './sim.js';
+import { codeOf, encodeCode } from './challenge.js';
 import { isMuted } from './audio.js';
 import { observeJuice, drawJuiceWorld, drawJuiceScreen, hitSquash, swingSquash, coinScale } from './juice.js';
 import { liveEffects } from './fx.js';
@@ -1800,7 +1801,8 @@ function drawHud(c, s, time, ui) {
   rrect(c, 40, y0 + 22, 150, 16, 8, 'rgba(0,0,0,0.45)', s.baseHitT > 0 ? '#ff6a5a' : OUT, 2);
   rrect(c, 42, y0 + 24, Math.max(0, 146 * hr), 12, 6, hr > 0.5 ? '#6be06b' : hr > 0.25 ? '#ffd23f' : '#ff6a5a');
   label(c, `${Math.ceil(s.lives)} / ${s.maxLives}`, 115, y0 + 30.5, 12, '#ffffff', 'center', 700);
-  label(c, (s.endless ? `Wave ${s.wave} · endless` : `Wave ${Math.max(1, s.wave)}/${TOTAL_WAVES}`) + (s.hard ? ' · hard' : ''), 14, y0 + 58, 16, s.endless || s.hard ? '#ffb86b' : '#e8f1f7', 'left', 600, null);
+  const tag = s.sprint ? (s.hard ? ' · sprint, hard' : ' · sprint') : s.hard ? ' · hard' : '';
+  label(c, fitText(c, (s.endless ? `Wave ${s.wave} · endless` : `Wave ${Math.max(1, s.wave)}/${lastWave(s)}`) + tag, 228, 16, 600), 14, y0 + 58, 16, s.endless || s.hard || s.sprint ? '#ffb86b' : '#e8f1f7', 'left', 600, null);
   const status = s.phase === 'pick' ? 'Choosing flowers' : s.phase === 'prep' ? `Next in ${Math.ceil(s.timer)}s · Enter` : `${s.enemies.length + s.queue.length} enemies left`;
   label(c, status, 14, y0 + 78, 12, '#a9bccb', 'left', 500, null);
   label(c, isMuted() ? '🔇' : '', 220, y0 + 30, 14, '#fff', 'center', 500, null);
@@ -1952,10 +1954,12 @@ function drawMapCarousel(c, s, ui, time) {
   pos = Math.abs(d) < 0.01 ? s.map : pos + d * Math.min(1, dt * 12);
   ui.mapPos = ((pos % N) + N) % N;
   label(c, `Map ${s.map + 1} / ${N}`, 16, 20, 13, '#8fa5b3', 'left', 600, null);
-  // difficulty: the plant key on the map row switches it
-  const hw = 74, hx = 108;
-  rrect(c, hx, 10, hw, 20, 10, s.hard ? 'rgba(255,106,90,0.25)' : 'rgba(255,255,255,0.06)', s.hard ? '#ff6a5a' : 'rgba(255,255,255,0.25)', 1.5);
-  label(c, s.hard ? 'Hard' : 'Normal', hx + hw / 2, 20.5, 12, s.hard ? '#ffb3a8' : '#cfe0ea', 'center', 700, null);
+  // the mode: the plant key on the map row switches it (Normal, Hard, Sprint, Sprint · Hard)
+  const hw = 104, hx = 108, hot = s.hard || s.sprint;
+  rrect(c, hx, 10, hw, 20, 10, hot ? 'rgba(255,106,90,0.25)' : 'rgba(255,255,255,0.06)', hot ? '#ff6a5a' : 'rgba(255,255,255,0.25)', 1.5);
+  label(c, modeName(s), hx + hw / 2, 20.5, 12, hot ? '#ffb3a8' : '#cfe0ea', 'center', 700, null);
+  // the challenge code: anyone who types it in meets these same waves
+  label(c, `${s.locked ? '🔒 ' : ''}Code ${codeOf(s)}`, BASE_W - 128, 20.5, 12, s.locked ? '#ffe27a' : '#8fa5b3', 'right', 600, null);
   for (let i = 0; i < N; i++) {
     const k = wrap(i - ui.mapPos);
     if (Math.abs(k) > 2.6) continue;
@@ -2038,7 +2042,7 @@ function drawPick(c, s, ui, time) {
     const y = y0 + ch + 20 + i * 24;
     const n = p.pick.chosen.length;
     const L = ui.keyLabel;
-    const keys = p.pick.row === 0 ? `[${L(k.left)}/${L(k.right)}] change map · [${L(k.build)}] ${s.hard ? 'normal' : 'hard'} mode · [${L(k.down)}] cats`
+    const keys = p.pick.row === 0 ? (s.locked ? `map and mode are set by the challenge · [${L(k.down)}] cats` : `[${L(k.left)}/${L(k.right)}] change map · [${L(k.build)}] mode · [${L(k.down)}] cats`)
       : p.pick.row === 1 ? `[${L(k.left)}/${L(k.right)}] change cat · [${L(k.up)}] map · [${L(k.down)}] flowers`
       : `[${L(k.left)}/${L(k.right)}] move · [${L(k.build)}] pick · [${L(k.up)}] cats · [${L(k.atk)}] ready`;
     const who = `${CATS[p.cat].name}, `;
@@ -2131,23 +2135,32 @@ const monsterName = (t) => (INTROS[t]?.[0] || t[0].toUpperCase() + t.slice(1) + 
 const retryWaveNo = (s) => (s.over || s.phase === 'wave' ? s.wave : s.wave + 1);
 function stopKeys(s, extra = '') {
   const retry = s.won || s.phase === 'pick' ? '' : `R: retry wave ${Math.max(1, retryWaveNo(s))}  ·  `;
-  return `${s.won ? 'C: keep going (endless)  ·  ' : ''}${retry}T: new game  ·  M: menu${extra}`;
+  const share = s.over || s.won ? 'X: copy result  ·  ' : '';
+  return `${s.won ? 'C: keep going (endless)  ·  ' : ''}${retry}${share}T: new game  ·  M: menu${extra}`;
+}
+// The score line on the end screens, with this browser's best for the same game.
+function scoreLine(s, ui) {
+  const b = ui.best, score = num(scoreOf(s));
+  if (!b) return `Score ${score}`;
+  if (b.isNew) return `Score ${score}  ·  ${b.prev == null ? 'first score' : 'new best'} for ${b.what}!`;
+  return `Score ${score}  ·  best ${num(b.prev)} for ${b.what}`;
 }
 
 function drawEndScreen(c, s, ui, time) {
   const won = s.won, S = ui.summary;
   const col = won ? '#8dff9a' : '#ff7a6a';
   const keys = stopKeys(s, '  ·  L: game log');
-  const head = won ? `All ${TOTAL_WAVES} waves defended  ·  ${num(s.kills)} monsters bonked` : `You reached ${s.endless ? 'endless ' : ''}wave ${s.wave}  ·  ${num(s.kills)} monsters bonked`;
-  if (!S) { drawOverlay(c, won ? 'Victory!' : 'The garden fell…', [head, keys], col); return; }
+  const head = won ? `All ${lastWave(s)} waves defended  ·  ${num(s.kills)} monsters bonked` : `You reached ${s.endless ? 'endless ' : ''}wave ${s.wave}  ·  ${num(s.kills)} monsters bonked`;
+  if (!S) { drawOverlay(c, won ? 'Victory!' : 'The garden fell…', [head, scoreLine(s, ui), keys], col); return; }
   dim(c, 'rgba(12,18,26,0.88)');
   // the two panels are as tall as their contents (a solo game has one cat, few flowers), centred
   const rowH = 46, blockH = 150;
   const h = clamp(Math.max(70 + S.flowers.length * rowH + (S.best ? 34 : 0), 52 + S.cats.length * (blockH + 8)), 250, 430);
   const top = Math.round((BASE_H - h) / 2) + 6;
-  label(c, won ? 'Victory!' : 'The garden fell…', BASE_W / 2, top - 72, 46, col, 'center', 700, OUT);
-  const where = won ? `All ${TOTAL_WAVES} waves` : S.wave > TOTAL_WAVES ? `Endless wave ${S.wave}` : `Wave ${S.wave}/${TOTAL_WAVES}`;
-  label(c, `${where}  ·  ${clock(S.seconds)}  ·  ${num(S.kills)} monsters bonked  ·  cottage ${S.cottage}/${S.maxCottage}`, BASE_W / 2, top - 28, 18, '#e8f1f7', 'center', 500, null);
+  label(c, won ? 'Victory!' : 'The garden fell…', BASE_W / 2, top - 92, 46, col, 'center', 700, OUT);
+  const where = won ? `All ${lastWave(s)} waves` : S.wave > lastWave(s) ? `Endless wave ${S.wave}` : `Wave ${S.wave}/${lastWave(s)}`;
+  label(c, fitText(c, `${where}  ·  ${clock(S.seconds)}  ·  ${num(S.kills)} monsters bonked  ·  cottage ${S.cottage}/${S.maxCottage}`, BASE_W - 40, 18), BASE_W / 2, top - 50, 18, '#e8f1f7', 'center', 500, null);
+  label(c, fitText(c, `${scoreLine(s, ui)}  ·  ${modeName(s)}  ·  code ${codeOf(s)}`, BASE_W - 40, 17, 700), BASE_W / 2, top - 22, 17, '#ffe27a', 'center', 700, null);
 
   // flowers: damage per type, biggest first
   const fx = 32, fw = 540;
@@ -2352,12 +2365,20 @@ function drawMenu(c, time, ui) {
     if (ci === 0 && ri) { rrect(c, cols[0] - 16, 352 + ri * 26 - 10, 32, 20, 10, PLAYER.scarves[ri - 1]); label(c, t, cols[0], 352 + ri * 26 + 0.5, 12, '#fff', 'center', 700, null); return; }
     label(c, t, cols[ci], 352 + ri * 26, ri ? 16 : 12, ri ? '#fff' : '#8fa5b3', 'center', ri ? 600 : 500, null);
   }));
-  const tips = [
-    'Build mode, then hold the plant key to grow a flower; hold heal on a worn one.',
-    `Each cat picks ${LOADOUT_SIZE} of the ${FLOWER_ORDER.length} flowers · Dig a flower up for ${Math.round(ECONOMY.uprootRefund * 100)}% of its coins back.`,
-  ];
-  tips.forEach((t, i) => label(c, t, cx, 462 + i * 24, 14, '#cfe0ea', 'center', 500, null));
-  label(c, `Defend the cottage for ${TOTAL_WAVES} waves, then keep going in endless mode.`, cx, 512, 13, '#8fa5b3', 'center', 500, null);
+  // challenges: the same waves for everyone with the same code, to compare scores
+  const ch = ui.challenge;
+  if (ch) {
+    const m = MAPS[ch.map];
+    c.globalAlpha = 0.8 + Math.sin(time * 4) * 0.2;
+    label(c, fitText(c, `${ch.day ? `Daily challenge ${ch.day}` : 'Challenge'} ${encodeCode(ch)} · ${m?.name} · ${modeName(ch)} — start any game  ·  K: clear`, 700, 16, 700), cx, 458, 16, '#8dff9a', 'center', 700, null);
+    c.globalAlpha = 1;
+  } else {
+    const ks = [['D', 'Daily challenge'], ['K', 'Play a challenge code']];
+    let x = cx - chipsWidth(c, ks, 15, 22) / 2;
+    for (const [key, txt] of ks) x += keyChip(c, x, 458, key, txt, 15) + 22;
+  }
+  label(c, `Each cat picks ${LOADOUT_SIZE} of the ${FLOWER_ORDER.length} flowers · Dig a flower up for ${Math.round(ECONOMY.uprootRefund * 100)}% of its coins back.`, cx, 488, 14, '#cfe0ea', 'center', 500, null);
+  label(c, `Defend the cottage for ${TOTAL_WAVES} waves (or a ${lastWave({ sprint: true })}-wave Sprint), then keep going in endless mode.`, cx, 512, 13, '#8fa5b3', 'center', 500, null);
 }
 
 // Which version this is, small in the bottom-right corner (menu and pause screen).

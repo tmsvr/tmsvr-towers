@@ -4,7 +4,8 @@
 //   local     – this browser runs the game for 1 or 2 players on one keyboard
 //   host      – this browser runs the game; player 2's inputs arrive over the network (host.js)
 //   guest     – this browser only sends inputs and draws snapshots from the host (guest.js)
-import { createState, step, continueEndless, retryWave, canRetry } from './sim.js';
+import { createState, step, continueEndless, retryWave, canRetry, setChallenge, scoreOf, modeName } from './sim.js';
+import { randomSeed, encodeCode, decodeCode, codeOf, dailyChallenge, shareText } from './challenge.js';
 import { finishLog, currentLog, gameSummary } from './stats.js';
 import { render, setView, VIEW_W, MAP_H, BASE_W, BASE_H } from './render.js';
 import { initAudio, play, toggleMute, setMusicMood } from './audio.js';
@@ -80,6 +81,7 @@ const ui = {
   keysFor: (pid) => (mode === 'local' ? KEYS[pid] : KEYS[0]),
   keyLabel: (code) => DEFAULT_LABELS[code] || code.replace(/^Key|^Digit/, ''),
   mode: () => mode,
+  challenge: null, best: null,
 };
 fitCanvas();
 // While the window is being resized the browser can swallow key releases, so a
@@ -121,7 +123,7 @@ function collectInputs() {
 
 addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement) {
-    if (e.code === 'Escape') backToMenu();
+    if (e.code === 'Escape') { if (mode === 'codeInput') closeCodeEntry(); else backToMenu(); }
     return;
   }
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Slash', 'Enter', 'Quote'].includes(e.code)) e.preventDefault();
@@ -157,11 +159,14 @@ addEventListener('keydown', (e) => {
   const stopped = inGame && state && (state.over || state.won || ui.paused);
   if (code === 'KeyM' && inGame && (stopped || ui.disconnected)) { backToMenu(); return; }
   if (code === 'KeyS' && ui.paused && inGame) { saveToFile(); return; }
+  if (code === 'KeyX' && inGame && state && (state.over || state.won) && state.phase !== 'pick') { copyResult(); return; }
   if (mode === 'menu') {
     // still connected after a game: 3 or Enter plays again together, any other mode leaves
     if (ui.online && (code === 'Digit3' || code === 'Numpad3' || code === 'Enter')) { playAgainOnline(); return; }
     if (ui.online && /^(Digit|Numpad)[124]$/.test(code)) leaveOnline();
     if (code === 'KeyO') openSaveFile();
+    if (code === 'KeyD') setDaily();
+    if (code === 'KeyK') { if (ui.challenge) { ui.challenge = null; flashNote('Challenge cleared'); } else showCodeEntry(); }
     if (code === 'Digit1' || code === 'Numpad1') startLocal(1);
     if (code === 'Digit2' || code === 'Numpad2') startLocal(2);
     if (code === 'Digit3' || code === 'Numpad3') startHost();
@@ -222,9 +227,59 @@ function downloadJson(text, what) {
 }
 function flashNote(txt) { ui.note = { txt, until: performance.now() + 2500 }; }
 
+// ---- challenges and scores -------------------------------------------------------
+// A challenge (a code typed in with K, or today's with D) fixes the seed, map
+// and mode of every game started until it is cleared, so everyone who plays it
+// meets the same waves. ui.challenge = { seed, map, hard, sprint, day? }.
+function setDaily() {
+  ui.challenge = dailyChallenge();
+  flashNote(`Daily challenge ${encodeCode(ui.challenge)} ready: start a game`);
+}
+
+function showCodeEntry() {
+  mode = 'codeInput';
+  showLobby(`<h2>Play a challenge code</h2><p>Everyone with the same code meets the same waves.</p>
+    <form id="codeform"><input id="code" maxlength="7" autocomplete="off" spellcheck="false" placeholder="ABC-DEF"><button>Use</button></form>
+    <p class="hint" id="codehint">Esc to cancel</p>`);
+  const input = document.getElementById('code');
+  input.focus();
+  document.getElementById('codeform').onsubmit = (ev) => {
+    ev.preventDefault();
+    const c = decodeCode(input.value);
+    if (!c) { document.getElementById('codehint').textContent = "That isn't a code: six letters and digits, like ABC-DEF"; return; }
+    ui.challenge = c;
+    closeCodeEntry();
+    flashNote(`Challenge ${encodeCode(c)} ready: start a game`);
+  };
+}
+function closeCodeEntry() { mode = 'menu'; hideLobby(); canvas.focus(); }
+
+function copyResult() {
+  const text = shareText(state, { daily: ui.challenge?.day && encodeCode(ui.challenge) === codeOf(state) ? ui.challenge.day : null });
+  navigator.clipboard.writeText(text).then(() => flashNote('Result copied: paste it in the chat'), () => flashNote("Couldn't copy (the browser said no)"));
+}
+
+// Personal bests, kept in this browser: per challenge code when one is being
+// played, otherwise per map, mode and number of players.
+const BEST_KEY = 'petalpatrol-best';
+function recordBest() {
+  const s = state, score = scoreOf(s), n = s.players.length;
+  const code = s.locked ? codeOf(s) : null;
+  const key = code ? `code ${code} ${n}p` : `${s.m.id} ${modeName(s)} ${n}p`;
+  let bests = {};
+  try { bests = JSON.parse(localStorage.getItem(BEST_KEY)) || {}; } catch { /* blocked */ }
+  const prev = bests[key]?.score ?? null;
+  const isNew = prev == null || score > prev;
+  if (isNew) {
+    bests[key] = { score, wave: s.wave, date: new Date().toISOString().slice(0, 10) };
+    try { localStorage.setItem(BEST_KEY, JSON.stringify(bests)); } catch { /* storage full or blocked */ }
+  }
+  ui.best = { score, prev, isNew, what: code ? `code ${code}` : `${s.m.name} · ${modeName(s)} · ${n === 1 ? 'solo' : `${n} players`}` };
+}
+
 // ---- modes ------------------------------------------------------------------
 let lastLoadouts = [], lastCats = [];
-let lastMap = 0, lastHard = false;
+let lastMap = 0, lastHard = false, lastSprint = false;
 // Online the guest asks for the state it wants, not a flip: if both cats press
 // Esc at once, or the guest presses again before the pause reaches its screen,
 // two flips would cancel out and the game would flicker in and out of pause.
@@ -236,8 +291,9 @@ function togglePause() {
 // A new game starts on the pick screen with the last map, cats and flowers chosen.
 function newGame() {
   saveGameLog('quit');
-  if (state && state.players) { lastLoadouts = state.players.map((p) => p.loadout || p.pick.chosen); lastCats = state.players.map((p) => p.cat); lastMap = state.map; lastHard = !!state.hard; }
-  state = createState(nPlayers, (Math.random() * 1e9) | 0, { sharedScreen: mode === 'local' && nPlayers > 1, loadouts: lastLoadouts, cats: lastCats, map: lastMap, hard: lastHard });
+  if (state && state.players) { lastLoadouts = state.players.map((p) => p.loadout || p.pick.chosen); lastCats = state.players.map((p) => p.cat); lastMap = state.map; lastHard = !!state.hard; lastSprint = !!state.sprint; }
+  state = createState(nPlayers, randomSeed(), { sharedScreen: mode === 'local' && nPlayers > 1, loadouts: lastLoadouts, cats: lastCats, map: lastMap, hard: lastHard, sprint: lastSprint });
+  if (ui.challenge) setChallenge(state, ui.challenge); // the same waves as everyone else with this code
   ui.cam.snap = true;
   ui.paused = false;
   ui.summary = null;
@@ -309,7 +365,7 @@ function startSaved({ state: s, mode: how, sameVersion }) {
 
 function resumeGame(s) {
   state = s;
-  lastLoadouts = s.players.map((p) => p.loadout || p.pick.chosen); lastCats = s.players.map((p) => p.cat); lastMap = s.map; lastHard = !!s.hard;
+  lastLoadouts = s.players.map((p) => p.loadout || p.pick.chosen); lastCats = s.players.map((p) => p.cat); lastMap = s.map; lastHard = !!s.hard; lastSprint = !!s.sprint;
   ui.cam.snap = true;
   ui.paused = true; // everyone gets their hands on the keys first
   ui.summary = null;
@@ -339,7 +395,7 @@ function backToMenu() {
 
 function menuTogether(note) {
   saveGameLog('quit');
-  if (mode === 'host' && state?.players) { lastLoadouts = state.players.map((p) => p.loadout || p.pick.chosen); lastCats = state.players.map((p) => p.cat); lastMap = state.map; lastHard = !!state.hard; }
+  if (mode === 'host' && state?.players) { lastLoadouts = state.players.map((p) => p.loadout || p.pick.chosen); lastCats = state.players.map((p) => p.cat); lastMap = state.map; lastHard = !!state.hard; lastSprint = !!state.sprint; }
   ui.online = mode === 'host' ? 'host' : 'guest';
   awaitingStart = ui.online === 'guest'; // snapshots of the old game may still be on the way
   mode = 'menu';
@@ -665,6 +721,8 @@ function frame(now) {
   if (ticking) blendPositions(state, Math.min(1, acc / DT));
   updateCamera(now);
   const inGame = mode === 'guest' || ticking;
+  // the score and best show on the end screen (and again after each endless defeat)
+  if (inGame && state && (state.over || state.won) && state.phase !== 'pick') { if (!ui.best) recordBest(); } else ui.best = null;
   updateMusic(inGame ? state : null);
   render(ctx, inGame ? state : null, ui);
   if (ticking) restorePositions();

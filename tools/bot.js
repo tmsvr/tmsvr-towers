@@ -84,10 +84,10 @@ const nearest = (list, p) => list.reduce((best, o) => (!best || dist(o, p) < dis
 const onTile = (p, tx, ty) => Math.floor(p.x / T) === tx && Math.floor(p.y / T) === ty;
 
 // onTick(s, jobs, roles), if given, is called after every tick (for watching what the bot does).
-export function runBot({ players = 2, seed = 1, loadouts, cats, map = 0, maxMinutes = 40, habits = {}, onTick } = {}) {
+export function runBot({ players = 2, seed = 1, loadouts, cats, map = 0, hard = false, sprint = false, maxMinutes = 40, habits = {}, onTick } = {}) {
   const H = { ...HABITS, ...habits };
   cats ??= players > 1 ? ['bomber', 'gardener'] : ['gardener'];
-  const s = sim.createState(players, seed, { map, cats });
+  const s = sim.createState(players, seed, { map, cats, hard, sprint });
   const m = s.m, base = m.base;
   fields.clear();
   // the gardener is Fern if she's playing (else P2); everyone else guards

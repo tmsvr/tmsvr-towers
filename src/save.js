@@ -78,6 +78,8 @@ export function loadGame(data) {
   const s = back(data.state);
   s.items ??= []; // saved before elites dropped power-ups
   s.hard ??= false; // saved before hard mode
+  s.sprint ??= false; // saved before Sprint mode…
+  s.seed ??= 0; s.wrng ??= s.rng; // …and before the waves had their own random numbers
   if (s.chest) s.chest.lock ??= 0; // saved before chests had a lock
   s.map = s.m.index; // where that map sits in today's list
   if (s.checkpoint) s.checkpoint.map = s.map;

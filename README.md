@@ -35,8 +35,9 @@ them.
 - Before each game, pick a map, a cat and 3 of the 7 flowers. Two players can't
   pick the same cat: Brick (slow, big hits), Zip (fast, light hits), Fern
   (grows and heals faster) or Boom (faster, bigger bombs). On the map row, E
-  switches between **Normal** and **Hard** (more and much tougher monsters,
-  and fewer coins: for players whose gardens hold Normal with lots to spare).
+  switches between **Normal**, **Hard** (more and much tougher monsters,
+  and fewer coins: for players whose gardens hold Normal with lots to spare),
+  **Sprint** (6 quick waves, see Competing below) and **Sprint · Hard**.
 - Standing on a flower, hold E to upgrade it and R to heal it. Q switches E to
   dig-up mode, which removes the flower and refunds part of what was spent on it.
 - At level 5 every flower **blooms**: it sparkles and gains a special ability
@@ -97,6 +98,40 @@ them.
   the guest; the host sees updates it had to drop). If the game feels laggy
   while it says 60 fps, a low update count means the connection, not the
   computer, is struggling.
+
+## Competing
+
+There is no server, so scores live in your browser and get shared by pasting
+them into a chat.
+
+- **Sprint** is the quick mode, about 8 minutes: 6 waves that play like normal
+  waves 2, 4, 5, 7, 9 and 10, with bosses in waves 3 and 6, more coins at the
+  start, more coins per monster and 12 s breaks.
+- **Every game has a challenge code** (top right of the pick screen, and on the
+  end screen), like `9KW-CVE`. It stands for the map, the mode and the waves'
+  random numbers. Anyone who plays the same code meets exactly the same monsters,
+  in the same order on the same roads, elites included, whatever they plant. So
+  a code makes a fair contest: everyone plays it, then you compare scores.
+- **K** on the menu: type in a code. **D**: today's **daily challenge** (a
+  Sprint on a map that changes every day, the same for everyone). The menu
+  shows the challenge until you press K to clear it, and every game started in
+  the meantime (solo, local or hosted online) uses it. The map and mode are
+  locked on the pick screen; cats and flowers are yours to choose.
+- **Score** = 1,000 per wave cleared + 20 per point of cottage health left + 5
+  per monster bonked, ×1.5 on Hard (`balance.json → score`). Only compare
+  scores of the same mode, map and number of players. The end screen shows
+  your best in this browser (per code for challenges, otherwise per map, mode
+  and number of players).
+- **X** on the victory or defeat screen copies the result for the chat:
+
+  ```
+  🌼 Petal Patrol · daily 2026-10-16 · Sprint · Whirlpool · 2 players
+  Code 9KW-CVE · won all 6 waves · 6 cleared
+  🏠 🟩🟩🟩🟩🟩🟩🟩⬛⬛⬛ 141/200 · 812 bonked
+  Score 12,880
+  ```
+
+  Retrying a wave (R) is allowed, but the result says how many retries you used.
 
 ## Tuning
 

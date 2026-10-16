@@ -48,6 +48,8 @@ export function startLog(s) {
     date: new Date().toISOString(),
     map: s.m.id,
     hard: !!s.hard, // hard mode (more, tougher monsters)
+    sprint: !!s.sprint, // Sprint mode (a few waves, skipping the easy ones)
+    seed: s.seed, // with map, hard and sprint: the challenge code (challenge.js)
     players: s.players.map((p) => ({ id: p.id, cat: p.cat, catName: CATS[p.cat]?.name, loadout: p.loadout.slice() })),
     cottageHealth: s.maxLives,
     result: null,

@@ -58,6 +58,7 @@ Claude Code users: `.claude/launch.json` defines this server as `towers`
 | `src/host.js` / `src/guest.js` | Each side of an online game (host-authoritative) |
 | `src/snapshot.js` | Host builds snapshots; guest interpolates between them |
 | `src/predict.js` | Guest-side prediction of its own cat, reconciled with the host |
+| `src/challenge.js` | Challenge codes (seed + map + mode in six letters), the daily challenge, and the result text players copy with X |
 | `src/save.js` | Saved games (S on the pause screen, O on the menu): the whole state as JSON, keeping shared references (`$id`/`$ref`) and naming shared data (monster types, maps) |
 | `src/util.js` | Seeded RNG, `clamp`, small helpers |
 | `src/version.js` | `BUILD`, the build number shown in the bottom-right corner of the menu and pause screen (the commit count) |
@@ -85,6 +86,12 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
 - **Determinism.** The sim uses only its own seeded RNG (`rnd(s)`), never
   `Math.random()`, so the same seed and inputs give the same game. Visual-only
   code (`fx.js`, `juice.js`) may use `Math.random()`.
+- **The waves have their own RNG** (`wrnd(s)`, state `s.wrng`, started from
+  `s.seed`). Everything that makes up a wave (`buildQueue`, `arrivals`,
+  `pickBoss`, and the elites, rolled into the queue entries) uses it and
+  nothing else does, so a seed, map and mode always bring the same monsters
+  however the game is played. That is what makes challenge codes fair: keep
+  `rnd(s)` out of wave make-up, and `wrnd(s)` out of everything else.
 - **Sim/render split.** `sim.js` must stay free of DOM and canvas so it can run
   on the online host and in `tools/bot.js`. It communicates outward through
   events on the state (`ev(s, 'chomp')`, banners, fx requests).
@@ -107,12 +114,24 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
   (guest) or dropped because the connection is backed up (host); see
   `measureFrame` in `main.js`. Caches (map background,
   sprite heads) are keyed by that scale (`ui.dpr`).
-- **Game phases.** Menu → pick screen (`s.phase === 'pick'`: map, Normal/Hard
-  (`s.hard`, plant key on the map row), cat, 3 flowers per player) → waves →
+- **Game phases.** Menu → pick screen (`s.phase === 'pick'`: map, mode
+  (`MODES` in `sim.js`: Normal, Hard, Sprint, Sprint · Hard, as `s.hard` and
+  `s.sprint`, plant key on the map row), cat, 3 flowers per player) → waves →
   won/over overlay. After a win, C carries on into endless mode
   (`continueEndless`): wave 11 is a smaller breather, then waves barely grow
   in number while boss count climbs (`breatherWaveSize`, `endless*` in
   `balance.json → difficulty`).
+- **Sprint mode** (`balance.json → sprint`) plays `sprint.waves.length` waves,
+  each like the normal wave it names. `levelOf(s)` is that normal wave; every
+  rule that grows with the waves (health, size, coin fade, elites, bosses, the
+  breather) goes by it, and `lastWave(s)` is the wave that wins. Use these,
+  not `s.wave` or `TOTAL_WAVES`, in new rules that scale with the waves.
+- **Challenges and scores.** `s.seed`, `s.map`, `s.hard` and `s.sprint` make
+  the challenge code (`codeOf` in `challenge.js`). A challenge (K or D on the
+  menu, `ui.challenge` in `main.js`) is applied to each new game with
+  `setChallenge`, which also sets `s.locked` so the pick screen can't change
+  the map or mode. `scoreOf(s)` in `sim.js` is the score; personal bests are
+  kept in `localStorage` (`recordBest` in `main.js`).
 - **The difficulty curve.** One rule for every wave, endless included: monster
   health is ×(1 + `hpGrowth`) a wave, so there are no jumps and a full garden
   meets a clear wall a few waves after it stops growing. Packs (swarms, wasps)
@@ -159,6 +178,7 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
 |---|---|
 | Rebalance (damage, costs, HP, waves, economy) | Edit `balance.json`. The flower guide (I key) and pick cards update themselves |
 | Change a map, or add one | Edit/add an entry in `maps.json`, then look at it whole in `/tools/maps.html`. Roads are lists of corner points; each segment must be horizontal or vertical; every road ends at `base`. Check reachability (a scatter seed can wall off a tile; change `scatter.seed`) |
+| Tune Sprint or the score | `balance.json → sprint` (which waves it plays, breaks, coins) and `→ score`. Check Sprint with `runBot({ sprint: true })` |
 | Make a map easier or harder | `waveSize` (monster count; boss HP scales with its square root) and `startCoins` in `maps.json` |
 | Add a flower | New entry in `balance.json → flowers` (its `kind` picks the attack code in `sim.js`; a new kind needs new code there), plus its look in `render.js` (`SPEC`, `PERSONA`, `BODIES`). The pick screen, guide and network encoding pick it up automatically; bump `PROTOCOL` |
 | Add an enemy | Entry in `balance.json → enemies`, plus an entry in `waves` or a `waveSets` list (`fromWave`, `weight`, `cost`, `group`) so it spawns, an `intros` card, and its drawing in `drawEnemy` (`render.js`; check it in `/tools/gallery.html`). Bump `PROTOCOL` |

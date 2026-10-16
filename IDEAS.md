@@ -19,6 +19,7 @@ or a rework of something core.
 | n/a | Walkable cottage yard where nothing can be planted | `2c11ddb` |
 | F4 (part) | Endless mode after a win, with a breather wave and growing boss counts (no high scores yet) | see git log |
 | n/a | Save the game from the pause screen, load it from the menu | `9655abf` |
+| F7, F4 (rest) | Sprint mode, challenge codes, the daily challenge, scores, personal bests and a copyable result (`experiment/compete` branch) | see git log |
 
 ---
 
@@ -202,7 +203,7 @@ mechanic** so the theme changes how the game plays, not only how it looks.
 - **F4. High scores** for endless mode (endless itself is done). 🎉 · S
 - **F5. Campaign** with maps unlocking in order and 1–3 stars per map. 🎉 · M
 - **F6. Unlocks between runs:** flowers, cat hats. 🎉 · M
-- **F7. Daily seed challenge.** 🎉 · S–M
+- ~~F7. Daily seed challenge.~~ (done on `experiment/compete`)
 - **F8. End-of-game stats:** MVP flower and MVP cat. 🎉 · S
 - **F9. Difficulty select:** easy, normal and hard. 🎯 · S
 

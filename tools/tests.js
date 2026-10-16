@@ -11,6 +11,7 @@ import { encodeSnapshot, encodeInputs, decodeFast } from '../src/schema.js';
 import { gameSummary } from '../src/stats.js';
 import { render, num, clock, setView, BASE_W, BASE_H, VIEW_W, MAP_H } from '../src/render.js';
 import { runBot } from './bot.js';
+import { encodeCode, decodeCode, codeOf, dailyChallenge, shareText } from '../src/challenge.js';
 import { saveGame, loadGame } from '../src/save.js';
 
 const DT = 1 / 60;
@@ -640,6 +641,112 @@ test('Retry', 'from the pause screen mid-wave or in a break, never after a win',
   eq(s.retries.join(), '2,2', 'both retries logged');
   const won = wonGame();
   ok(!sim.canRetry(won), 'nothing to retry after a win');
+});
+
+// ---- Sprint mode, challenge codes and scores -----------------------------------------
+// The monsters of the next wave, without playing it.
+function nextQueue(s) {
+  s.phase = 'prep'; s.queue = []; s.enemies = [];
+  tick(s, { ready: true });
+  return s.queue.map((e) => `${e.type}/${e.path}/${e.elite ? e.elite.join('+') : ''}`).join(' ');
+}
+
+test('Sprint', 'a Sprint plays sprint.waves: each wave as tough and as big as the normal wave it names', () => {
+  const SP = BALANCE.sprint;
+  eq(sim.lastWave({ sprint: true }), SP.waves.length, 'number of waves');
+  SP.waves.forEach((lv, i) => eq(sim.levelOf({ sprint: true }, i + 1), lv, `sprint wave ${i + 1}`));
+  eq(sim.levelOf({ sprint: true }, SP.waves.length + 1), TOTAL_WAVES + 1, 'endless carries on from the breather');
+  const hpIn = (sprint, wave) => { const s = game({ seed: 3 }); s.sprint = sprint; s.wave = wave; sim.spawnEnemy(s, 'grunt', null, 0); return s.enemies.at(-1).maxhp; };
+  near(hpIn(true, 3), hpIn(false, SP.waves[2]), 1e-9, 'grunt health in sprint wave 3');
+  const sizeOf = (sprint, wave) => { const s = game({ seed: 3 }); s.sprint = sprint; s.wave = wave - 1; return nextQueue(s).split(' ').length; };
+  eq(sizeOf(true, 2), sizeOf(false, SP.waves[1]), 'monsters in sprint wave 2');
+});
+
+test('Sprint', 'a Sprint is won after its last wave, with more coins to start and shorter breaks', () => {
+  const SP = BALANCE.sprint, E = BALANCE.economy;
+  const s = sim.createState(1, 5, { map: 0, sprint: true });
+  eq(s.players[0].coins, Math.round(E.startCoinsSolo * MAPS[0].startCoins * SP.startCoins), 'start coins');
+  s.players[0].pick.chosen = ['thorn', 'frost', 'daisy']; s.players[0].pick.ready = true;
+  tick(s);
+  eq(s.timer, SP.firstWaveDelay, 'time before the first wave');
+  clearNextWave(s);
+  eq(s.timer, SP.timeBetweenWaves, 'break');
+  s.wave = SP.waves.length - 1;
+  clearNextWave(s);
+  ok(s.won, `not won after wave ${s.wave}`);
+});
+
+test('Sprint', 'the plant key on the map row goes Normal, Hard, Sprint, Sprint · Hard', () => {
+  const s = sim.createState(1, 1, { map: 0 });
+  s.players[0].pick.row = 0;
+  const seen = [];
+  for (let i = 0; i < 4; i++) { seen.push(sim.modeName(s)); sim.step(s, [{ buildTap: true }], DT); sim.step(s, [{}], DT); }
+  eq(seen.join(', '), 'Normal, Hard, Sprint, Sprint · Hard', 'modes');
+  eq(sim.modeName(s), 'Normal', 'and back');
+});
+
+test('Challenges', 'a code gives back its seed, map and mode; a typo is refused', () => {
+  for (const c of [{ seed: 0, map: 0, hard: false, sprint: false }, { seed: 2 ** 21 - 1, map: MAPS.length - 1, hard: true, sprint: true }, { seed: 123456, map: 4, hard: false, sprint: true }]) {
+    const code = encodeCode(c), back = decodeCode(code.toLowerCase());
+    ok(/^[A-Z2-9]{3}-[A-Z2-9]{3}$/.test(code), `code ${code}`);
+    eq(JSON.stringify(back), JSON.stringify(c), `${code} decodes`);
+  }
+  const code = encodeCode({ seed: 777, map: 2, hard: false, sprint: true });
+  let refused = 0, tried = 0;
+  for (let i = 0; i < 7; i++) if (code[i] !== '-') for (const ch of 'ABCXYZ2') { if (ch === code[i]) continue; tried++; if (!decodeCode(code.slice(0, i) + ch + code.slice(i + 1))) refused++; }
+  ok(refused / tried > 0.6, `only ${refused} of ${tried} one-letter typos refused`);
+  eq(decodeCode('hello'), null, 'not a code');
+});
+
+test('Challenges', 'the same code brings the same waves, however the game goes', () => {
+  const play = (mess) => {
+    const s = game({ cats: ['bomber', 'gardener'], seed: 4242 });
+    const waves = [];
+    for (let w = 0; w < 4; w++) {
+      if (mess) for (let i = 0; i < 25; i++) { sim.spawnEnemy(s, 'tank', null, 0); sim.damage(s, s.enemies.at(-1), 1e9, true); } // kills roll coins
+      waves.push(nextQueue(s));
+    }
+    return waves;
+  };
+  const a = play(false), b = play(true);
+  a.forEach((q, i) => eq(b[i], q, `wave ${i + 1}`));
+  const other = game({ cats: ['bomber', 'gardener'], seed: 4243 });
+  ok(nextQueue(other) !== a[0] || nextQueue(other) !== a[1], 'another seed brings other waves');
+});
+
+test('Challenges', 'a challenge sets the map, mode and seed, and they can no longer be changed', () => {
+  const s = sim.createState(2, 1, { map: 0 });
+  sim.setChallenge(s, { seed: 99, map: 3, hard: true, sprint: true });
+  eq(codeOf(s), encodeCode({ seed: 99, map: 3, hard: true, sprint: true }), 'code');
+  s.players[0].pick.row = 0;
+  sim.step(s, [{ mx: 1 }, {}], DT); sim.step(s, [{}, {}], DT); sim.step(s, [{ buildTap: true }, {}], DT);
+  eq(s.map, 3, 'map'); ok(s.hard && s.sprint, 'mode');
+});
+
+test('Challenges', 'the daily challenge is the same all day and changes the next', () => {
+  const a = dailyChallenge(new Date('2026-10-16T08:00:00Z')), b = dailyChallenge(new Date('2026-10-16T20:00:00Z')), c = dailyChallenge(new Date('2026-10-17T08:00:00Z'));
+  eq(encodeCode(a), encodeCode(b), 'same day');
+  ok(encodeCode(a) !== encodeCode(c), 'next day');
+  ok(a.sprint, 'a Sprint');
+});
+
+test('Challenges', 'the score adds up waves, cottage and kills; Hard counts more; the result names the code', () => {
+  const S = BALANCE.score, s = game({ cats: ['bomber', 'gardener'] });
+  s.wave = 4; s.phase = 'wave'; s.over = true; s.lives = 37.2; s.kills = 120;
+  eq(sim.wavesCleared(s), 3, 'waves cleared when wave 4 was lost');
+  eq(sim.scoreOf(s), 3 * S.perWave + 38 * S.perCottage + 120 * S.perKill, 'score');
+  s.hard = true;
+  eq(sim.scoreOf(s), Math.round((3 * S.perWave + 38 * S.perCottage + 120 * S.perKill) * S.hard), 'hard score');
+  const text = shareText(s);
+  ok(text.includes(codeOf(s)) && text.includes(sim.scoreOf(s).toLocaleString('en-US')) && text.includes('2 players'), text);
+});
+
+test('Challenges', 'mode, seed and lock survive a snapshot', () => {
+  const s = sim.createState(2, 1, { map: 0 });
+  sim.setChallenge(s, { seed: 5150, map: 2, hard: false, sprint: true });
+  const g = decodeFast(encodeSnapshot(s, { seq: 1, at: 0, paused: false, ack: 0 })).state.game;
+  ok(g.sprint && g.locked && !g.hard, 'flags'); eq(g.seed, 5150, 'seed');
+  eq(codeOf({ ...g }), codeOf(s), 'the guest shows the same code');
 });
 
 // ---- whole games ----------------------------------------------------------------

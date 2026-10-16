@@ -7,6 +7,7 @@ import {
   T, U, VIEW_W, MAP_H, TOTAL_WAVES, MAPS, ENEMIES, INTROS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, GROW_TIME, FLOWER_HP, WEAR_PER_SEC, WEAR_MULT, HEAL_RATE, HEAL_COST,
   POISON_TIME, START_COINS, LOADOUT_SIZE, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, plantCost, GLOBAL_RANGE, PLAYER, CATS, CAT_ORDER, bloomOf, ELITES, SHIELD, CHEST, PERKS,
+  SPRINT, SCORE,
 } from './data.js';
 import { prune, clamp, nextSeed, randomFrom } from './util.js';
 import * as log from './stats.js';
@@ -30,22 +31,48 @@ export const TUNE = DIFFICULTY;
 // Hard mode multiplies monster health, how many come and the coins they drop (chosen on the pick screen).
 const HARD = { enemyHp: 1, waveSize: 1, coins: 1, ...DIFFICULTY.hard };
 
+// The waves come from their own random numbers, started from the seed, so the
+// same seed, map and mode always bring the same monsters, however the game is
+// played: that is what makes a challenge code fair to compare.
+function wrnd(s) {
+  s.wrng = nextSeed(s.wrng);
+  return randomFrom(s.wrng);
+}
+const waveSeed = (seed) => (seed ^ 0x5bd1e995) | 0;
+
+// Sprint mode plays a few of the usual waves (SPRINT.waves), skipping the easy
+// middle. levelOf is the normal wave a wave plays like; everything that grows
+// with the waves (health, size, coins, elites, bosses) goes by it.
+export const lastWave = (s) => (s.sprint ? SPRINT.waves.length : TOTAL_WAVES);
+export function levelOf(s, n = s.wave) {
+  if (!s.sprint || n <= 0) return n;
+  return n <= SPRINT.waves.length ? SPRINT.waves[n - 1] : TOTAL_WAVES + n - SPRINT.waves.length; // endless goes on from wave 11
+}
+const breakTime = (s) => (s.sprint ? SPRINT.timeBetweenWaves : TUNE.timeBetweenWaves);
+const firstWaveDelay = (s) => (s.sprint ? SPRINT.firstWaveDelay : DIFFICULTY.firstWaveDelay);
+
+// The four ways to play a map, in the order the plant key on the map row goes through them.
+export const MODES = [{ hard: false, sprint: false }, { hard: true, sprint: false }, { hard: false, sprint: true }, { hard: true, sprint: true }];
+export const modeName = (s) => (s.sprint ? (s.hard ? 'Sprint · Hard' : 'Sprint') : s.hard ? 'Hard' : 'Normal');
+
 // sharedScreen: both cats share one camera, so they can't wander further apart than the view.
 // loadouts / cats / hard: last game's flower picks, characters and difficulty, pre-selected on the pick screen.
+// sprint: the short mode. locked: a challenge or a versus race, whose map and mode can't be changed.
 // The map lives on the state (s.m, one of MAPS), so any number of games can
 // exist side by side: the balance bot's, a guest's view, the real one.
-export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, loadouts = [], cats = [], map = 0, hard = false } = {}) {
+export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, loadouts = [], cats = [], map = 0, hard = false, sprint = false, locked = false } = {}) {
   const m = MAPS[map] || MAPS[0];
   const s = {
     m,
-    t: 0, nextId: 1, rng: seed, wave: 0, phase: 'pick', timer: DIFFICULTY.firstWaveDelay, queue: [], spawnWait: 0,
+    t: 0, nextId: 1, rng: seed, seed, wrng: waveSeed(seed), wave: 0, phase: 'pick', timer: 0, queue: [], spawnWait: 0,
     lives: DIFFICULTY.cottageHealth, maxLives: DIFFICULTY.cottageHealth, baseHitT: 0, lastAlarm: -99, players: [], flowers: [], enemies: [], drops: [], bombs: [], projs: [], clouds: [],
-    fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, sharedScreen, map: m.index, hard: !!hard,
+    fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, sharedScreen, map: m.index, hard: !!hard, sprint: !!sprint, locked: !!locked,
     items: [], // power-ups dropped by elites, waiting to be picked up
     perks: {}, chest: null, chestDue: false, // boss chests: the team's perks, the open chest, one is owed
     seen: {}, // monster types met so far (each gets one warning banner)
   };
-  const coins = startCoins(m, nPlayers);
+  s.timer = firstWaveDelay(s);
+  const coins = startCoins(s, nPlayers);
   const taken = new Set();
   for (let i = 0; i < nPlayers; i++) {
     let cat = CATS[cats[i]] && !taken.has(cats[i]) ? cats[i] : CAT_ORDER.find((c, k) => k >= i && !taken.has(c)) || CAT_ORDER.find((c) => !taken.has(c));
@@ -150,7 +177,8 @@ export const healLeft = (p, f) => coinsFor(p, (FLOWER_HP - f.hp) * healCostPerHp
 const FLOWER_MODES = ['grow', 'dig'];
 
 // ---- Enemies --------------------------------------------------------------
-export function spawnEnemy(s, type, from, path = 0) {
+// elite: [trait, item] rolled with the wave, or null; left out, it is rolled now.
+export function spawnEnemy(s, type, from, path = 0, elite) {
   log.logSpawn(s, type);
   // the first of a new kind of monster says what it is and what stops it
   if (!s.seen[type]) {
@@ -158,13 +186,14 @@ export function spawnEnemy(s, type, from, path = 0) {
     if (INTROS[type]) s.fx.push({ kind: 'intro', type }); // a card with its picture and hint
   }
   const d = ENEMIES[type];
-  const w = Math.max(0, s.wave - 1);
+  const lv = levelOf(s);
+  const w = Math.max(0, lv - 1);
   const solo = s.players.length === 1;
   // The last boss is the big one. Bosses also shrink on maps with split-up
   // defences (smaller waveSize), since only some flowers will ever see them.
-  const finale = d.boss ? (s.wave >= TOTAL_WAVES ? TUNE.finalBossHp || 1 : 1) * Math.sqrt(s.m.waveSize) : 1;
+  const finale = d.boss ? (lv >= TOTAL_WAVES ? TUNE.finalBossHp || 1 : 1) * Math.sqrt(s.m.waveSize) : 1;
   // endless bosses stack the finale's bonus with endless toughening, so they get trimmed
-  const endlessBoss = d.boss && s.wave > TOTAL_WAVES ? TUNE.endlessBossHp ?? 1 : 1;
+  const endlessBoss = d.boss && lv > TOTAL_WAVES ? TUNE.endlessBossHp ?? 1 : 1;
   // One curve for every wave, endless included: each wave is hpGrowth tougher than
   // the last, so there is no jump anywhere and a full garden meets a clear wall.
   const grow = Math.pow(1 + TUNE.hpGrowth, w);
@@ -185,30 +214,39 @@ export function spawnEnemy(s, type, from, path = 0) {
   });
   const e = s.enemies[s.enemies.length - 1];
   // boss shields (IDEAS R3): the health shares at which this boss will raise one
-  if (d.boss && SHIELD.enabled && !d.noShield) { e.shieldAt = [...(s.wave >= TOTAL_WAVES ? SHIELD.atBig : SHIELD.at)]; e.shield = 0; e.shieldMax = 0; e.exposedT = 0; }
-  if (!from) maybeElite(s, e);
+  if (d.boss && SHIELD.enabled && !d.noShield) { e.shieldAt = [...(lv >= TOTAL_WAVES ? SHIELD.atBig : SHIELD.at)]; e.shield = 0; e.shieldMax = 0; e.exposedT = 0; }
+  if (elite) makeElite(s, e, elite[0], elite[1]);
+  else if (!from && elite === undefined) maybeElite(s, e);
 }
 
 // ---- Elite monsters and power-ups (IDEAS R2) ----------------------------------
-function pickWeighted(s, table) {
+function pickWeighted(s, table, random = rnd) {
   const keys = Object.keys(table);
-  let r = rnd(s) * keys.reduce((a, k) => a + (table[k].weight ?? 1), 0);
+  let r = random(s) * keys.reduce((a, k) => a + (table[k].weight ?? 1), 0);
   for (const k of keys) if ((r -= table[k].weight ?? 1) <= 0) return k;
   return keys[keys.length - 1];
 }
 
-// The share of eligible monsters that arrive as elites in the current wave.
-export function eliteChance(s) {
+// The share of eligible monsters that arrive as elites in wave n (by default the current one).
+export function eliteChance(s, n = levelOf(s)) {
   const E = ELITES;
-  if (!E.enabled || s.wave < E.fromWave) return 0;
+  if (!E.enabled || n < E.fromWave) return 0;
   // endless monsters are tough enough already: fewer elites, growing slowly
-  if (s.wave > TOTAL_WAVES && E.endlessChance != null) return Math.min(E.endlessMaxChance ?? 1, E.endlessChance + (E.endlessChancePerWave ?? 0) * (s.wave - TOTAL_WAVES - 1));
-  return Math.min(E.maxChance, E.chance + E.chancePerWave * (s.wave - E.fromWave));
+  if (n > TOTAL_WAVES && E.endlessChance != null) return Math.min(E.endlessMaxChance ?? 1, E.endlessChance + (E.endlessChancePerWave ?? 0) * (n - TOTAL_WAVES - 1));
+  return Math.min(E.maxChance, E.chance + E.chancePerWave * (n - E.fromWave));
+}
+
+// [trait, item] for a monster of `type` in wave n, or null. Waves roll theirs
+// as they are made up (with the wave's random numbers); random = rnd for others.
+function rollElite(s, type, n, random) {
+  const chance = eliteChance(s, n);
+  if (!(chance > 0 && ELITES.types.includes(type) && random(s) < chance)) return null;
+  return [pickWeighted(s, ELITES.traits, random), pickWeighted(s, ELITES.items, random)];
 }
 
 function maybeElite(s, e) {
-  const chance = eliteChance(s);
-  if (chance > 0 && ELITES.types.includes(e.type) && rnd(s) < chance) makeElite(s, e, pickWeighted(s, ELITES.traits), pickWeighted(s, ELITES.items));
+  const el = rollElite(s, e.type, levelOf(s), rnd);
+  if (el) makeElite(s, e, el[0], el[1]);
 }
 
 // What it carries stays a surprise until it drops.
@@ -372,8 +410,8 @@ function killEnemy(s, e) {
   if (e.carry) { dropItem(s, e.carry, e.x, e.y); log.logItem(s, null, e.carry, 'dropped'); }
   // Drops shrink a little each wave, so bigger waves don't pay out ever more;
   // fractions round up by chance, so even 1-coin monsters drop less on average.
-  const fade = Math.max(ECONOMY.coinFadeMin ?? 0, 1 - (ECONOMY.coinFadePerWave ?? 0) * Math.max(0, s.wave - 1));
-  const raw = e.def.coin * ECONOMY.coinDropMultiplier * s.m.coinDrops * fade * (s.hard ? HARD.coins : 1);
+  const fade = Math.max(ECONOMY.coinFadeMin ?? 0, 1 - (ECONOMY.coinFadePerWave ?? 0) * Math.max(0, levelOf(s) - 1));
+  const raw = e.def.coin * ECONOMY.coinDropMultiplier * s.m.coinDrops * fade * (s.hard ? HARD.coins : 1) * (s.sprint ? SPRINT.coinDrops : 1);
   const v = Math.floor(raw + rnd(s));
   if (v <= 0) return;
   // Large drops split into a few pickups so they scatter nicely.
@@ -526,17 +564,19 @@ function chompCottage(s, e, dt) {
 // Which boss comes: each one is picked at random, by its weight in bossTypes.
 function pickBoss(s) {
   const types = TUNE.bossTypes ?? { boss: 1 }, keys = Object.keys(types);
-  let r = rnd(s) * keys.reduce((a, k) => a + types[k], 0);
+  let r = wrnd(s) * keys.reduce((a, k) => a + types[k], 0);
   for (const k of keys) if ((r -= types[k]) <= 0) return k;
   return keys[keys.length - 1];
 }
 // The wave each monster type first turns up in. A [lo, hi] range is rolled
 // once per game, so players can't always know when the flyers are coming.
 function arrivals(s) {
-  if (!s.arrive) s.arrive = s.m.waves.map((u) => Array.isArray(u.fromWave) ? u.fromWave[0] + Math.floor(rnd(s) * (u.fromWave[1] - u.fromWave[0] + 1)) : u.fromWave);
+  if (!s.arrive) s.arrive = s.m.waves.map((u) => Array.isArray(u.fromWave) ? u.fromWave[0] + Math.floor(wrnd(s) * (u.fromWave[1] - u.fromWave[0] + 1)) : u.fromWave);
   return s.arrive;
 }
 
+// The monsters of a wave that plays like normal wave n (levelOf). All its
+// random numbers come from s.wrng, elites included.
 function buildQueue(s, n) {
   const q = [];
   const from = arrivals(s);
@@ -559,15 +599,15 @@ function buildQueue(s, n) {
   };
   const total = avail.reduce((a, u) => a + weightOf(u), 0);
   while (budget > 0) {
-    let r = rnd(s) * total, pick = avail[0];
+    let r = wrnd(s) * total, pick = avail[0];
     for (const u of avail) { r -= weightOf(u); if (r <= 0) { pick = u; break; } }
-    const path = Math.floor(rnd(s) * s.m.paths.length); // a group sticks together on one road
+    const path = Math.floor(wrnd(s) * s.m.paths.length); // a group sticks together on one road
     const [lo, hi] = TUNE.spawnGap || [0.4, 1.2];
     // packs (swarms, wasps) get bigger every wave after they first appear, up to packMaxGrowth
     // times their size, and pay for every member: bigger packs come less often, not for free
     const growth = Math.min(TUNE.packMaxGrowth ?? Infinity, 1 + (TUNE.packGrowthPerWave ?? 0) * (n - pick.fromWave));
     const group = pick.group > 1 ? Math.round(pick.group * growth) : 1;
-    for (let i = 0; i < group; i++) q.push({ type: pick.enemy, path, wait: group > 1 ? 0.18 : lo + rnd(s) * (hi - lo) });
+    for (let i = 0; i < group; i++) q.push({ type: pick.enemy, path, wait: group > 1 ? 0.18 : lo + wrnd(s) * (hi - lo) });
     budget -= pick.cost * (group / pick.group);
   }
   // endless brings more bosses every bossEvery waves; the extra ones come mid-wave. Ordinary
@@ -576,10 +616,10 @@ function buildQueue(s, n) {
   const bosses = (bossWave ? 1 : 0) + Math.max(0, cycles - (bossWave ? 0 : TUNE.bossFreeCycles ?? 0)) * (TUNE.endlessBossesPerCycle ?? 0);
   for (let i = 0; i < bosses; i++) {
     const at = bossWave && i === bosses - 1 ? q.length : Math.floor((q.length * (i + 1)) / (bosses + 1));
-    q.splice(at, 0, { type: pickBoss(s), path: Math.floor(rnd(s) * s.m.paths.length), wait: 3 });
+    q.splice(at, 0, { type: pickBoss(s), path: Math.floor(wrnd(s) * s.m.paths.length), wait: 3 });
   }
   const k = Math.max(TUNE.spawnGapMinScale ?? 0.5, 1 - n * (TUNE.spawnSpeedupPerWave ?? 0.03));
-  for (const e of q) e.wait *= k;
+  for (const e of q) { e.wait *= k; e.elite = rollElite(s, e.type, n, wrnd); }
   // the opening rush: the first part of every wave pours out almost at once
   const rush = breather ? 0 : Math.floor(q.length * (TUNE.openingRush ?? 0));
   for (let i = 0; i < rush; i++) q[i].wait = Math.min(q[i].wait, 0.12);
@@ -589,12 +629,12 @@ function buildQueue(s, n) {
 function startWave(s) {
   s.wave++;
   s.phase = 'wave';
-  s.queue = buildQueue(s, s.wave);
+  s.queue = buildQueue(s, levelOf(s));
   s.spawnWait = 0.5;
   log.logWaveStart(s);
   staggerMapWide(s);
   const boss = s.queue.filter((e) => ENEMIES[e.type].boss).length;
-  banner(s, boss > 1 ? `Wave ${s.wave} — ${boss} BOSSES!` : boss ? `Wave ${s.wave} — BOSS!` : s.wave === TOTAL_WAVES + 1 ? `Wave ${s.wave} — catch your breath` : `Wave ${s.wave}`);
+  banner(s, boss > 1 ? `Wave ${s.wave} — ${boss} BOSSES!` : boss ? `Wave ${s.wave} — BOSS!` : levelOf(s) === TOTAL_WAVES + 1 ? `Wave ${s.wave} — catch your breath` : `Wave ${s.wave}`);
   ev(s, boss ? 'boss' : 'wave');
 }
 
@@ -617,15 +657,15 @@ function updateWaves(s, dt, ready) {
     s.spawnWait -= dt;
     if (s.spawnWait <= 0) {
       const e = s.queue.shift();
-      spawnEnemy(s, e.type, null, e.path);
+      spawnEnemy(s, e.type, null, e.path, e.elite ?? null);
       s.spawnWait = e.wait;
     }
   } else if (!s.enemies.some((e) => !e.dead)) {
-    if (s.wave >= TOTAL_WAVES && !s.endless) { s.won = true; log.logWaveEnd(s, 'won'); ev(s, 'win'); return; }
+    if (s.wave >= lastWave(s) && !s.endless) { s.won = true; log.logWaveEnd(s, 'won'); ev(s, 'win'); return; }
     s.phase = 'prep';
-    s.timer = TUNE.timeBetweenWaves;
+    s.timer = breakTime(s);
     // Everyone gets a share; in co-op each cat gets a bit more than half.
-    const bonus = Math.round((ECONOMY.waveBonusBase + s.wave * ECONOMY.waveBonusPerWave) * (s.players.length > 1 ? ECONOMY.coopBonusShare : 1));
+    const bonus = Math.round((ECONOMY.waveBonusBase + levelOf(s) * ECONOMY.waveBonusPerWave) * (s.players.length > 1 ? ECONOMY.coopBonusShare : 1));
     for (const p of s.players) p.coins += bonus;
     log.logWaveEnd(s, 'cleared');
     banner(s, bonus > 0 ? `Wave cleared!  +${bonus} each` : 'Wave cleared!');
@@ -643,12 +683,21 @@ export function continueEndless(s) {
   s.won = false;
   s.endless = true;
   s.phase = 'prep';
-  s.timer = TUNE.timeBetweenWaves;
+  s.timer = breakTime(s);
   log.resumeLog(s);
   banner(s, 'Endless mode: how far can you go?');
   ev(s, 'wave');
   if (s.chestDue) openChest(s); // the last boss's chest
   saveCheckpoint(s);
+}
+
+// ---- Score ---------------------------------------------------------------------
+// One number to compare games by (balance.json → score): waves cleared, the
+// cottage left and monsters bonked, more on Hard.
+export const wavesCleared = (s) => (s.won || s.phase !== 'wave' ? s.wave : s.wave - 1);
+export function scoreOf(s) {
+  const raw = wavesCleared(s) * SCORE.perWave + Math.max(0, Math.ceil(s.lives)) * SCORE.perCottage + s.kills * SCORE.perKill;
+  return Math.round(raw * (s.hard ? SCORE.hard : 1));
 }
 
 // ---- Retrying a wave ---------------------------------------------------------
@@ -1229,12 +1278,28 @@ function updateDrops(s, dt) {
   prune(s.drops, isDone);
 }
 
-const startCoins = (m, n) => Math.round((n > 1 ? START_COINS.coop : START_COINS.solo) * m.startCoins);
+const startCoins = (s, n) => Math.round((n > 1 ? START_COINS.coop : START_COINS.solo) * s.m.startCoins * (s.sprint ? SPRINT.startCoins : 1));
 
 function selectMap(s, i) {
   const m = s.m = MAPS[i] || MAPS[0];
   s.map = m.index;
-  s.players.forEach((p, k) => { p.x = m.start.x + k * T; p.y = m.start.y; p.pick.ready = false; p.coins = startCoins(m, s.players.length); });
+  s.players.forEach((p, k) => { p.x = m.start.x + k * T; p.y = m.start.y; p.pick.ready = false; p.coins = startCoins(s, s.players.length); });
+}
+
+// Normal, Hard, Sprint or both (one of MODES). Like a new map, everyone confirms again.
+export function setMode(s, { hard, sprint }) {
+  s.hard = !!hard;
+  s.sprint = !!sprint;
+  s.timer = firstWaveDelay(s);
+  s.players.forEach((p) => { p.pick.ready = false; p.coins = startCoins(s, s.players.length); });
+}
+
+// A challenge code or a versus race sets the map and mode from outside the game.
+export function setChallenge(s, { map, hard, sprint, seed }) {
+  if (seed != null) { s.seed = s.rng = seed; s.wrng = waveSeed(seed); }
+  selectMap(s, map);
+  setMode(s, { hard, sprint });
+  s.locked = true;
 }
 
 // Next cat in direction `dir` that no other player has.
@@ -1260,15 +1325,21 @@ function updatePick(s, inputs) {
     if (my && my !== p.prevMy && !pk.ready) { pk.row = clamp(pk.row + my, 0, 2); ev(s, 'cycle'); }
     p.prevMy = my;
     if (mx && mx !== p.prevMx && !pk.ready) {
-      if (pk.row === 0) selectMap(s, (s.map + mx + MAPS.length) % MAPS.length); // changing the map un-readies everyone
+      if (pk.row === 0 && s.locked) ev(s, 'deny'); // a challenge's map stays put
+      else if (pk.row === 0) selectMap(s, (s.map + mx + MAPS.length) % MAPS.length); // changing the map un-readies everyone
       else if (pk.row === 1) p.cat = nextCat(s, p, mx); // taken cats are skipped
       else pk.cursor = (pk.cursor + mx + N) % N;
-      ev(s, 'cycle');
+      if (pk.row || !s.locked) ev(s, 'cycle');
     }
     p.prevMx = mx;
     if (inp.buildTap) {
       if (pk.ready) { pk.ready = false; ev(s, 'cycle'); }
-      else if (pk.row === 0) { s.hard = !s.hard; s.players.forEach((o) => { o.pick.ready = false; }); ev(s, 'cycle'); } // like a new map, everyone confirms again
+      else if (pk.row === 0 && s.locked) ev(s, 'deny');
+      else if (pk.row === 0) {
+        const k = MODES.findIndex((o) => o.hard === s.hard && o.sprint === s.sprint);
+        setMode(s, MODES[(k + 1) % MODES.length]);
+        ev(s, 'cycle');
+      }
       else if (pk.row === 1) { pk.row++; ev(s, 'cycle'); }
       else {
         const t = FLOWER_ORDER[pk.cursor];
@@ -1288,8 +1359,8 @@ function updatePick(s, inputs) {
   if (s.players.every((p) => p.pick.ready)) {
     s.players.forEach((p, k) => { p.loadout = p.pick.chosen.slice(); p.sel = 0; p.x = s.m.start.x + k * T; p.y = s.m.start.y; });
     s.phase = 'prep';
-    s.timer = DIFFICULTY.firstWaveDelay;
-    banner(s, 'Plant your flowers!');
+    s.timer = firstWaveDelay(s);
+    banner(s, s.sprint ? `Sprint: ${lastWave(s)} quick waves. Plant fast!` : 'Plant your flowers!');
     ev(s, 'wave');
     log.startLog(s);
     saveCheckpoint(s);

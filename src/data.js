@@ -246,6 +246,8 @@ export const CATS = BAL.cats;
 
 export const ECONOMY = BAL.economy;
 export const DIFFICULTY = BAL.difficulty;
+export const SPRINT = BAL.sprint;
+export const SCORE = BAL.score;
 export const START_COINS = { solo: ECONOMY.startCoinsSolo, coop: ECONOMY.startCoinsCoop };
 
 const P = BAL.player;
