@@ -271,5 +271,5 @@ export const PLAYER = {
   sprintSeconds: P.sprintSeconds,
   sprintRecover: P.sprintRecoverSeconds,
   sprintDelay: P.sprintRecoverDelay,
-  scarves: ['#3a7bd5', '#e04f7a'],
+  scarves: ['#3a7bd5', '#e04f7a', '#3fa45b', '#e08a1e'], // P1-P4
 };

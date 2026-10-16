@@ -1,6 +1,6 @@
 # Petal Patrol
 
-A co-op tower defense game in the browser: two cats defend their cottage by
+A co-op tower defense game in the browser: up to four cats defend their cottage by
 planting flower creatures, bonking monsters with batons and throwing bombs.
 Plain HTML + JavaScript, no build step.
 
@@ -23,15 +23,20 @@ The game is just static files, so GitHub Pages can serve it as is:
 3. After a minute the game is at `https://<user>.github.io/<repo>/`.
 
 Every push to `main` redeploys. Online co-op works from there too: the host
-presses **3** and sends the **Copy invite link** link; players are connected
+presses **3** and sends the **Copy invite link** link to up to 3 friends; players are connected
 through PeerJS's free public server, so no server of your own is needed.
-GitHub caches files for up to 10 minutes, so after an update both players
+GitHub caches files for up to 10 minutes, so after an update every player
 should reload. `.nojekyll` tells Pages to serve the files without processing
 them.
 
 ## Playing
 
-- **1** solo · **2** local co-op (one keyboard) · **3** host online · **4** join online · **5** versus race
+- **1** solo · **2** local co-op (two on one keyboard) · **3** host online (up to 4 cats) · **4** join online · **5** versus race
+- Online the host waits in the lobby until everyone is in, then presses **Enter** (or the button) to
+  start. With 3 or 4 cats each wave brings more monsters, a little tougher (`balance.json →
+  difficulty.morePlayers`), boss shields take more bombs, and each player's HUD shows their own
+  cat's card in full and the others small. Someone who drops out can rejoin with the same code
+  and gets their cat back.
 - Before each game, pick a map, a cat and 3 of the 7 flowers. Two players can't
   pick the same cat: Brick (slow, big hits), Zip (fast, light hits), Fern
   (grows and heals faster) or Boom (faster, bigger bombs). On the map row, E
@@ -82,16 +87,16 @@ them.
   - **T** starts a new game (the pick screen, with your last map, cats and flowers already chosen)
   - **M** goes back to the menu (Esc too, after the game)
   - **C** on the victory screen keeps going in endless mode
-- **O** on the main menu loads a saved game (solo, local co-op or online) and carries on from the moment it was saved, paused. Online, the host saves and loads; a loaded online game starts once P2 joins.
+- **O** on the main menu loads a saved game (solo, local co-op or online) and carries on from the moment it was saved, paused. Online, the host saves and loads; a loaded online game starts once all its players are back (or when the host presses Enter).
 - Beat all 10 waves and press C on the victory screen to keep going in **endless mode**: wave after wave, each tougher than the last. Every wave's monsters are 20% tougher than the last, endless ones too, so sooner or later even a garden full of level-5 flowers meets a wave it can't hold. Wave 11, right after the big boss, is a smaller one to catch your breath; after that the monsters come in about the same numbers, and every 5 waves brings one more boss (wave 15 has two, wave 20 three, wave 25 four…). From wave 21 the waves in between bring bosses too (one each until wave 25, then two…).
 - The game fills the browser window: a wider or taller window shows more of the map (things stay the same size), so there are no black bars.
 - I (in the menu or while picking) opens the flower guide: every flower's stats at each level, worked out from `balance.json`.
 - L downloads the game logs (see below).
-- Online, both players use the P1 keys on their own keyboard. Your friend needs
+- Online, everyone uses the P1 keys on their own keyboard. Your friends need
   the game too: easiest is hosting it on GitHub Pages (see above) and sending
   them the invite link.
 - Online, going back to the menu (from the pause, victory or defeat screen)
-  takes both players there and keeps you connected: either of you presses
+  takes everyone there and keeps you connected: anyone presses
   **3** or **Enter** to play again together, **Esc** leaves.
 - Online, the top-left label shows the ping, frames per second, the slowest
   frame of the last second and how many game updates arrive each second (for

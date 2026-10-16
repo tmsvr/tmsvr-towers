@@ -13,6 +13,7 @@ import { render, num, clock, setView, BASE_W, BASE_H, VIEW_W, MAP_H } from '../s
 import { runBot } from './bot.js';
 import { encodeCode, decodeCode, codeOf, dailyChallenge, shareText } from '../src/challenge.js';
 import { raceStatus, raceResult } from '../src/versus.js';
+import { createHostLink } from '../src/host.js';
 import { saveGame, loadGame } from '../src/save.js';
 
 const DT = 1 / 60;
@@ -603,7 +604,7 @@ test('Endless', 'a lost endless wave can be retried from the break before it', (
   ok(s.m === MAPS[s.map], 'the map is the shared one');
   tick(s, { ready: true });
   eq(s.wave, TOTAL_WAVES + 2, 'the retried wave starts');
-  const m = decodeFast(encodeSnapshot(s, { seq: 1, at: 0, paused: false, ack: 0 }));
+  const m = decodeFast(encodeSnapshot(s, { seq: 1, at: 0, paused: false, acks: [0, 0] }));
   ok(m.state.game.endless, 'online guests are told it is endless');
 });
 
@@ -745,7 +746,7 @@ test('Challenges', 'the score adds up waves, cottage and kills; Hard counts more
 test('Challenges', 'mode, seed and lock survive a snapshot', () => {
   const s = sim.createState(2, 1, { map: 0 });
   sim.setChallenge(s, { seed: 5150, map: 2, hard: false, sprint: true });
-  const g = decodeFast(encodeSnapshot(s, { seq: 1, at: 0, paused: false, ack: 0 })).state.game;
+  const g = decodeFast(encodeSnapshot(s, { seq: 1, at: 0, paused: false, acks: [0, 0] })).state.game;
   ok(g.sprint && g.locked && !g.hard, 'flags'); eq(g.seed, 5150, 'seed');
   eq(codeOf({ ...g }), codeOf(s), 'the guest shows the same code');
 });
@@ -778,6 +779,50 @@ test('Versus', 'who wins a race: survive, then waves cleared, then cottage, then
   const s = game({ cats: ['bomber'] });
   const r = raceStatus(s);
   ok(r.picked && r.last === TOTAL_WAVES && r.lives === s.maxLives, 'status of a fresh game');
+});
+
+// ---- 3 and 4 cats online ----------------------------------------------------------------
+test('Four cats', 'up to 4 cats, each a different one, with more and tougher monsters past the second', () => {
+  const X = BALANCE.difficulty.morePlayers;
+  const s4 = sim.createState(4, 1, { map: 0 });
+  eq(new Set(s4.players.map((p) => p.cat)).size, 4, 'four different cats');
+  const wave = (n) => {
+    let size = 0, hp = 0;
+    for (let seed = 1; seed <= 6; seed++) {
+      const s = game({ cats: CAT_ORDER.slice(0, n), seed });
+      s.wave = 6; size += nextQueue(s).split(' ').length;
+      sim.spawnEnemy(s, 'grunt', null, 0); hp = s.enemies.at(-1).maxhp;
+    }
+    return { size, hp };
+  };
+  const two = wave(2), three = wave(3), four = wave(4);
+  near(three.hp / two.hp, X[3].enemyHp, 1e-9, 'grunt health with 3 cats');
+  near(four.hp / two.hp, X[4].enemyHp, 1e-9, 'grunt health with 4 cats');
+  near(three.size / two.size, X[3].waveSize, 0.12, `${three.size} monsters with 3 cats, ${two.size} with 2`);
+  near(four.size / two.size, X[4].waveSize, 0.15, `${four.size} monsters with 4 cats, ${two.size} with 2`);
+});
+
+test('Four cats', 'a boss shield takes more bombs with every cat past the second', () => {
+  const at = (n) => { const s = game({ cats: CAT_ORDER.slice(0, n) }); sim.spawnEnemy(s, 'boss', null, 0); const e = s.enemies.at(-1); sim.damage(s, e, e.maxhp * 0.5, true); return e.shieldMax; };
+  eq(at(2), SHIELD.hitsCoop, 'two cats');
+  eq(at(4), SHIELD.hitsCoop + BALANCE.difficulty.morePlayers[4].shieldHits, 'four cats');
+});
+
+test('Four cats', 'the host keeps each guest\'s inputs apart and tells each one its own ack', () => {
+  const h = createHostLink();
+  h.receiveInputs(1, [{ seq: 1, mx: 1 }, { seq: 2, mx: 1 }]);
+  h.receiveInputs(3, [{ seq: 1, my: -1, bomb: true }]);
+  eq(h.nextInput(1).mx, 1, 'P2 moves'); ok(h.nextInput(3).bomb, 'P4 bombs');
+  ok(!h.nextInput(2).mx, 'nobody plays P3: it stands still');
+  ok(!h.nextInput(3).bomb, 'a late input repeats the keys held, not the taps');
+  const s = game({ cats: CAT_ORDER.slice(0, 4) });
+  const sent = [], link = (name) => ({ congested: false, sendFast: (b) => sent.push([name, b]), send() {} });
+  h.ticked(); h.ticked();
+  eq(h.send(new Map([[1, link('P2')], [3, link('P4')]]), s, 1000, 0, false), 1, 'sent');
+  eq(sent.length, 2, 'one snapshot to each guest');
+  const m = decodeFast(sent[0][1]);
+  eq(m.acks.join(), '0,1,0,1', 'acks by player');
+  eq(m.state.players.length, 4, 'all four cats in the snapshot');
 });
 
 // ---- whole games ----------------------------------------------------------------
@@ -1101,7 +1146,7 @@ test('Power-ups', 'elites and power-ups survive a snapshot', () => {
   eliteOn(s, 'tank', road, 'regenerating');
   loose(s, 'sun', 100, 100);
   p.item = 'water';
-  const m = decodeFast(encodeSnapshot(s, { seq: 1, at: 0, paused: false, ack: 0 }));
+  const m = decodeFast(encodeSnapshot(s, { seq: 1, at: 0, paused: false, acks: [0, 0] }));
   eq(m.state.enemies.at(-1).elite, 'regenerating', 'trait');
   eq(m.state.items[0].kind, 'sun', 'item on the ground');
   eq(m.state.players[0].item, 'water', 'carried item');
@@ -1260,7 +1305,7 @@ test('Boss chests', 'a perk is offered at most twice; endless opens the last bos
     sim.continueEndless(s);
     ok(!s.chest.offers.flat().includes('roof'), 'roof offered a third time');
   }
-  const m = decodeFast(encodeSnapshot(s, { seq: 1, at: 0, paused: false, ack: 0 }));
+  const m = decodeFast(encodeSnapshot(s, { seq: 1, at: 0, paused: false, acks: [0, 0] }));
   eq(m.state.game.chest.offers[0].length, CHEST.choices, 'offers in a snapshot');
   eq(m.state.game.perks.roof, 2, 'team perks in a snapshot');
 });
@@ -1269,7 +1314,7 @@ test('Boss chests', 'shields and perks survive a snapshot', () => {
   const { s, boss } = bossGame();
   hurtTo(s, boss, 0.5);
   sim.applyPerk(s, s.players[0], 'paws');
-  const m = decodeFast(encodeSnapshot(s, { seq: 1, at: 0, paused: false, ack: 0 }));
+  const m = decodeFast(encodeSnapshot(s, { seq: 1, at: 0, paused: false, acks: [0, 0] }));
   const e = m.state.enemies.find((x) => x.type === 'boss');
   eq(e.shield, SHIELD.hitsCoop, 'shield'); eq(e.shieldMax, SHIELD.hitsCoop, 'shield max');
   eq(m.state.players[0].perks.paws, 1, 'perk');
@@ -1320,9 +1365,9 @@ test('Online', 'a snapshot decodes back to the same game', () => {
   tick(s, { ready: true });
   for (let i = 0; i < 60 * 8; i++) tick(s);
   ok(s.enemies.length > 0, 'monsters are out');
-  const m = decodeFast(encodeSnapshot(s, { seq: 5, at: 1234.5, paused: false, ack: 9 }));
+  const m = decodeFast(encodeSnapshot(s, { seq: 5, at: 1234.5, paused: false, acks: [0, 9, 4] }));
   ok(m && m.t === 'snap', 'decodes as a snapshot');
-  eq(m.seq, 5, 'seq'); eq(m.ack, 9, 'ack');
+  eq(m.seq, 5, 'seq'); eq(m.acks.join(), '0,9,4', 'acks');
   const g = m.state;
   eq(g.game.wave, s.wave, 'wave'); eq(g.game.map, s.map, 'map');
   eq(g.enemies.length, s.enemies.length, 'monster count');

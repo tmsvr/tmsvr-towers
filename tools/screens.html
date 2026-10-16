@@ -90,6 +90,9 @@ show('Menu, still online after a game', null, ui({ online: 'host' }));
 show('Flower guide', null, ui({ guide: 1 }));
 show('Pick screen, co-op', sim.createState(2, 1, { map: 0 }), ui());
 show('Pick screen, solo', sim.createState(1, 1, { map: 0 }), ui());
+const pick4 = sim.createState(4, 1, { map: 0 });
+pick4.players.forEach((p, i) => { p.pick.chosen = [['thorn', 'frost', 'daisy'], ['daisy', 'stink'], ['daisy'], ['daisy', 'sunflower', 'firelily']][i]; p.pick.ready = i === 3; p.pick.row = [2, 1, 2, 2][i]; p.pick.cursor = i; });
+show('Pick screen, 4 cats online', pick4, ui({ mode: () => 'host' }));
 
 givePerks(duo);
 show('Game, co-op, with a banner and intro cards', duo, ui({ cam: camOn(duo, duo.players[0]) }), () => {
@@ -99,6 +102,10 @@ show('Game, co-op, with a banner and intro cards', duo, ui({ cam: camOn(duo, duo
 });
 show('Game, online (status label)', duo, ui({ cam: camOn(duo, duo.players[0]), netLabel: 'Online · room HDPM · P2 connected', perf: '42 ms · 60 fps · 18 ms', mode: () => 'host' }));
 show('Game, solo', solo, ui({ cam: camOn(solo, solo.players[0]) }));
+// 4 cats online, as P3 sees it: its own card in full, the others small
+const quad = playUntil(4, 5);
+givePerks(quad);
+show('Game, online, 4 cats (P3\'s screen)', quad, ui({ cam: camOn(quad, quad.players[2]), netLabel: 'Online · room HDPM · 4 cats', perf: '42 ms · 60 fps · 18 ms', mode: () => 'guest', me: () => 2 }));
 // versus races: the rival's panel, and the wait for the rivals to pick
 const rival = { wave: 5, last: 6, phase: 'wave', cleared: 4, lives: 143, maxLives: 200, kills: 1234, score: 12345, over: false, won: false, players: 2, picked: true };
 show('Game, versus race, with a teammate', duo, ui({ cam: camOn(duo, duo.players[0]), netLabel: 'Online · room HDPM · P2 connected', perf: '42 ms · 60 fps · 18 ms', mode: () => 'host', versus: { race: {}, rival } }));
@@ -107,6 +114,7 @@ show('Game, versus race, waiting for the rivals to pick', held, ui({ versus: { r
 
 const chestOf = (s) => ({ offers: s.players.map((p, i) => i ? ['thumb', 'roof', 'pouch'] : ['paws', 'roots', `fourth:${FLOWER_ORDER.find((t) => !p.loadout.includes(t))}`]), cursor: s.players.map(() => 1), picked: s.players.map(() => null), lock: 0 });
 duo.chest = { ...chestOf(duo), lock: 0.5 }; show('Boss chest, co-op, just opened (locked)', duo, ui({ cam: camOn(duo, duo.players[0]) })); duo.chest = null;
+quad.chest = { ...chestOf(quad), picked: [null, 'roof', null, 'thumb'] }; show('Boss chest, 4 cats (P3\'s screen)', quad, ui({ cam: camOn(quad, quad.players[2]), mode: () => 'guest', me: () => 2 })); quad.chest = null;
 solo.chest = chestOf(solo); show('Boss chest, solo', solo, ui({ cam: camOn(solo, solo.players[0]) })); solo.chest = null;
 show('Pause, co-op with perks', duo, ui({ cam: camOn(duo, duo.players[0]), paused: true }));
 show('Pause, solo without perks', solo, ui({ cam: camOn(solo, solo.players[0]), paused: true }));
@@ -120,6 +128,9 @@ duo.won = false; duo.over = true; duo.endless = true; duo.wave = 34;
 show('Defeat, co-op, endless wave 34 (big numbers)', duo, ui({ cam: camOn(duo, duo.players[0]), summary: bigSummary(S, 25) }));
 const sSolo = gameSummary(runBot({ players: 1, seed: 4, map: 0, maxMinutes: 40 }).game);
 solo.over = true;
+const S4 = gameSummary(runBot({ players: 4, seed: 2, map: 0, maxMinutes: 40 }).game);
+quad.over = true;
+show('Defeat, 4 cats', quad, ui({ cam: camOn(quad, quad.players[0]), summary: S4 }));
 show('Defeat, solo', solo, ui({ cam: camOn(solo, solo.players[0]), summary: sSolo }));
 show('Victory, versus race won', duo, ui({ cam: camOn(duo, duo.players[0]), summary: sSolo, versus: { race: {}, result: 'win', rival: { ...rival, over: true } } }), () => { duo.won = true; duo.over = false; });
 show('Defeat, versus race still going (no summary yet)', solo, ui({ cam: camOn(solo, solo.players[0]), versus: { race: {}, result: null, rival } }));

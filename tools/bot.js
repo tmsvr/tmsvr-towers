@@ -86,7 +86,7 @@ const onTile = (p, tx, ty) => Math.floor(p.x / T) === tx && Math.floor(p.y / T) 
 // onTick(s, jobs, roles), if given, is called after every tick (for watching what the bot does).
 export function runBot({ players = 2, seed = 1, loadouts, cats, map = 0, hard = false, sprint = false, maxMinutes = 40, habits = {}, onTick } = {}) {
   const H = { ...HABITS, ...habits };
-  cats ??= players > 1 ? ['bomber', 'gardener'] : ['gardener'];
+  cats ??= players > 1 ? ['bomber', 'gardener', 'brawler', 'scout'].slice(0, players) : ['gardener']; // 3-4 cats: one more guard each
   const s = sim.createState(players, seed, { map, cats, hard, sprint });
   const m = s.m, base = m.base;
   fields.clear();
@@ -284,6 +284,8 @@ export function runBot({ players = 2, seed = 1, loadouts, cats, map = 0, hard = 
   }
 
   const jobs = s.players.map(() => null);
+  // each cat looks for a new job every 10 ticks, on its own tick (P1 0, P2 5, P3 1, P4 6)
+  const jobTick = (i) => (i * 5 + Math.floor(i / 2)) % 10;
   const log = [];
   let lastWave = 0, lastLives = s.lives;
   for (let tick = 0; tick < 60 * 60 * maxMinutes && !s.over && !s.won; tick++) {
@@ -324,7 +326,7 @@ export function runBot({ players = 2, seed = 1, loadouts, cats, map = 0, hard = 
       } else {
         // the gardener helps when the cottage is eaten and the guard is away,
         // and otherwise only bonks what comes close while it has nothing to do
-        if (!jobs[i] && tick % 10 === i * 5) jobs[i] = gardenJob(p, i); // a job first: fighting is for when there's nothing to spend on
+        if (!jobs[i] && tick % 10 === jobTick(i)) jobs[i] = gardenJob(p, i); // a job first: fighting is for when there's nothing to spend on
         if (!jobs[i]) {
           const close = enemiesNear(p, atkRange(p) + T * 0.3)[0];
           if (close) { fight(p, close, inp); return; }
@@ -340,7 +342,7 @@ export function runBot({ players = 2, seed = 1, loadouts, cats, map = 0, hard = 
         return;
       }
       if (jobs[i] && jobDone(p, jobs[i])) jobs[i] = null;
-      if (!jobs[i] && tick % 10 === i * 5) jobs[i] = gardenJob(p, i);
+      if (!jobs[i] && tick % 10 === jobTick(i)) jobs[i] = gardenJob(p, i);
       if (jobs[i]) { doJob(p, jobs[i], inp); return; }
       // nothing to do: pick up coins
       const coin = nearest(s.drops, p);

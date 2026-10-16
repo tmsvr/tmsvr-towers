@@ -9,13 +9,15 @@ import { createPredictor, predictTick, reconcile, unacked, showPrediction } from
 const DT = 1 / 60;
 
 // sample(): this tick's keys (taps included, then forgotten). dropTaps():
-// forget taps without using them.
+// forget taps without using them. The host tells us which cat is ours
+// ('welcome'); until then we guess P2.
 export function createGuestLink({ sample, dropTaps }) {
   const pred = createPredictor();
   let acc = 0, unsent = 0, lastKeys = '', lastPing = 0;
 
   return {
     pred,
+    pid: 1,
 
     update(net, s, elapsed, now) {
       const fr = newestFrame(s);
@@ -24,8 +26,8 @@ export function createGuestLink({ sample, dropTaps }) {
       const canMove = g.phase !== 'pick' && !g.over && !g.won && !fr.paused && !g.chest && !g.hold; // the host's game waits during a boss chest and before a race
       if (fr.seq !== pred.baseSeq) {
         pred.baseSeq = fr.seq;
-        const me = fr.byId.players.get(1);
-        if (me) reconcile(pred, m, me.snap, fr.ack, canMove);
+        const me = fr.byId.players.get(this.pid);
+        if (me) reconcile(pred, m, me.snap, fr.acks?.[this.pid] || 0, canMove);
       }
       acc = Math.min(acc + elapsed, 0.25);
       let changed = false;
@@ -48,6 +50,6 @@ export function createGuestLink({ sample, dropTaps }) {
     },
 
     // Draw our cat where we've predicted it, between our last two ticks.
-    show(s, frameDt) { showPrediction(pred, s.players[1], acc / DT, frameDt); },
+    show(s, frameDt) { showPrediction(pred, s.players.find((p) => p.id === this.pid), acc / DT, frameDt); },
   };
 }

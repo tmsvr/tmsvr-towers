@@ -9,7 +9,7 @@ import { ENEMIES, FLOWER_ORDER, CAT_ORDER, ELITE_TRAITS, ITEM_KINDS, PERKS } fro
 // so small numbers take one byte and a position in tenths of a pixel three.
 // Bump whenever a message changes shape, so mismatched copies refuse to play
 // together instead of misreading each other (checked when a guest joins).
-export const PROTOCOL = 15;
+export const PROTOCOL = 16;
 
 const utf8 = new TextEncoder(), fromUtf8 = new TextDecoder();
 
@@ -175,10 +175,12 @@ const SECTIONS = [
 // ---- messages -------------------------------------------------------------------
 const SNAP = 1, INPUTS = 2;
 
-// The world at host time `at`, plus the last guest input applied (`ack`).
-export function encodeSnapshot(s, { seq, at, paused, ack }) {
+// The world at host time `at`, plus the last input applied from each guest
+// (`acks`, by player id; the host's own place is 0). One snapshot serves every guest.
+export function encodeSnapshot(s, { seq, at, paused, acks }) {
   const w = new Out();
-  w.byte(SNAP); w.uint(seq); w.f64(at); w.byte(paused ? 1 : 0); w.uint(ack);
+  w.byte(SNAP); w.uint(seq); w.f64(at); w.byte(paused ? 1 : 0);
+  w.uint(acks.length); for (const a of acks) w.uint(a || 0);
   for (const [from, codec] of SECTIONS) codec.write(w, from ? s[from] : s, s);
   return w.bytes();
 }
@@ -203,7 +205,7 @@ export function encodeInputs(list) {
   return w.bytes();
 }
 
-// A fast-lane message back into an object: { t: 'snap', seq, at, paused, ack,
+// A fast-lane message back into an object: { t: 'snap', seq, at, paused, acks,
 // state: { game, players, flowers, ... } } or { t: 'in', inputs: [one per tick] }.
 // Anything that doesn't decode cleanly gives null.
 export function decodeFast(buf) {
@@ -218,7 +220,8 @@ function decode(buf) {
   const r = new In(buf);
   const type = r.byte();
   if (type === SNAP) {
-    const m = { t: 'snap', seq: r.uint(), at: r.f64(), paused: r.byte() === 1, ack: r.uint(), state: {} };
+    const m = { t: 'snap', seq: r.uint(), at: r.f64(), paused: r.byte() === 1, state: {} };
+    m.acks = Array.from({ length: r.len(8) }, () => r.uint());
     for (const [from, codec] of SECTIONS) m.state[from || 'game'] = codec.read(r);
     return m;
   }

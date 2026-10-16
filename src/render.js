@@ -1764,7 +1764,7 @@ function coinIcon(c, x, y, r) {
 }
 
 function contextText(s, p, ui) {
-  if (!p.loadout) return p.pick.ready ? 'Ready! Waiting for the other cat…' : 'Choosing flowers…';
+  if (!p.loadout) return p.pick.ready ? `Ready! Waiting for the other cat${s.players.length > 2 ? 's' : ''}…` : 'Choosing flowers…';
   if (p.stun > 0) return 'Knocked down!';
   const key = ui.keyLabel(ui.keysFor(p.id).build), cyc = ui.keyLabel(ui.keysFor(p.id).cycle), hk = ui.keyLabel(ui.keysFor(p.id).heal);
   const m = s.m;
@@ -1808,10 +1808,17 @@ function drawHud(c, s, time, ui) {
   label(c, status, 14, y0 + 78, 12, '#a9bccb', 'left', 500, null);
   label(c, isMuted() ? '🔇' : '', 220, y0 + 30, 14, '#fff', 'center', 500, null);
 
-  // the cats' cards, centred in the space right of the cottage on a wide screen
-  const pw = 370, cards = s.players.length * (pw + 12) - 12, left = 250 + Math.max(0, Math.round((VIEW_W - 260 - cards) / 2));
+  // the cats' cards, centred in the space right of the cottage on a wide screen.
+  // With 3 or 4 cats (online) your own card is full size and the others small.
+  const n = s.players.length, me = ui.me?.() ?? 0, pw = 370, gap = 12, avail = VIEW_W - 260;
+  const mini = n > 2 ? Math.min(190, Math.floor((avail - pw - gap * (n - 1)) / (n - 1))) : 0;
+  const widths = s.players.map((p) => (n > 2 && p.id !== me ? mini : pw));
+  const cards = widths.reduce((a, w) => a + w + gap, -gap);
+  let left = 250 + Math.max(0, Math.round((avail - cards) / 2));
   s.players.forEach((p, i) => {
-    const x0 = left + i * (pw + 12);
+    const x0 = left;
+    left += widths[i] + gap;
+    if (widths[i] !== pw) { drawMiniCard(c, s, p, x0, y0, widths[i], time); return; }
     const pc = PLAYER.scarves[i];
     rrect(c, x0, y0 + 9, pw, HUD_H - 18, 12, 'rgba(255,255,255,0.06)', pc, 2);
     rrect(c, x0 + 10, y0 + 17, 30, 18, 9, pc);
@@ -1863,6 +1870,27 @@ function drawHud(c, s, time, ui) {
     });
   });
 }
+
+// Another cat's card when there are 3 or 4: who, coins, bomb, power-up, what it's up to.
+function drawMiniCard(c, s, p, x0, y0, w, time) {
+  const pc = PLAYER.scarves[p.id];
+  rrect(c, x0, y0 + 9, w, HUD_H - 18, 12, 'rgba(255,255,255,0.06)', pc, 2);
+  rrect(c, x0 + 8, y0 + 17, 30, 18, 9, pc);
+  label(c, `P${p.id + 1}`, x0 + 23, y0 + 26.5, 12, '#fff', 'center', 700, null);
+  coinIcon(c, x0 + 50, y0 + 26, 7);
+  label(c, `${Math.floor(p.coins)}`, x0 + 61, y0 + 27, 14, '#ffe27a', 'left', 700, null);
+  const bx = x0 + 22, by = y0 + 60;
+  circle(c, bx, by, 12, 'rgba(0,0,0,0.45)', OUT, 2);
+  const frac = Math.min(1, p.bombs);
+  if (frac < 1) { c.beginPath(); c.moveTo(bx, by); c.arc(bx, by, 10, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2); c.closePath(); c.fillStyle = 'rgba(255,179,71,0.55)'; c.fill(); }
+  else circle(c, bx, by, 10, `rgba(255,179,71,${0.5 + Math.sin(time * 5) * 0.2})`);
+  circle(c, bx, by + 1, 5, '#2b2b33', OUT, 1.2);
+  if (p.item) drawItemIcon(c, p.item, x0 + 50, by, 8);
+  const doing = !p.loadout ? (p.pick.ready ? 'ready' : 'picking') : p.stun > 0 ? 'knocked down' : p.working ? (p.healing ? 'healing' : 'gardening') : p.building ? 'planting' : CATS[p.cat]?.name || '';
+  label(c, fitText(c, doing, w - (p.item ? 72 : 52), 11), x0 + (p.item ? 64 : 42), by, 11, p.stun > 0 ? '#ffb347' : '#a9bccb', 'left', 600, null);
+}
+
+const CARD_COLORS = ['#8fc3ff', '#ff9ab8', '#8fe0a0', '#ffc27a']; // the scarf colours, lightened
 
 // The pause screen: the keys, then (once there are any) a panel with every
 // cat's chest perks and the team's, each with what it adds up to.
@@ -2054,7 +2082,8 @@ function drawPick(c, s, ui, time) {
     lines.forEach((t, j) => label(c, fitText(c, t, cw - 8, 11), cx, y0 + 215 - (lines.length - 1 - j) * 13, 11, j ? '#cfe0ea' : '#8fa5b3', 'center', 500, null));
     pickedBy.forEach((p) => {
       const n = p.pick.chosen.indexOf(t) + 1;
-      const bx = p.id === 0 ? x + 18 : x + cw - 18;
+      // up to 4 badges: P1 and P2 in the top corners, P3 and P4 just inside them
+      const bx = [x + 18, x + cw - 18, x + 44, x + cw - 44][p.id] ?? x + 18;
       circle(c, bx, y0 + 18, 12, PLAYER.scarves[p.id], '#ffffff', 2);
       label(c, `${n}`, bx, y0 + 19, 13, '#fff', 'center', 700, null);
     });
@@ -2063,7 +2092,7 @@ function drawPick(c, s, ui, time) {
   // per-player status and controls
   s.players.forEach((p, i) => {
     const k = ui.keysFor(p.id);
-    const y = y0 + ch + 20 + i * 24;
+    const y = y0 + ch + (s.players.length > 2 ? 14 + i * 20 : 20 + i * 24); // 4 rows still fit above the HUD
     const n = p.pick.chosen.length;
     const L = ui.keyLabel;
     const keys = p.pick.row === 0 ? (s.locked ? `map and mode are set by the challenge · [${L(k.down)}] cats` : `[${L(k.left)}/${L(k.right)}] change map · [${L(k.build)}] mode · [${L(k.down)}] cats`)
@@ -2104,9 +2133,14 @@ function drawChest(c, s, ui, time) {
   dim(c, 'rgba(12,18,26,0.72)', false);
   label(c, 'Boss chest!', BASE_W / 2, 52, 36, '#ffe27a', 'center', 700, OUT);
   label(c, 'Each cat takes one perk for the rest of the run', BASE_W / 2, 86, 15, '#cfe0ea', 'center', 500, null);
-  const n = s.players.length, colW = BASE_W / n;
-  s.players.forEach((p, i) => {
-    const offers = ch.offers[i] || [], picked = ch.picked[i], cx = colW * (i + 0.5), pc = PLAYER.scarves[i];
+  // with 3 or 4 cats each screen shows its own cat's cards, and how far the others are
+  const n = s.players.length, me = ui.me?.() ?? 0, shown = n > 2 ? s.players.filter((p) => p.id === me) : s.players, colW = BASE_W / shown.length;
+  if (n > 2) {
+    const others = s.players.filter((p) => p.id !== me).map((p) => `P${p.id + 1} ${ch.picked[p.id] != null ? 'picked ✓' : 'choosing…'}`).join('   ·   ');
+    label(c, others, BASE_W / 2, 398, 14, '#a9bccb', 'center', 600, null);
+  }
+  shown.forEach((p, k) => {
+    const i = p.id, offers = ch.offers[i] || [], picked = ch.picked[i], cx = colW * (k + 0.5), pc = PLAYER.scarves[i];
     label(c, `P${i + 1}`, cx, 122, 16, pc, 'center', 700, OUT);
     if (!offers.length) { label(c, 'Nothing left to take', cx, 230, 15, '#8fa5b3', 'center', 500, null); return; }
     const cw = Math.min(150, (colW - 40) / offers.length - 10), x0 = cx - (offers.length * (cw + 10) - 10) / 2;
@@ -2141,7 +2175,7 @@ function drawChest(c, s, ui, time) {
   const L = (id) => ui.keysFor(id), pair = (id) => `${ui.keyLabel(L(id).left)}/${ui.keyLabel(L(id).right)}`;
   const keys = ui.mode() === 'local' && n > 1 ? `P1: ${pair(0)} choose, ${k(0)} or ${a(0)} take  ·  P2: ${pair(1)} choose, ${k(1)} or ${a(1)} take` : `${pair(0)} or ←/→ to choose  ·  ${k(0)} or ${a(0)} to take it`;
   label(c, keys, BASE_W / 2, BASE_MAP_H - 40, 15, '#fff', 'center', 600, null);
-  if (ch.picked.some((x) => x != null) && ch.picked.some((x) => x == null)) label(c, 'Waiting for the other cat…', BASE_W / 2, BASE_MAP_H - 18, 13, '#a9bccb', 'center', 500, null);
+  if (ch.picked.some((x) => x != null) && ch.picked.some((x) => x == null)) label(c, `Waiting for ${s.players.length > 2 ? `${ch.picked.filter((x) => x == null).length} more cats` : 'the other cat'}…`, BASE_W / 2, BASE_MAP_H - 18, 13, '#a9bccb', 'center', 500, null);
 }
 
 function drawOverlay(c, title, sub, col) {
@@ -2189,7 +2223,7 @@ function drawEndScreen(c, s, ui, time) {
   if (!S) { drawOverlay(c, title, [head, scoreLine(s, ui), ...(race ? [rivalWords()] : []), keys], col); return; }
   dim(c, 'rgba(12,18,26,0.88)');
   // the two panels are as tall as their contents (a solo game has one cat, few flowers), centred
-  const rowH = 46, blockH = 150;
+  const rowH = 46, many = S.cats.length > 2, blockH = many ? 86 : 150; // 3-4 cats get shorter blocks
   const h = clamp(Math.max(70 + S.flowers.length * rowH + (S.best ? 34 : 0), 52 + S.cats.length * (blockH + 8)), 250, 430);
   const top = Math.round((BASE_H - h) / 2) + 6;
   label(c, title, BASE_W / 2, top - 92, 46, col, 'center', 700, OUT);
@@ -2227,14 +2261,15 @@ function drawEndScreen(c, s, ui, time) {
   rrect(c, cx, top, cw, h, 14, 'rgba(255,255,255,0.06)', 'rgba(255,255,255,0.15)', 1.5);
   label(c, 'Cats', cx + 18, top + 24, 20, '#ffe27a', 'left', 700, null);
   S.cats.forEach((k, i) => {
-    const y = top + 48 + i * (blockH + 8), K = CATS[k.cat] || {}, tx = cx + 88;
-    c.save(); c.translate(cx + 42, y + 40); c.scale(1.1, 1.1);
+    const y = top + 48 + i * (blockH + 8), K = CATS[k.cat] || {}, tx = cx + (many ? 74 : 88);
+    c.save(); c.translate(cx + (many ? 36 : 42), y + (many ? 36 : 40)); c.scale(many ? 0.8 : 1.1, many ? 0.8 : 1.1);
     drawCat(c, { id: i, cat: k.cat, noTag: true, x: 0, y: 0, dir: 0, moving: false, stun: 0, swingT: 0, swingDir: 0 }, time);
     c.restore();
-    label(c, `P${i + 1}  ${K.name || k.cat}`, tx, y + 14, 18, ['#8fc3ff', '#ff9ab8'][i], 'left', 700, null); // scarf colours, lightened
-    const rows = [['Coins earned', k.earned], ['Spent on flowers', k.spent], ['Baton damage', k.baton], ['Bomb damage', k.bomb], ['Monsters bonked', k.kills], ['Their flowers dealt', k.garden]];
+    label(c, `P${i + 1}  ${K.name || k.cat}`, tx, y + 14, 18, CARD_COLORS[i], 'left', 700, null);
+    const rows = many ? [['Coins earned', k.earned], ['Monsters bonked', k.kills], ['Spent on flowers', k.spent], ['Their flowers dealt', k.garden]]
+      : [['Coins earned', k.earned], ['Spent on flowers', k.spent], ['Baton damage', k.baton], ['Bomb damage', k.bomb], ['Monsters bonked', k.kills], ['Their flowers dealt', k.garden]];
     rows.forEach(([name, v], j) => {
-      const colX = tx + (j % 2) * ((cx + cw - tx - 8) / 2), ry = y + 42 + Math.floor(j / 2) * 34;
+      const colX = tx + (j % 2) * ((cx + cw - tx - 8) / 2), ry = y + (many ? 34 : 42) + Math.floor(j / 2) * (many ? 30 : 34);
       label(c, name, colX, ry, 11.5, '#8fa5b3', 'left', 500, null);
       label(c, num(v), colX, ry + 15, 16, '#fff', 'left', 600, null);
     });
@@ -2371,7 +2406,7 @@ function drawMenu(c, time, ui) {
   const cx = BASE_W / 2;
   rrect(c, cx - 370, 24, 740, 512, 24, 'rgba(30,38,48,0.93)', 'rgba(255,255,255,0.25)', 2);
   label(c, 'Petal Patrol', cx, 84, 64, '#ffe27a', 'center', 700, OUT);
-  label(c, 'Two cats. One garden. Many, many monsters.', cx, 130, 18, '#cfe0ea', 'center', 500, null);
+  label(c, 'Up to four cats. One garden. Many, many monsters.', cx, 130, 18, '#cfe0ea', 'center', 500, null);
   drawCat(c, { id: 0, cat: 'scout', x: cx - 250, y: 84, dir: 0, moving: true, swingT: 0, stun: 0 }, time);
   drawCat(c, { id: 1, cat: 'gardener', x: cx + 250, y: 84, dir: Math.PI, moving: true, swingT: 0, stun: 0 }, time);
   FLOWER_ORDER.forEach((t, i) => {
@@ -2383,7 +2418,8 @@ function drawMenu(c, time, ui) {
   // how to start: one keycap per mode
   if (ui.online) {
     c.globalAlpha = 0.75 + Math.sin(time * 4) * 0.25;
-    label(c, `Still online with ${ui.online === 'host' ? 'P2' : 'the host'}  ·  3 or Enter: play again together  ·  Esc: leave`, cx, 304, 19, '#8dff9a', 'center', 600, null);
+    const n = ui.guests?.() ?? 1, who = ui.online === 'host' ? (n > 1 ? `${n} friends` : 'P2') : 'the host';
+    label(c, `Still online with ${who}  ·  3 or Enter: play again together  ·  Esc: leave`, cx, 304, 19, '#8dff9a', 'center', 600, null);
     c.globalAlpha = 1;
   } else {
     const modes = [['1', 'Solo'], ['2', 'Local co-op'], ['3', 'Host online'], ['4', 'Join online'], ['5', 'Versus'], ['O', 'Load']];
@@ -2430,7 +2466,7 @@ function drawMenuKeys(c) {
   const keys = [['Enter', 'next wave early'], ['P', 'pause'], ['N', 'sound'], ['I', 'flower guide'], ['L', 'game logs']];
   let x = cx - chipsWidth(c, keys, 14, 20) / 2;
   for (const [key, txt] of keys) x += keyChip(c, x, MAP_H + 34, key, txt, 14) + 20;
-  label(c, 'Online, both players use the P1 keys (or the arrows) on their own keyboard.', cx, MAP_H + 68, 13, '#8fa5b3', 'center', 500, null);
+  label(c, 'Online (up to 4 cats), everyone uses the P1 keys (or the arrows) on their own keyboard.', cx, MAP_H + 68, 13, '#8fa5b3', 'center', 500, null);
 }
 
 // The depth-sorted draw list, reused every frame.

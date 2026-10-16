@@ -30,6 +30,9 @@ const EDGE = 14;
 export const TUNE = DIFFICULTY;
 // Hard mode multiplies monster health, how many come and the coins they drop (chosen on the pick screen).
 const HARD = { enemyHp: 1, waveSize: 1, coins: 1, ...DIFFICULTY.hard };
+// 3 or 4 cats (online) meet more and tougher monsters (balance.json → difficulty.morePlayers).
+// Read when used, so it can be swept from the console like the rest of TUNE.
+const more = (s, k, none = 1) => DIFFICULTY.morePlayers?.[s.players.length]?.[k] ?? none;
 
 // The waves come from their own random numbers, started from the seed, so the
 // same seed, map and mode always bring the same monsters, however the game is
@@ -199,7 +202,7 @@ export function spawnEnemy(s, type, from, path = 0, elite) {
   // One curve for every wave, endless included: each wave is hpGrowth tougher than
   // the last, so there is no jump anywhere and a full garden meets a clear wall.
   const grow = Math.pow(1 + TUNE.hpGrowth, w);
-  const hpScale = (TUNE.enemyHp ?? 1) * grow * (solo ? (d.boss ? TUNE.soloBossHp : 1) : TUNE.coopEnemyHp) * finale * endlessBoss * (s.hard ? HARD.enemyHp : 1);
+  const hpScale = (TUNE.enemyHp ?? 1) * grow * (solo ? (d.boss ? TUNE.soloBossHp : 1) : TUNE.coopEnemyHp * more(s, 'enemyHp')) * finale * endlessBoss * (s.hard ? HARD.enemyHp : 1);
   const j = () => (rnd(s) - 0.5) * 18 * U;
   const id = s.nextId++;
   const road = s.m.paths[from ? from.path : path];
@@ -364,7 +367,7 @@ export function damage(s, e, amt, ignoreArmor = false, quiet = false, src = null
 // ---- Boss shields (IDEAS R3) ------------------------------------------------------
 function raiseShield(s, e) {
   e.shieldAt.shift();
-  e.shield = e.shieldMax = s.players.length > 1 ? SHIELD.hitsCoop : SHIELD.hitsSolo;
+  e.shield = e.shieldMax = s.players.length > 1 ? SHIELD.hitsCoop + more(s, 'shieldHits', 0) : SHIELD.hitsSolo;
   e.exposedT = 0;
   banner(s, 'The boss raised a shield! Bomb it');
   ev(s, 'shieldUp');
@@ -587,7 +590,7 @@ function buildQueue(s, n) {
   // easy crowds for pulse flowers); their monsters get tougher instead.
   const endless = n > TOTAL_WAVES + 1;
   let budget = (endless ? size(TOTAL_WAVES) * (1 + (TUNE.endlessWaveSizePerWave ?? 0) * (n - TOTAL_WAVES)) : size(n))
-    * (s.players.length > 1 ? TUNE.coopWaveSize : TUNE.soloWaveSize) * s.m.waveSize * (s.hard ? HARD.waveSize : 1);
+    * (s.players.length > 1 ? TUNE.coopWaveSize * more(s, 'waveSize') : TUNE.soloWaveSize) * s.m.waveSize * (s.hard ? HARD.waveSize : 1);
   const avail = s.m.waves.map((u, i) => ({ ...u, fromWave: from[i] })).filter((u) => u.fromWave <= n);
   const bossWave = n % TUNE.bossEvery === 0;
   if (bossWave) budget *= TUNE.bossWaveBudget;

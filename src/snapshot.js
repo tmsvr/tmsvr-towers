@@ -29,9 +29,9 @@ export function effectsMessage(fx, events, at) {
 
 // The world as it is at host time `at`. Sent on the fast lane: any snapshot can
 // be lost or arrive out of order, so each one is complete on its own.
-// `ack` is the last guest input applied, for the guest's prediction.
-export function makeSnapshot(s, seq, at, paused, ack) {
-  return encodeSnapshot(s, { seq, at, paused, ack });
+// `acks` are the last inputs applied from each guest, for their prediction.
+export function makeSnapshot(s, seq, at, paused, acks) {
+  return encodeSnapshot(s, { seq, at, paused, acks });
 }
 
 // The guest's state has the same shape as the host's wherever render.js
@@ -63,7 +63,7 @@ function decode(m) {
   for (const e of u.enemies) e.def = ENEMIES[e.type];
   u.enemies = u.enemies.filter((e) => e.def);
   u.flowers = u.flowers.filter((f) => f.type);
-  const fr = { seq: m.seq, at: m.at, paused: m.paused, ack: m.ack, game: u.game, clouds: u.clouds, flowers: u.flowers, items: u.items.filter((it) => it.kind), byId: {} };
+  const fr = { seq: m.seq, at: m.at, paused: m.paused, acks: m.acks, game: u.game, clouds: u.clouds, flowers: u.flowers, items: u.items.filter((it) => it.kind), byId: {} };
   for (const f of u.flowers) { f.x = (f.tx + 0.5) * T; f.y = (f.ty + 0.5) * T; }
   const W = (MAPS[u.game.map] || MAPS[0]).W;
   fr.grid = new Map(u.flowers.map((f) => [f.ty * W + f.tx, f]));

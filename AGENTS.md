@@ -153,19 +153,29 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
 
 ### Online play
 
-- **Host-authoritative.** The host runs `sim.js`; the guest sends inputs (one
-  per tick, numbered and resent until acknowledged) and receives binary
-  snapshots on the unreliable channel. Sounds and effects ride along.
+- **Host-authoritative.** The host runs `sim.js`; each guest (up to 3, so 4
+  cats) sends inputs (one per tick, numbered and resent until acknowledged)
+  and receives binary snapshots on the unreliable channel. Sounds and effects
+  ride along. One snapshot serves every guest: its header carries the last
+  input applied from each (`acks`, by player id).
+- **Players and places.** The host's guests are a map of player id → link
+  (`guests` in `main.js`; P1 is always the host). The host waits in its lobby
+  until it presses Enter; then `seatGuests` gives the guests the places P2, P3…
+  and tells each with `{t: 'welcome', pid}` (the guest keeps it as `myPid`, for
+  its prediction, camera and HUD; `ui.me()` in `render.js`). Mid-game a
+  newcomer can only take the place of a cat whose player dropped out; a cat
+  nobody plays stands still. The sim scales monsters for every cat past the
+  second (`difficulty.morePlayers`); local co-op stays at 2 (one keyboard).
 - **The guest predicts its own cat** (`predict.js`) and blends everything else
   between snapshots (`snapshot.js`).
 - **Version check on join.** Both sides compare `PROTOCOL` (in `schema.js`)
   and `DATA_HASH` (a hash of `balance.json` + `maps.json`). If they differ, the
-  host refuses with "a different version of the game", so **both players must
+  host refuses with "a different version of the game", so **all players must
   run the same deploy** (hard reload after an update).
 - **If you change what a snapshot or input contains** (`schema.js` field
   lists), **bump `PROTOCOL`**.
 - **Back to the menu together.** Leaving a game (pause → M, or Esc on the
-  end screen) sends `{t: 'menu'}` and both sides go to the main menu still
+  end screen) sends `{t: 'menu'}` and everyone goes to the main menu still
   connected (`ui.online`). There 3 or Enter starts a new game (the guest sends
   `again`, the host answers `start` and the guest makes a fresh input link);
   Esc or another mode leaves. The guest ignores snapshots until `start`, since
@@ -182,8 +192,8 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
   `pause` across. The sims never talk to each other, so each side's game
   stays exactly as deterministic as before.
 - **Saves online** are made and loaded by the host. A loaded online save
-  either resumes at once (partner still connected) or opens a room and
-  resumes when P2 joins (`pendingSave`).
+  either resumes at once (the others still connected) or opens a room and
+  resumes when all its players have joined, or when the host presses Enter (`pendingSave`).
 
 ## Common changes
 
@@ -192,6 +202,7 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
 | Rebalance (damage, costs, HP, waves, economy) | Edit `balance.json`. The flower guide (I key) and pick cards update themselves |
 | Change a map, or add one | Edit/add an entry in `maps.json`, then look at it whole in `/tools/maps.html`. Roads are lists of corner points; each segment must be horizontal or vertical; every road ends at `base`. Check reachability (a scatter seed can wall off a tile; change `scatter.seed`) |
 | Tune Sprint or the score | `balance.json → sprint` (which waves it plays, breaks, coins) and `→ score`. Check Sprint with `runBot({ sprint: true })` |
+| Tune 3-4 cat games | `balance.json → difficulty.morePlayers`. Check with `runBot({ players: 3 })` and `players: 4` against `players: 2` |
 | Make a map easier or harder | `waveSize` (monster count; boss HP scales with its square root) and `startCoins` in `maps.json` |
 | Add a flower | New entry in `balance.json → flowers` (its `kind` picks the attack code in `sim.js`; a new kind needs new code there), plus its look in `render.js` (`SPEC`, `PERSONA`, `BODIES`). The pick screen, guide and network encoding pick it up automatically; bump `PROTOCOL` |
 | Add an enemy | Entry in `balance.json → enemies`, plus an entry in `waves` or a `waveSets` list (`fromWave`, `weight`, `cost`, `group`) so it spawns, an `intros` card, and its drawing in `drawEnemy` (`render.js`; check it in `/tools/gallery.html`). Bump `PROTOCOL` |
@@ -232,7 +243,9 @@ Check changes like this:
    usually a little behind (they won on Hourglass, it wins 4/4 with less
    cottage left), so read it as a slightly pessimistic estimate. Its habits
    are numbers in `HABITS` (`runBot({ habits })` overrides them; `onTick`
-   watches it play). Solo play is less tuned (the logs are all co-op). From
+   watches it play). Solo play is less tuned (the logs are all co-op). With 3
+   or 4 cats (`players: 3`) every cat but Fern guards; `difficulty.morePlayers`
+   is set so those games end about like 2-cat ones (no real 3-4 cat logs yet). From
    the console: `(await import('/tools/bot.js')).runBot({ players: 2, seed: 1, map: 0 })`
    returns `{ won, wave, lives, log, game }`.
 4. **Art and screens**: `/tools/gallery.html` (add `?zoom=5`) for sprites, and
