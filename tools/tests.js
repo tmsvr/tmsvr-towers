@@ -288,6 +288,21 @@ test('Bosses', 'the Mole King shakes the flowers around it when it comes up', ()
   near(before - f.hp, q.damage * WEAR_MULT[f.lvl], 0.5, 'quake damage');
 });
 
+test('Monsters', 'a mole at the cottage comes up to bite and stays up, so it can be hit', () => {
+  const s = game({ cats: ['bomber'] }), b = s.m.base, path = s.m.paths[0];
+  sim.spawnEnemy(s, 'mole', null, 0);
+  const e = s.enemies.at(-1);
+  e.seg = path.waypoints.length - 1;
+  e.x = b.x + Math.cos(e.baseAng) * T * 0.62; e.y = b.y + Math.sin(e.baseAng) * T * 0.5;
+  e.under = true; e.phaseT = 0;
+  const lives = s.lives;
+  tick(s);
+  eq(s.lives, lives, 'no bite from underground');
+  for (let t = 0; t < ENEMIES.mole.burrow.aboveSeconds + 1; t += DT) tick(s);
+  ok(!e.under && sim.hittable(e), 'above ground and hittable');
+  ok(s.lives < lives, 'bites once it is up');
+});
+
 test('Bosses', 'the Bramble Witch heals monsters near it and withers flowers', () => {
   const { s, f, road } = flowerByRoad('frost');
   const witch = monsterOn(s, 'witch', road), grunt = monsterOn(s, 'grunt', road), d = ENEMIES.witch;

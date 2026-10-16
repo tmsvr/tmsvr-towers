@@ -437,7 +437,9 @@ function updateEnemies(s, dt) {
     }
     if (e.def.burrow) {
       e.phaseT += dt;
-      if (e.phaseT >= (e.under ? e.def.burrow.belowSeconds : e.def.burrow.aboveSeconds)) {
+      // at the cottage a digger comes up and stays up: it can only bite from above
+      // ground, and while it bites the cats and flowers can hit it back
+      if (e.atBase ? e.under : e.phaseT >= (e.under ? e.def.burrow.belowSeconds : e.def.burrow.aboveSeconds)) {
         e.phaseT = 0;
         e.under = !e.under;
         puff(s, e.x, e.y, '#8a6038', 8, 70);
@@ -504,6 +506,7 @@ function quake(s, e) {
 function chompCottage(s, e, dt) {
   e.atBase = true;
   e.left = 0;
+  if (e.under) return; // still underground: it surfaces first (next tick), then bites
   e.wob += dt * 14;
   e.ang = Math.atan2(s.m.base.y - e.y, s.m.base.x - e.x);
   s.lives -= e.def.bite * dt;
