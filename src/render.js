@@ -11,7 +11,7 @@
 import {
   T, U, VIEW_W as BASE_W, MAP_H as BASE_MAP_H, HUD_H, TOTAL_WAVES, MAPS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, GLOBAL_RANGE, ENEMIES, INTROS,
-  BLOOM, bloomOf, ELITES, CHEST, ECONOMY,
+  BLOOM, bloomOf, ELITES, CHEST, ECONOMY, SEND,
 } from './data.js';
 import { tileOf, canBuildAt, uprootRefund, catStats, plantPrice, upgradeLeft, healLeft, lastWave, modeName, scoreOf, wavesCleared } from './sim.js';
 import { codeOf, encodeCode } from './challenge.js';
@@ -1898,14 +1898,15 @@ const CARD_COLORS = ['#8fc3ff', '#ff9ab8', '#8fe0a0', '#ffc27a']; // the scarf c
 // the screen, and while one team is still picking, a note that we wait.
 let race = null; // ui.versus for this frame, read by the stop screens
 const RACE_WORDS = { win: ['You have won the race!', '#8dff9a'], lose: ['The rivals are out of reach', '#ff9a8a'], draw: ['Level with the rivals', '#ffe27a'] };
-function drawRace(c, s, ui) {
+function drawRace(c, s, ui, time) {
   const V = ui.versus, r = V.rival;
-  const w = 420, x = Math.round((VIEW_W - w) / 2), y = ui.netLabel ? 38 : 8; // under the online label
+  const meter = SEND.enabled, w = meter ? 560 : 420, x = Math.round((VIEW_W - w) / 2), y = ui.netLabel ? 38 : 8; // under the online label
   rrect(c, x, y, w, 44, 12, 'rgba(20,28,36,0.85)', '#ff9a5a', 2);
   rrect(c, x + 10, y + 11, 38, 22, 11, '#ff9a5a');
   label(c, 'VS', x + 29, y + 22.5, 13, '#2a2030', 'center', 700, null);
-  const who = r?.players > 1 ? `Rivals (${r.players})` : 'Rival';
-  label(c, fitText(c, `${who}: ${raceLine(r)}`, w - 70, 15, 700), x + 58, y + 16, 15, '#fff', 'left', 700, null);
+  const who = r?.players > 1 ? `Rivals (${r.players})` : 'Rival', tw = w - 70 - (meter ? 150 : 0);
+  label(c, fitText(c, `${who}: ${raceLine(r)}`, tw, 15, 700), x + 58, y + 16, 15, '#fff', 'left', 700, null);
+  if (meter) drawSendMeter(c, s, ui, x + w - 148, y + 7, time);
   const res = V.result && RACE_WORDS[V.result];
   if (res) label(c, res[0], x + 58, y + 33, 12, res[1], 'left', 700, null);
   else if (r?.picked && !r.left) label(c, `their score ${num(r.score)}  ·  ${num(r.kills)} bonked`, x + 58, y + 33, 12, '#a9bccb', 'left', 500, null);
@@ -1914,6 +1915,27 @@ function drawRace(c, s, ui) {
     label(c, 'Waiting for the rivals to pick…', VIEW_W / 2, MAP_H / 2 - 8, 22, '#fff', 'center', 700, null);
     label(c, 'Both teams start at the same moment', VIEW_W / 2, MAP_H / 2 + 18, 14, '#a9bccb', 'center', 500, null);
   }
+}
+
+// The team's send meter: how full, how many packs are ready, and the key.
+// The ticks mark what one pack costs.
+function drawSendMeter(c, s, ui, x, y, time) {
+  const m = s.meter || 0, ready = Math.floor(m / SEND.cost + 1e-9), bw = 138, k = ui.keyLabel(ui.keysFor(ui.me?.() ?? 0).send || 'KeyX');
+  c.globalAlpha = ready ? 0.85 + Math.sin(time * 6) * 0.15 : 1;
+  label(c, ready ? `[${k}] send monsters ×${ready}` : 'send meter', x, y + 8, 12, ready ? '#d9a8ff' : '#a9bccb', 'left', 700, null);
+  c.globalAlpha = 1;
+  rrect(c, x, y + 18, bw, 10, 5, 'rgba(0,0,0,0.45)');
+  if (m > 0) rrect(c, x + 1, y + 19, Math.max(8, (bw - 2) * Math.min(1, m / SEND.max)), 8, 4, ready ? '#b77cff' : '#7d5aa8');
+  for (let v = SEND.cost; v < SEND.max; v += SEND.cost) { const tx = x + bw * (v / SEND.max); c.fillStyle = 'rgba(255,255,255,0.5)'; c.fillRect(Math.round(tx), y + 18, 1.5, 10); }
+}
+
+// A ring on the ground under monsters the rivals sent, so you know whose they are.
+function drawSentMark(c, e, time) {
+  const r = Math.max(e.def.r * 1.5, T * 0.32);
+  c.save();
+  c.globalAlpha = 0.75 + Math.sin(time * 5 + e.id) * 0.2;
+  ellipse(c, e.x, e.y + e.def.r * 0.5, r, r * 0.45, 'rgba(140,60,255,0.45)', '#9b4dff', 3);
+  c.restore();
 }
 
 function drawPause(c, s) {
@@ -2530,13 +2552,13 @@ export function render(c, s, ui) {
   actors.sort(byY);
   for (const a of actors) {
     if (a.kind === FLOWER) drawFlower(c, a.o, time);
-    else if (a.kind === ENEMY) drawEnemy(c, a.o, time);
+    else if (a.kind === ENEMY) { if (a.o.sent) drawSentMark(c, a.o, time); drawEnemy(c, a.o, time); }
     else if (a.kind === CAT) drawCat(c, a.o, time);
     else drawTree(c, a.o, time);
   }
   for (const f of s.flowers) if (vis(f)) drawFlowerStatus(c, f, s);
   for (const p of s.players) if (p.working) drawWorkStream(c, p, time);
-  for (const e of s.enemies) if (e.def.flying && vis(e)) drawEnemy(c, e, time);
+  for (const e of s.enemies) if (e.def.flying && vis(e)) { if (e.sent) drawSentMark(c, e, time); drawEnemy(c, e, time); }
   for (const pr of s.projs) if (vis(pr)) drawProj(c, pr, time);
   for (const b of s.bombs) drawBomb(c, b, time);
   drawFx(c);
@@ -2547,7 +2569,7 @@ export function render(c, s, ui) {
   drawBanners(c);
   drawIntros(c, ui, time);
   drawMinimap(c, s, ui);
-  if (race) drawRace(c, s, ui);
+  if (race) drawRace(c, s, ui, time);
   c.restore();
   drawHud(c, s, time, ui);
   drawJuiceScreen(c);

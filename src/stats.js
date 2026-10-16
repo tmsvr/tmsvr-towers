@@ -34,6 +34,9 @@
 //  - perks: [[p, perk]]  boss chest picks after this wave ('fourth:<flower>' names the flower);
 //    in totals [[p, perk, wave]]
 //  timeline: [t, 'shield', 'up' | 'broken', bossId], [t, 'perk', p, perk]
+// Versus races (send monsters):
+//  - versus: { sent, got }  packs this team sent, monsters the rivals sent it
+//  timeline: [t, 'send', p]  p sent a pack;  [t, 'got', n]  n monsters arrived from the rivals
 import { DATA_HASH, CATS } from './data.js';
 
 const add = (o, k, v = 1) => { o[k] = (o[k] || 0) + v; };
@@ -87,6 +90,7 @@ function openPeriod(s) {
     items: { dropped: {}, picked: {}, used: {}, expired: {} }, // their power-ups by kind
     shields: { raised: 0, broken: 0, bombHits: 0 }, // boss shields (IDEAS R3)
     perks: [], // [player, perk] picked from boss chests at the end of this wave
+    versus: { sent: 0, got: 0 }, // versus races: packs sent to the rivals, monsters they sent us
   };
 }
 
@@ -130,7 +134,7 @@ export function finishLog(s, how) {
   st.result = { how, wave: s.wave, won: !!s.won, cottage: r1(s.lives), kills: s.kills, seconds: Math.round(s.t), retries: s.retries || [] };
   const totals = { damage: {}, kills: {}, cottageDamage: {}, cottageDamageByRoad: {}, coins: s.players.map(() => ({ earned: 0, plant: 0, upgrade: 0, heal: 0, refund: 0 })), bloom: { damage: {}, triggers: {} },
     elites: { spawned: {}, killed: 0 }, items: { dropped: {}, picked: {}, used: {}, expired: {} },
-    shields: { raised: 0, broken: 0, bombHits: 0 }, perks: [] };
+    shields: { raised: 0, broken: 0, bombHits: 0 }, perks: [], versus: { sent: 0, got: 0 } };
   for (const w of st.waves) {
     for (const k in w.bloom?.damage) add(totals.bloom.damage, k, w.bloom.damage[k]);
     for (const k in w.bloom?.triggers) add(totals.bloom.triggers, k, w.bloom.triggers[k]);
@@ -138,6 +142,7 @@ export function finishLog(s, how) {
     totals.elites.killed += w.elites?.killed || 0;
     for (const what in w.items) for (const k in w.items[what]) add(totals.items[what], k, w.items[what][k]);
     for (const k in w.shields) totals.shields[k] += w.shields[k];
+    for (const k in w.versus) totals.versus[k] += w.versus[k];
     totals.perks.push(...(w.perks || []).map(([p, perk]) => [p, perk, w.wave]));
     for (const k in w.damage) add(totals.damage, k, w.damage[k]);
     for (const k in w.kills) add(totals.kills, k, w.kills[k]);
@@ -201,6 +206,8 @@ export function logPerk(s, p, offer) {
   (s.stats.waves[s.stats.waves.length - 1] || cur(s))?.perks?.push([p.id, offer]);
   ev(s, 'perk', p.id, offer);
 }
+export function logSend(s, p) { if (!cur(s)) return; cur(s).versus.sent++; ev(s, 'send', p.id); }
+export function logGot(s, n) { if (!cur(s)) return; cur(s).versus.got += n; ev(s, 'got', n); }
 export function logEliteKilled(s) { if (cur(s)) cur(s).elites.killed++; }
 export function logItem(s, p, kind, what) {
   if (!cur(s)) return;

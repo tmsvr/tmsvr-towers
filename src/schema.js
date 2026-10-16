@@ -9,7 +9,7 @@ import { ENEMIES, FLOWER_ORDER, CAT_ORDER, ELITE_TRAITS, ITEM_KINDS, PERKS } fro
 // so small numbers take one byte and a position in tenths of a pixel three.
 // Bump whenever a message changes shape, so mismatched copies refuse to play
 // together instead of misreading each other (checked when a guest joins).
-export const PROTOCOL = 16;
+export const PROTOCOL = 17;
 
 const utf8 = new TextEncoder(), fromUtf8 = new TextDecoder();
 
@@ -121,7 +121,7 @@ const CHEST = struct([['offers', listOf(listOf(text))], ['cursor', listOf(int)],
 const GAME = struct([
   ['lives', r1], ['wave', int], ['phase', oneOf(PHASES)], ['timer', r1], ['queue', count], ['over', bool], ['won', bool],
   ['kills', int], ['map', int], ['baseHitT', r2], ['maxLives', int], ['endless', bool], ['chest', maybe(CHEST)], ['perks', counts(PERKS)], ['hard', bool],
-  ['sprint', bool], ['locked', bool], ['seed', int], ['versus', bool], ['hold', bool],
+  ['sprint', bool], ['locked', bool], ['seed', int], ['versus', bool], ['hold', bool], ['meter', r2],
 ]);
 
 const PICK = struct([['cursor', int], ['chosen', listOf(flowerType)], ['ready', bool], ['row', int]]);
@@ -147,7 +147,7 @@ const ENEMY = struct([
   // the drawing only uses wob through sines of 1, 1.5, 2, 2.2, 4 and 0.3 times it, all of which repeat every 20π
   ['wob', cycle(20 * Math.PI, 2)], ['ang', r2], ['slowT', r2], ['stun', r2], ['under', bool], ['dashing', bool], ['chew', bool], ['psn', int],
   ['atBase', bool], ['burnT', r1], ['vulnT', r1], ['elite', oneOf([null, ...ELITE_TRAITS])], ['mini', bool],
-  ['shield', int], ['shieldMax', int], ['exposedT', r1],
+  ['shield', int], ['shieldMax', int], ['exposedT', r1], ['sent', bool],
 ]);
 
 const DROP = struct([['id', int], ['x', r1], ['y', r1], ['big', bool], ['age', r1]]);
@@ -187,7 +187,7 @@ export function encodeSnapshot(s, { seq, at, paused, acks }) {
 
 // Guest ticks' keys. Holding a direction gives long runs of identical
 // ticks, so each run is sent once: first seq, how many, direction, buttons.
-const INPUT_FLAGS = ['atk', 'build', 'sprint', 'bomb', 'cycle', 'buildTap', 'ready', 'heal', 'use'];
+const INPUT_FLAGS = ['atk', 'build', 'sprint', 'bomb', 'cycle', 'buildTap', 'ready', 'heal', 'use', 'send'];
 const unit = (v) => Math.max(-1, Math.min(1, Math.round(+v || 0)));
 const inputFlags = (i) => INPUT_FLAGS.reduce((f, k, b) => f | (i[k] ? 1 << b : 0), 0);
 

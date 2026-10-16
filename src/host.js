@@ -2,8 +2,8 @@
 // tick, and sending snapshots, sounds and effects back to every guest.
 import { makeSnapshot, effectsMessage } from './snapshot.js';
 
-const TAPS = ['bomb', 'cycle', 'buildTap', 'ready', 'use'];
-const NO_TAPS = { bomb: false, cycle: false, buildTap: false, ready: false, use: false };
+const TAPS = ['bomb', 'cycle', 'buildTap', 'ready', 'use', 'send'];
+const NO_TAPS = Object.fromEntries(TAPS.map((k) => [k, false]));
 
 // One guest's inputs. It numbers them, one per guest tick, and resends the
 // ones we haven't confirmed; we apply exactly one per sim tick and report the

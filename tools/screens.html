@@ -31,8 +31,8 @@ import { runBot } from './bot.js';
 
 // the key layouts from main.js (which can't be imported: it starts the game)
 const KEYS = [
-  { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', atk: 'KeyF', bomb: 'KeyG', build: 'KeyE', heal: 'KeyR', cycle: 'KeyQ', sprint: 'ShiftLeft', use: 'KeyV' },
-  { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', atk: 'Comma', bomb: 'Period', build: 'Slash', heal: 'Quote', cycle: 'KeyM', sprint: 'ShiftRight', use: 'Semicolon' },
+  { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', atk: 'KeyF', bomb: 'KeyG', build: 'KeyE', heal: 'KeyR', cycle: 'KeyQ', sprint: 'ShiftLeft', use: 'KeyV', send: 'KeyX' },
+  { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', atk: 'Comma', bomb: 'Period', build: 'Slash', heal: 'Quote', cycle: 'KeyM', sprint: 'ShiftRight', use: 'Semicolon', send: 'Backslash' },
 ];
 const DEFAULT_LABELS = { ShiftLeft: 'Shift', ShiftRight: 'R-Shift', Comma: ',', Period: '.', Slash: '/', Quote: "'", ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Semicolon: ';' };
 // ?size=1500x656 draws every screen as a window of that shape would show it
@@ -108,7 +108,10 @@ givePerks(quad);
 show('Game, online, 4 cats (P3\'s screen)', quad, ui({ cam: camOn(quad, quad.players[2]), netLabel: 'Online · room HDPM · 4 cats', perf: '42 ms · 60 fps · 18 ms', mode: () => 'guest', me: () => 2 }));
 // versus races: the rival's panel, and the wait for the rivals to pick
 const rival = { wave: 5, last: 6, phase: 'wave', cleared: 4, lives: 143, maxLives: 200, kills: 1234, score: 12345, over: false, won: false, players: 2, picked: true };
+duo.enemies.forEach((e, i) => { e.sent = i % 2 === 0; }); duo.meter = 1.3;
 show('Game, versus race, with a teammate', duo, ui({ cam: camOn(duo, duo.players[0]), netLabel: 'Online · room HDPM · P2 connected', perf: '42 ms · 60 fps · 18 ms', mode: () => 'host', versus: { race: {}, rival } }));
+show('Game, versus race, monsters from the rivals (purple rings)', duo, ui({ cam: camOn(duo, duo.enemies.find((e) => e.sent && !e.dead) || duo.players[0]), mode: () => 'host', versus: { race: {}, rival } }));
+duo.enemies.forEach((e) => { e.sent = false; }); duo.meter = 0;
 const held = sim.createState(1, 1, { map: 0, versus: true }); held.players[0].pick.chosen = ['thorn', 'frost', 'daisy']; held.players[0].pick.ready = true; sim.step(held, [{}], 1 / 60);
 show('Game, versus race, waiting for the rivals to pick', held, ui({ versus: { race: {}, rival: { ...rival, picked: false, wave: 0 } } }));
 

@@ -2,7 +2,7 @@
 // (same seed, map and mode, so the same waves), linked host to host. Neither
 // side's game knows about the other; the hosts swap a few numbers a second,
 // and whoever holds out better wins. Pure helpers here; main.js does the
-// talking (the 'race', 'picked', 'status' and 'pause' messages).
+// talking (the 'race', 'status', 'pause' and 'send' messages).
 import { wavesCleared, scoreOf, lastWave } from './sim.js';
 
 // What one team tells the other about its game, a few times a second.
@@ -10,7 +10,7 @@ export function raceStatus(s) {
   return {
     wave: s.wave, last: lastWave(s), phase: s.phase, cleared: wavesCleared(s),
     lives: Math.max(0, Math.ceil(s.lives)), maxLives: s.maxLives, kills: s.kills, score: scoreOf(s),
-    over: !!s.over, won: !!s.won, players: s.players.length, picked: s.phase !== 'pick',
+    over: !!s.over, won: !!s.won, players: s.players.length, picked: s.phase !== 'pick', meter: s.meter || 0,
   };
 }
 

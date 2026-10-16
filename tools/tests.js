@@ -781,6 +781,98 @@ test('Versus', 'who wins a race: survive, then waves cleared, then cottage, then
   ok(r.picked && r.last === TOTAL_WAVES && r.lives === s.maxLives, 'status of a fresh game');
 });
 
+// A race side past its pick, let go, with a wave on.
+function raceGame(seed = 21) {
+  const s = sim.createState(2, seed, { map: 0, versus: true, cats: ['bomber', 'gardener'] });
+  s.players.forEach((p) => { p.pick.chosen = ['thorn', 'frost', 'daisy']; p.pick.ready = true; });
+  tick(s); sim.releaseHold(s);
+  tick(s, { ready: true });
+  return s;
+}
+
+test('Sending monsters', 'bonking the wave fills the meter; monsters that split off or were sent don\'t count', () => {
+  const S = BALANCE.send, s = raceGame();
+  eq(s.meter, 0, 'empty to start');
+  const n = s.waveCount;
+  ok(n > 5, `wave 1 has ${n} monsters`);
+  for (let i = 0; i < 3; i++) { sim.spawnEnemy(s, 'grunt', null, 0, null); sim.damage(s, s.enemies.at(-1), 1e9, true); }
+  near(s.meter, 3 * S.meterPerWave / n, 1e-9, 'three kills');
+  const before = s.meter;
+  sim.spawnEnemy(s, 'grunt', s.enemies[0] || { path: 0, x: 100, y: 100, seg: 0, dist: 0, left: 1 }); sim.damage(s, s.enemies.at(-1), 1e9, true);
+  sim.spawnEnemy(s, 'grunt', null, 0, null); s.enemies.at(-1).sent = true; sim.damage(s, s.enemies.at(-1), 1e9, true);
+  eq(s.meter, before, 'a split-off and a sent monster add nothing');
+  for (let i = 0; i < 10 * n; i++) { sim.spawnEnemy(s, 'grunt', null, 0, null); sim.damage(s, s.enemies.at(-1), 1e9, true); }
+  eq(s.meter, S.max, 'the meter stops at max');
+});
+
+test('Sending monsters', 'the send key spends the meter on a pack for the rivals, only when it is full enough', () => {
+  const S = BALANCE.send, s = raceGame();
+  s.meter = S.cost * 0.9;
+  tick(s, { send: true });
+  eq(s.outbox.length, 0, 'not enough: nothing sent');
+  s.meter = S.cost * 1.5;
+  tick(s, { send: true }, 1);
+  eq(s.outbox.length, 1, 'a pack is on its way'); eq(s.outbox[0].share, S.pack, 'its size');
+  near(s.meter, S.cost * 0.5, 1e-9, 'meter left');
+  const solo = game();
+  solo.meter = 5; tick(solo, { send: true });
+  ok(!solo.outbox?.length, 'nothing to send outside a race');
+});
+
+test('Sending monsters', 'a pack joins the wave at once, or the next wave in a break; it is marked and drops fewer coins', () => {
+  const S = BALANCE.send, s = raceGame();
+  const left = s.queue.length, n = sim.receivePack(s, S.pack);
+  ok(n > 0, 'some monsters came');
+  eq(s.queue.length, left + n, 'they join the wave');
+  ok(s.queue.slice(0, n).every((e) => e.sent && !ENEMIES[e.type].boss), 'first in line, marked, no bosses');
+  for (let i = 0; i < 60; i++) tick(s);
+  ok(s.enemies.some((e) => e.sent), 'sent monsters are out');
+  const brk = raceGame(22);
+  brk.phase = 'prep'; brk.queue = []; brk.enemies = [];
+  const m = sim.receivePack(brk, S.pack);
+  eq(brk.queue.length, 0, 'nothing comes during the break'); eq(brk.incoming.length, m, 'held for the next wave');
+  tick(brk, { ready: true });
+  ok(brk.queue.slice(0, m).every((e) => e.sent), 'the next wave starts with them');
+  const coinsFrom = (sent) => {
+    let c = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const g = raceGame(seed); g.drops.length = 0;
+      sim.spawnEnemy(g, 'tank', null, 0, null); g.enemies.at(-1).sent = sent;
+      sim.damage(g, g.enemies.at(-1), 1e9, true);
+      c += g.drops.reduce((a, d) => a + d.value, 0);
+    }
+    return c;
+  };
+  const plain = coinsFrom(false), sent = coinsFrom(true);
+  near(sent / plain, S.coins, 0.1, `${sent} coins instead of ${plain}`);
+});
+
+test('Sending monsters', 'a pack doesn\'t change the waves: they stay those of the challenge code', () => {
+  const play = (pack) => {
+    const s = raceGame(77), waves = [];
+    for (let w = 0; w < 3; w++) {
+      if (pack) sim.receivePack(s, BALANCE.send.pack);
+      s.queue = s.queue.filter((e) => !e.sent);
+      waves.push(nextQueue(s));
+    }
+    return waves;
+  };
+  const a = play(false), b = play(true);
+  a.forEach((q, i) => eq(b[i], q, `wave ${i + 2}`));
+});
+
+test('Sending monsters', 'the meter, sent monsters and the send key survive the trip', () => {
+  const s = raceGame();
+  s.meter = 1.25;
+  sim.receivePack(s, BALANCE.send.pack);
+  for (let i = 0; i < 90; i++) tick(s);
+  const m = decodeFast(encodeSnapshot(s, { seq: 1, at: 0, paused: false, acks: [0, 0] }));
+  near(m.state.game.meter, 1.25, 0.01, 'meter');
+  eq(m.state.enemies.filter((e) => e.sent).length, s.enemies.filter((e) => e.sent).length, 'sent monsters');
+  const inp = decodeFast(encodeInputs([{ seq: 1, mx: 0, my: 0, send: true }]));
+  ok(inp.inputs[0].send, 'the send key');
+});
+
 // ---- 3 and 4 cats online ----------------------------------------------------------------
 test('Four cats', 'up to 4 cats, each a different one, with more and tougher monsters past the second', () => {
   const X = BALANCE.difficulty.morePlayers;

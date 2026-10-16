@@ -191,6 +191,14 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
   each passes the rival's on to its guests (`versus`), and pausing sends
   `pause` across. The sims never talk to each other, so each side's game
   stays exactly as deterministic as before.
+- **Sending monsters** (`balance.json → send`, the end of the "Versus races"
+  section of `sim.js`). Kills of a wave's own monsters fill `s.meter`
+  (`fillMeter`); the `send` input spends it and queues `{share}` in
+  `s.outbox`, which `main.js` sends across as `send`. The other side calls
+  `receivePack`: `buildQueue` with `share` makes the pack from that side's own
+  wave (no bosses, no elites) with the game's `rnd`, never `wrnd`, so the
+  challenge's waves stay the same. Pack entries and their monsters carry
+  `sent` (purple ring, `SEND.coins` of the coins, no meter).
 - **Saves online** are made and loaded by the host. A loaded online save
   either resumes at once (the others still connected) or opens a room and
   resumes when all its players have joined, or when the host presses Enter (`pendingSave`).

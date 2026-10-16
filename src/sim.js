@@ -7,7 +7,7 @@ import {
   T, U, VIEW_W, MAP_H, TOTAL_WAVES, MAPS, ENEMIES, INTROS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, GROW_TIME, FLOWER_HP, WEAR_PER_SEC, WEAR_MULT, HEAL_RATE, HEAL_COST,
   POISON_TIME, START_COINS, LOADOUT_SIZE, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, plantCost, GLOBAL_RANGE, PLAYER, CATS, CAT_ORDER, bloomOf, ELITES, SHIELD, CHEST, PERKS,
-  SPRINT, SCORE,
+  SPRINT, SCORE, SEND,
 } from './data.js';
 import { prune, clamp, nextSeed, randomFrom } from './util.js';
 import * as log from './stats.js';
@@ -72,6 +72,7 @@ export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, l
     t: 0, nextId: 1, rng: seed, seed, wrng: waveSeed(seed), wave: 0, phase: 'pick', timer: 0, queue: [], spawnWait: 0,
     lives: DIFFICULTY.cottageHealth, maxLives: DIFFICULTY.cottageHealth, baseHitT: 0, lastAlarm: -99, players: [], flowers: [], enemies: [], drops: [], bombs: [], projs: [], clouds: [],
     fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, sharedScreen, map: m.index, hard: !!hard, sprint: !!sprint, locked: !!locked, versus: !!versus, hold: false,
+    meter: 0, outbox: [], incoming: [], // versus: the team's send meter, packs to send, packs received in a break
     items: [], // power-ups dropped by elites, waiting to be picked up
     perks: {}, chest: null, chestDue: false, // boss chests: the team's perks, the open chest, one is owed
     seen: {}, // monster types met so far (each gets one warning banner)
@@ -216,6 +217,7 @@ export function spawnEnemy(s, type, from, path = 0, elite) {
     phaseT: rnd(s) * 2, spawnT: 0, under: false, dashing: false, chew: null, chewT: 0, chewCd: 1,
     psn: 0, psnT: 0, psnDps: 0, atBase: false, baseAng: rnd(s) * Math.PI * 2,
     burnT: 0, burnDps: 0, vulnT: 0, vuln: 0, // Bloom: Fire Lily's burning, Stinkbloom's weak spot
+    child: !!from, // split off or spawned by another monster
   });
   const e = s.enemies[s.enemies.length - 1];
   // boss shields (IDEAS R3): the health shares at which this boss will raise one
@@ -412,11 +414,12 @@ function killEnemy(s, e) {
   }
   if (e.elite) log.logEliteKilled(s);
   if (e.def.boss && CHEST.enabled) s.chestDue = true; // the chest opens when the wave is over
+  if (s.versus && SEND.enabled && !e.sent && !e.child) fillMeter(s, SEND.meterPerWave / Math.max(1, s.waveCount || 1) + (e.def.boss ? SEND.bossBonus : 0));
   if (e.carry) { dropItem(s, e.carry, e.x, e.y); log.logItem(s, null, e.carry, 'dropped'); }
   // Drops shrink a little each wave, so bigger waves don't pay out ever more;
   // fractions round up by chance, so even 1-coin monsters drop less on average.
   const fade = Math.max(ECONOMY.coinFadeMin ?? 0, 1 - (ECONOMY.coinFadePerWave ?? 0) * Math.max(0, levelOf(s) - 1));
-  const raw = e.def.coin * ECONOMY.coinDropMultiplier * s.m.coinDrops * fade * (s.hard ? HARD.coins : 1) * (s.sprint ? SPRINT.coinDrops : 1);
+  const raw = e.def.coin * ECONOMY.coinDropMultiplier * s.m.coinDrops * fade * (s.hard ? HARD.coins : 1) * (s.sprint ? SPRINT.coinDrops : 1) * (e.sent ? SEND.coins : 1);
   const v = Math.floor(raw + rnd(s));
   if (v <= 0) return;
   // Large drops split into a few pickups so they scatter nicely.
@@ -581,8 +584,12 @@ function arrivals(s) {
 }
 
 // The monsters of a wave that plays like normal wave n (levelOf). All its
-// random numbers come from s.wrng, elites included.
-function buildQueue(s, n) {
+// random numbers come from s.wrng, elites included. A pack sent by the
+// rivals (share = its size as a share of the wave) has no bosses, no rush
+// and no elites, and takes its random numbers from the game's own (rnd), so
+// the waves still come out the same as everyone else's with this code.
+function buildQueue(s, n, { share = 0 } = {}) {
+  const R = share ? rnd : wrnd;
   const q = [];
   const from = arrivals(s);
   const size = (k) => TUNE.waveBudgetBase + k * TUNE.waveBudgetPerWave + k * k * (TUNE.waveBudgetPerWaveSquared || 0);
@@ -592,10 +599,11 @@ function buildQueue(s, n) {
   let budget = (endless ? size(TOTAL_WAVES) * (1 + (TUNE.endlessWaveSizePerWave ?? 0) * (n - TOTAL_WAVES)) : size(n))
     * (s.players.length > 1 ? TUNE.coopWaveSize * more(s, 'waveSize') : TUNE.soloWaveSize) * s.m.waveSize * (s.hard ? HARD.waveSize : 1);
   const avail = s.m.waves.map((u, i) => ({ ...u, fromWave: from[i] })).filter((u) => u.fromWave <= n);
-  const bossWave = n % TUNE.bossEvery === 0;
+  const bossWave = !share && n % TUNE.bossEvery === 0;
   if (bossWave) budget *= TUNE.bossWaveBudget;
+  if (share) budget *= share;
   // the first endless wave after the big boss is a breather before it ramps up again
-  const breather = n === TOTAL_WAVES + 1;
+  const breather = !share && n === TOTAL_WAVES + 1;
   if (breather) budget *= TUNE.breatherWaveSize ?? 1;
   // Monsters that just arrived get the spotlight; older ones slowly make room.
   const weightOf = (u) => {
@@ -604,19 +612,20 @@ function buildQueue(s, n) {
   };
   const total = avail.reduce((a, u) => a + weightOf(u), 0);
   while (budget > 0) {
-    let r = wrnd(s) * total, pick = avail[0];
+    let r = R(s) * total, pick = avail[0];
     for (const u of avail) { r -= weightOf(u); if (r <= 0) { pick = u; break; } }
-    const path = Math.floor(wrnd(s) * s.m.paths.length); // a group sticks together on one road
+    const path = Math.floor(R(s) * s.m.paths.length); // a group sticks together on one road
     const [lo, hi] = TUNE.spawnGap || [0.4, 1.2];
     // packs (swarms, wasps) get bigger every wave after they first appear, up to packMaxGrowth
     // times their size, and pay for every member: bigger packs come less often, not for free
     const growth = Math.min(TUNE.packMaxGrowth ?? Infinity, 1 + (TUNE.packGrowthPerWave ?? 0) * (n - pick.fromWave));
     const group = pick.group > 1 ? Math.round(pick.group * growth) : 1;
-    for (let i = 0; i < group; i++) q.push({ type: pick.enemy, path, wait: group > 1 ? 0.18 : lo + wrnd(s) * (hi - lo) });
+    for (let i = 0; i < group; i++) q.push({ type: pick.enemy, path, wait: group > 1 ? 0.18 : lo + R(s) * (hi - lo) });
     budget -= pick.cost * (group / pick.group);
   }
   // endless brings more bosses every bossEvery waves; the extra ones come mid-wave. Ordinary
   // waves get them bossFreeCycles cycles later, so bosses don't come every wave too soon
+  if (share) { for (const e of q) { e.sent = true; e.wait = Math.min(e.wait, 0.4); } return q; }
   const cycles = endless ? Math.floor((n - TOTAL_WAVES) / TUNE.bossEvery) : 0;
   const bosses = (bossWave ? 1 : 0) + Math.max(0, cycles - (bossWave ? 0 : TUNE.bossFreeCycles ?? 0)) * (TUNE.endlessBossesPerCycle ?? 0);
   for (let i = 0; i < bosses; i++) {
@@ -635,6 +644,8 @@ function startWave(s) {
   s.wave++;
   s.phase = 'wave';
   s.queue = buildQueue(s, levelOf(s));
+  s.waveCount = s.queue.length; // what fills the send meter (versus)
+  if (s.incoming?.length) { s.queue.unshift(...s.incoming); s.incoming = []; } // the rivals' packs from the break come first
   s.spawnWait = 0.5;
   log.logWaveStart(s);
   staggerMapWide(s);
@@ -663,6 +674,7 @@ function updateWaves(s, dt, ready) {
     if (s.spawnWait <= 0) {
       const e = s.queue.shift();
       spawnEnemy(s, e.type, null, e.path, e.elite ?? null);
+      if (e.sent) s.enemies[s.enemies.length - 1].sent = true; // from the rivals
       s.spawnWait = e.wait;
     }
   } else if (!s.enemies.some((e) => !e.dead)) {
@@ -703,6 +715,40 @@ export function releaseHold(s) {
   s.hold = false;
   banner(s, 'Go! The same waves for both teams. Plant fast!');
   ev(s, 'boss');
+}
+
+// Sending monsters (balance.json → send): bonking the team's wave fills a
+// meter; any cat's send key spends part of it on a pack for the rivals.
+// The sim only queues it (s.outbox); main.js carries it across, and the other
+// side's game takes it in with receivePack.
+function fillMeter(s, amt) {
+  const was = s.meter || 0;
+  s.meter = Math.min(SEND.max, was + amt);
+  if (was < SEND.cost && s.meter >= SEND.cost && !s.seen.send) { s.seen.send = true; banner(s, 'The send meter is full: X sends monsters to the rivals!'); }
+}
+
+function sendPack(s, p) {
+  if (!SEND.enabled || s.over || s.won) return;
+  if ((s.meter || 0) < SEND.cost) { deny(s, p, p.x, p.y - T * 0.6, 'Bonk more monsters to fill the send meter'); return; }
+  s.meter -= SEND.cost;
+  s.outbox.push({ share: SEND.pack, by: p.id });
+  text(s, p.x, p.y - T * 0.8, 'Sent to the rivals!', '#d9a8ff');
+  ev(s, 'throw');
+  log.logSend(s, p);
+}
+
+// A pack from the rivals: share times our current wave, straight in if a
+// wave is on, else with the next one. Returns how many monsters came.
+export function receivePack(s, share) {
+  if (!s.versus || s.over || s.won || s.phase === 'pick' || !(share > 0 && share <= 1)) return 0;
+  const lv = levelOf(s, s.phase === 'wave' ? s.wave : s.wave + 1);
+  const pack = buildQueue(s, Math.max(1, lv), { share });
+  if (s.phase === 'wave') { s.queue.unshift(...pack); s.spawnWait = Math.min(s.spawnWait, 0.6); }
+  else s.incoming.push(...pack);
+  banner(s, `The rivals sent you ${pack.length} monsters!`);
+  ev(s, 'elite');
+  log.logGot(s, pack.length);
+  return pack.length;
 }
 
 // ---- Score ---------------------------------------------------------------------
@@ -1034,6 +1080,7 @@ function updatePlayers(s, dt, inputs) {
     if (inp.atk && p.atkCd <= 0) { swing(s, p); p.building = false; }
     if (inp.bomb && p.bombs >= 1 && !p.bombCd) { throwBomb(s, p); p.building = false; }
     if (inp.use && p.item) useItem(s, p);
+    if (inp.send && s.versus) sendPack(s, p);
 
     const { tx, ty } = tileOf(s.m, p);
     let f = s.grid.get(ty * s.m.W + tx);

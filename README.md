@@ -79,7 +79,7 @@ them.
   out what everyone's perks add up to.
 - In co-op, each cat keeps the coins it picks up (`economy.coopCoinShare` in
   `balance.json` can split a share of every pickup with the other cat).
-- P1: WASD move · Shift sprint · F baton · G bomb · V use power-up · E plant/upgrade (hold) · R heal (hold) · Q next flower / dig-up mode
+- P1: WASD move · Shift sprint · F baton · G bomb · V use power-up · E plant/upgrade (hold) · R heal (hold) · Q next flower / dig-up mode · X send monsters (versus races)
 - P2 (local): arrows · Right Shift sprint · `,` baton · `.` bomb · `;` use power-up · `/` plant/upgrade · `'` heal · M next flower
 - P or Esc pauses (either player, online too); S on the pause screen saves the game as a file.
 - The pause, defeat and victory screens share the same keys:
@@ -156,7 +156,15 @@ players (the host plus one teammate who joins with 4).
 The panel at the top shows how the rivals are doing. The team that survives
 longer wins; if both survive (or fall in the same wave), the one with more
 cottage left wins, then the higher score. Once the rivals fall behind for
-good, you've won, but you can keep playing for the score. Pausing pauses both
+good, you've won, but you can keep playing for the score.
+
+**Send them monsters.** Bonking your wave fills your team's purple send
+meter (a whole wave fills it once over, a boss adds half). When it's past the
+first tick, any cat presses **X** to send a pack to the rivals: 15% of the
+wave they're playing, made of its kinds of monsters (never bosses). It arrives
+at once, or with their next wave if they're in a break. Sent monsters have a
+purple ring and drop half the coins, and killing them doesn't fill the
+meter, so packs can't bounce back and forth. Numbers: `balance.json → send`. Pausing pauses both
 teams. A race can't be retried or saved; **Enter** on the end screen asks for
 a rematch (new waves, same map and mode), **M** leaves.
 

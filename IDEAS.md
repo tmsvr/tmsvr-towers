@@ -20,7 +20,7 @@ or a rework of something core.
 | F4 (part) | Endless mode after a win, with a breather wave and growing boss counts (no high scores yet) | see git log |
 | n/a | Save the game from the pause screen, load it from the menu | `9655abf` |
 | F7, F4 (rest) | Sprint mode, challenge codes, the daily challenge, scores, personal bests and a copyable result (`experiment/compete` branch) | see git log |
-| G2 (part) | Versus races: two teams race the same challenge, linked host to host (`experiment/compete`) | see git log |
+| G2 | Versus races: two teams race the same challenge, linked host to host, and send each other monsters (`experiment/compete`) | see git log |
 | G3 | 3-4 cats online, with more monsters for each cat past the second (`experiment/compete`) | see git log |
 
 ---
@@ -212,7 +212,7 @@ mechanic** so the theme changes how the game plays, not only how it looks.
 ## G. Co-op and multiplayer
 
 - **G1. Asymmetric roles:** a gardener and a guardian. 🎉 · M
-- **G2. Versus mode:** send enemies to your opponent's garden. 🎉 · L
+- ~~G2. Versus mode:~~ send enemies to your opponent's garden. (done on `experiment/compete`)
 - ~~G3. 3–4 players online.~~ (done on `experiment/compete`)
 - **G4. Gamepad support** for couch co-op. 🎉 · S–M
 

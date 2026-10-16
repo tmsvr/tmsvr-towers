@@ -4,7 +4,7 @@
 //   local     – this browser runs the game for 1 or 2 players on one keyboard
 //   host      – this browser runs the game for up to 4 cats; the guests' inputs arrive over the network (host.js)
 //   guest     – this browser only sends inputs and draws snapshots from the host (guest.js)
-import { createState, step, continueEndless, retryWave, canRetry, setChallenge, scoreOf, modeName, MODES, releaseHold } from './sim.js';
+import { createState, step, continueEndless, retryWave, canRetry, setChallenge, scoreOf, modeName, MODES, releaseHold, receivePack } from './sim.js';
 import { randomSeed, encodeCode, decodeCode, codeOf, dailyChallenge, shareText } from './challenge.js';
 import { finishLog, currentLog, gameSummary } from './stats.js';
 import { render, setView, VIEW_W, MAP_H, BASE_W, BASE_H } from './render.js';
@@ -64,10 +64,10 @@ function fitCanvas() {
 }
 
 const KEYS = [
-  { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', atk: 'KeyF', bomb: 'KeyG', build: 'KeyE', heal: 'KeyR', cycle: 'KeyQ', sprint: 'ShiftLeft', use: 'KeyV' },
-  { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', atk: 'Comma', bomb: 'Period', build: 'Slash', heal: 'Quote', cycle: 'KeyM', sprint: 'ShiftRight', use: 'Semicolon' },
+  { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', atk: 'KeyF', bomb: 'KeyG', build: 'KeyE', heal: 'KeyR', cycle: 'KeyQ', sprint: 'ShiftLeft', use: 'KeyV', send: 'KeyX' },
+  { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', atk: 'Comma', bomb: 'Period', build: 'Slash', heal: 'Quote', cycle: 'KeyM', sprint: 'ShiftRight', use: 'Semicolon', send: 'Backslash' },
 ];
-const DEFAULT_LABELS = { ShiftLeft: 'Shift', ShiftRight: 'R-Shift', Comma: ',', Period: '.', Slash: '/', Quote: "'", ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Semicolon: ';' };
+const DEFAULT_LABELS = { ShiftLeft: 'Shift', ShiftRight: 'R-Shift', Comma: ',', Period: '.', Slash: '/', Quote: "'", ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Semicolon: ';', Backslash: '\\' };
 const KEY_TO_CODE = { '/': 'Slash', ',': 'Comma', '.': 'Period', "'": 'Quote', ';': 'Semicolon' };
 
 const held = new Set();
@@ -115,6 +115,7 @@ function readKeys(k, withArrows) {
     buildTap: pressed.has(k.build),
     bomb: pressed.has(k.bomb),
     use: pressed.has(k.use),
+    send: pressed.has(k.send), // versus races: monsters for the rivals
     cycle: pressed.has(k.cycle),
     ready: pressed.has('Enter'),
   };
@@ -704,6 +705,7 @@ function onRivalMessage(m) {
   if (m.t === 'team') { V.rivalPlayers = m.players || 1; updateVersusLobby(); }
   else if (m.t === 'race' && !V.referee && Number.isFinite(m.seed)) startRace({ seed: m.seed, map: m.map, hard: !!m.hard, sprint: !!m.sprint }, false);
   else if (m.t === 'status' && m.status) V.rival = { ...m.status, left: false };
+  else if (m.t === 'send' && V.race && state?.players && Number.isFinite(m.share)) receivePack(state, m.share);
   else if (m.t === 'pause' && V.race) setPaused(!!m.on, true);
   else if (m.t === 'again' && V.referee) rematch();
 }
@@ -751,6 +753,9 @@ function updateRace(now) {
     net.send({ t: 'versus', rival: V.rival, result: V.result });
   }
   if (state.hold && (V.rival?.picked || V.rival?.left || !rivalLink?.connected)) releaseHold(state);
+  // monsters our cats sent go across at once
+  for (const o of state.outbox || []) rivalLink?.send({ t: 'send', share: o.share });
+  if (state.outbox) state.outbox.length = 0;
   const was = V.result;
   V.result = V.rival?.left ? null : raceResult(mine, V.rival);
   if (V.result && !was && !state.over && !state.won) flashNote(V.result === 'win' ? 'The rivals fell: you have won the race! Play on for the score' : 'The rivals are out of reach…');
