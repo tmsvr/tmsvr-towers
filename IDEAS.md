@@ -20,6 +20,7 @@ or a rework of something core.
 | F4 (part) | Endless mode after a win, with a breather wave and growing boss counts (no high scores yet) | see git log |
 | n/a | Save the game from the pause screen, load it from the menu | `9655abf` |
 | F7, F4 (rest) | Sprint mode, challenge codes, the daily challenge, scores, personal bests and a copyable result (`experiment/compete` branch) | see git log |
+| G2 (part) | Versus races: two teams race the same challenge, linked host to host (`experiment/compete`) | see git log |
 
 ---
 

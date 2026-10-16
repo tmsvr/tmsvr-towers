@@ -12,6 +12,7 @@ import { gameSummary } from '../src/stats.js';
 import { render, num, clock, setView, BASE_W, BASE_H, VIEW_W, MAP_H } from '../src/render.js';
 import { runBot } from './bot.js';
 import { encodeCode, decodeCode, codeOf, dailyChallenge, shareText } from '../src/challenge.js';
+import { raceStatus, raceResult } from '../src/versus.js';
 import { saveGame, loadGame } from '../src/save.js';
 
 const DT = 1 / 60;
@@ -747,6 +748,36 @@ test('Challenges', 'mode, seed and lock survive a snapshot', () => {
   const g = decodeFast(encodeSnapshot(s, { seq: 1, at: 0, paused: false, ack: 0 })).state.game;
   ok(g.sprint && g.locked && !g.hard, 'flags'); eq(g.seed, 5150, 'seed');
   eq(codeOf({ ...g }), codeOf(s), 'the guest shows the same code');
+});
+
+test('Versus', 'a race side holds after picking until it is let go, and can\'t be retried', () => {
+  const s = sim.createState(1, 9, { map: 0, versus: true });
+  s.players[0].pick.chosen = ['thorn', 'frost', 'daisy']; s.players[0].pick.ready = true;
+  tick(s);
+  ok(s.hold && s.phase === 'prep', 'holding after the pick');
+  const t0 = s.timer;
+  for (let i = 0; i < 60; i++) tick(s, { mx: 1 });
+  eq(s.timer, t0, 'the first-wave timer waits'); eq(s.t, 0, 'nothing moves');
+  sim.releaseHold(s);
+  tick(s);
+  ok(!s.hold && s.timer < t0, 'running once let go');
+  ok(!sim.canRetry(s), 'a race has no retries');
+});
+
+test('Versus', 'who wins a race: survive, then waves cleared, then cottage, then score', () => {
+  const st = (o) => ({ won: false, over: false, cleared: 0, lives: 0, score: 0, picked: true, ...o });
+  eq(raceResult(st({ won: true, cleared: 6, lives: 120 }), st({ won: true, cleared: 6, lives: 90 })), 'win', 'more cottage left');
+  eq(raceResult(st({ won: true, cleared: 6, lives: 90 }), st({ won: true, cleared: 6, lives: 120 })), 'lose', 'less cottage left');
+  eq(raceResult(st({ over: true, cleared: 4, score: 5000 }), st({ over: true, cleared: 3, score: 9000 })), 'win', 'further beats a higher score');
+  eq(raceResult(st({ over: true, cleared: 3, score: 9000 }), st({ over: true, cleared: 3, score: 9000 })), 'draw', 'the same');
+  eq(raceResult(st({ over: true, cleared: 2 }), st({ cleared: 2 })), null, 'the rivals can still fall in the same wave');
+  eq(raceResult(st({ over: true, cleared: 2 }), st({ cleared: 3 })), 'lose', 'the rivals are already further');
+  eq(raceResult(st({ cleared: 4 }), st({ over: true, cleared: 3 })), 'win', 'we are already further than where they fell');
+  eq(raceResult(st({ won: true, cleared: 6, lives: 50 }), st({ cleared: 5 })), null, 'they can still win with more cottage');
+  eq(raceResult(st({}), null), null, 'no rival yet');
+  const s = game({ cats: ['bomber'] });
+  const r = raceStatus(s);
+  ok(r.picked && r.last === TOTAL_WAVES && r.lives === s.maxLives, 'status of a fresh game');
 });
 
 // ---- whole games ----------------------------------------------------------------

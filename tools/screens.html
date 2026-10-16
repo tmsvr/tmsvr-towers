@@ -99,6 +99,11 @@ show('Game, co-op, with a banner and intro cards', duo, ui({ cam: camOn(duo, duo
 });
 show('Game, online (status label)', duo, ui({ cam: camOn(duo, duo.players[0]), netLabel: 'Online · room HDPM · P2 connected', perf: '42 ms · 60 fps · 18 ms', mode: () => 'host' }));
 show('Game, solo', solo, ui({ cam: camOn(solo, solo.players[0]) }));
+// versus races: the rival's panel, and the wait for the rivals to pick
+const rival = { wave: 5, last: 6, phase: 'wave', cleared: 4, lives: 143, maxLives: 200, kills: 1234, score: 12345, over: false, won: false, players: 2, picked: true };
+show('Game, versus race, with a teammate', duo, ui({ cam: camOn(duo, duo.players[0]), netLabel: 'Online · room HDPM · P2 connected', perf: '42 ms · 60 fps · 18 ms', mode: () => 'host', versus: { race: {}, rival } }));
+const held = sim.createState(1, 1, { map: 0, versus: true }); held.players[0].pick.chosen = ['thorn', 'frost', 'daisy']; held.players[0].pick.ready = true; sim.step(held, [{}], 1 / 60);
+show('Game, versus race, waiting for the rivals to pick', held, ui({ versus: { race: {}, rival: { ...rival, picked: false, wave: 0 } } }));
 
 const chestOf = (s) => ({ offers: s.players.map((p, i) => i ? ['thumb', 'roof', 'pouch'] : ['paws', 'roots', `fourth:${FLOWER_ORDER.find((t) => !p.loadout.includes(t))}`]), cursor: s.players.map(() => 1), picked: s.players.map(() => null), lock: 0 });
 duo.chest = { ...chestOf(duo), lock: 0.5 }; show('Boss chest, co-op, just opened (locked)', duo, ui({ cam: camOn(duo, duo.players[0]) })); duo.chest = null;
@@ -116,6 +121,9 @@ show('Defeat, co-op, endless wave 34 (big numbers)', duo, ui({ cam: camOn(duo, d
 const sSolo = gameSummary(runBot({ players: 1, seed: 4, map: 0, maxMinutes: 40 }).game);
 solo.over = true;
 show('Defeat, solo', solo, ui({ cam: camOn(solo, solo.players[0]), summary: sSolo }));
+show('Victory, versus race won', duo, ui({ cam: camOn(duo, duo.players[0]), summary: sSolo, versus: { race: {}, result: 'win', rival: { ...rival, over: true } } }), () => { duo.won = true; duo.over = false; });
+show('Defeat, versus race still going (no summary yet)', solo, ui({ cam: camOn(solo, solo.players[0]), versus: { race: {}, result: null, rival } }));
+duo.won = false; duo.over = true;
 show('Defeat, summary not there yet (online guest)', solo, ui({ cam: camOn(solo, solo.players[0]) }));
 show('Disconnected', solo, ui({ cam: camOn(solo, solo.players[0]), disconnected: true }));
 </script>

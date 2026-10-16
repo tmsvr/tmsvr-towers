@@ -31,7 +31,7 @@ them.
 
 ## Playing
 
-- **1** solo · **2** local co-op (one keyboard) · **3** host online · **4** join online
+- **1** solo · **2** local co-op (one keyboard) · **3** host online · **4** join online · **5** versus race
 - Before each game, pick a map, a cat and 3 of the 7 flowers. Two players can't
   pick the same cat: Brick (slow, big hits), Zip (fast, light hits), Fern
   (grows and heals faster) or Boom (faster, bigger bombs). On the map row, E
@@ -132,6 +132,28 @@ them into a chat.
   ```
 
   Retrying a wave (R) is allowed, but the result says how many retries you used.
+
+### Versus races
+
+Two teams race on the same challenge, each in its own garden, each team on
+its own computers: same map, same mode, same waves. A team is one or two
+players (the host plus one teammate who joins with 4).
+
+1. Each team's host presses **5**. That opens a versus room with a code.
+2. One host types the other team's code in and clicks **Link to the rival
+   team** (or opens the **Copy rival link** link). The room that was linked
+   to picks the map and mode (Sprint by default) and starts the race.
+3. Teammates press **4** and enter their own host's code, before the race
+   starts.
+4. Everyone picks cats and flowers; a team that's ready waits for the other,
+   then both start at the same moment.
+
+The panel at the top shows how the rivals are doing. The team that survives
+longer wins; if both survive (or fall in the same wave), the one with more
+cottage left wins, then the higher score. Once the rivals fall behind for
+good, you've won, but you can keep playing for the score. Pausing pauses both
+teams. A race can't be retried or saved; **Enter** on the end screen asks for
+a rematch (new waves, same map and mode), **M** leaves.
 
 ## Tuning
 

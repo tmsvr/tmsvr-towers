@@ -116,30 +116,45 @@ function requirePeer(onError) {
 
 const OFFLINE = { send() {}, sendFast() {}, close() {}, kick() {}, connected: false, congested: false };
 
-// Host: registers a room code and waits for one guest. A new guest replaces a
-// dropped one, so a friend can rejoin with the same code.
-export function hostGame({ onOpen, onConnect, onData, onClose, onError }) {
-  let peer = null, closed = false;
-  const link = lanes();
-  if (!requirePeer(onError)) return OFFLINE;
+// Host: registers a room code and keeps every connection that opens, each as
+// a link with its own two lanes. Teammates join the room; a versus race also
+// links two rooms (connect). Who a link is (teammate or rival) is up to the
+// game: the first thing either side says is a hello naming its role.
+//   onOpen(code)        the room has its code
+//   onLink(link)        a connection opened (link.out: we connected to them)
+//   onData(link, msg)   a message (fast-lane ones as an ArrayBuffer)
+//   onClose(link)       a link closed or failed
+export function openRoom({ onOpen, onLink, onData, onClose, onError }) {
+  let peer = null, closed = false, code = '';
+  if (!requirePeer(onError)) return { ...OFFLINE, connect() {}, links: [] };
+  const links = new Set();
+
+  const adopt = (c, out) => {
+    const lane = lanes();
+    let gone = false;
+    const link = {
+      out, role: null,
+      send: (msg) => lane.send(msg),
+      sendFast: (msg) => lane.sendFast(msg),
+      get connected() { return lane.open; },
+      get congested() { return lane.congested; },
+      // Close it (after a moment, so a last message such as a refusal still gets out).
+      kick() { if (lane.detach(c)) setTimeout(() => c.close(), 300); },
+    };
+    const lost = () => { if (gone) return; gone = true; lane.detach(c); links.delete(link); if (!closed) onClose(link); };
+    c.on('open', () => { lane.attach(c, (m) => onData(link, m)); links.add(link); onLink(link); });
+    wire(c, { onData: (m) => onData(link, m), onClose: lost });
+  };
 
   const open = () => peerOptions().then((opts) => {
     if (closed) return;
-    const code = randomCode();
+    code = randomCode();
     peer = new window.Peer(PREFIX + code, opts);
     peer.on('open', () => onOpen(code));
-    peer.on('connection', (c) => {
-      c.on('open', () => {
-        const old = link.conn;
-        if (old && old !== c) { link.detach(old); old.close(); }
-        link.attach(c, onData);
-        onConnect();
-      });
-      wire(c, { onData, onClose: () => { if (link.detach(c) && !closed) onClose(); } });
-    });
+    peer.on('connection', (c) => adopt(c, false));
     peer.on('error', (err) => {
       if (err.type === 'unavailable-id') { peer.destroy(); open(); return; } // code clash: pick another
-      if (err.type === 'peer-unavailable') return;
+      if (err.type === 'peer-unavailable') { onError(errorText(err), true); return; } // a room we tried to link to isn't there
       if (!closed) onError(errorText(err));
     });
     // The signalling link can drop while the game connection is fine; reconnect so rejoining still works.
@@ -148,13 +163,11 @@ export function hostGame({ onOpen, onConnect, onData, onClose, onError }) {
   open();
 
   return {
-    send: (msg) => link.send(msg),
-    sendFast: (msg) => link.sendFast(msg),
+    get code() { return code; },
+    get links() { return [...links]; },
+    // Link to another room (a rival team's host).
+    connect(other) { adopt(peer.connect(PREFIX + other.toUpperCase(), { reliable: true }), true); },
     close() { closed = true; peer && peer.destroy(); },
-    // Drop the current guest (the room stays open for another).
-    kick() { const c = link.conn; if (c) { link.detach(c); setTimeout(() => c.close(), 300); } },
-    get connected() { return link.open; },
-    get congested() { return link.congested; },
   };
 }
 

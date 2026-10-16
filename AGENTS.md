@@ -53,7 +53,8 @@ Claude Code users: `.claude/launch.json` defines this server as `towers`
 | `src/fx.js`, `src/juice.js` | Visual-only effects (particles, damage numbers, squash, hit-stop) |
 | `src/audio.js` | Procedural sound effects and adaptive music |
 | `src/main.js` | Entry point: keyboard input, fixed-step game loop, menus, camera, lobby, game logs (L key), canvas sizing |
-| `src/net.js` | PeerJS wrapper: a reliable channel and a fast, unreliable one. Fetches TURN servers from `ICE_URL` first, falling back to PeerJS's own |
+| `src/net.js` | PeerJS wrapper: a host's room (`openRoom`: any number of links, and linking to another room) and a guest's connection (`joinGame`), each link with a reliable channel and a fast, unreliable one. Fetches TURN servers from `ICE_URL` first, falling back to PeerJS's own |
+| `src/versus.js` | Versus races: what one team tells the other (`raceStatus`) and who wins (`raceResult`) |
 | `src/schema.js` | Binary encoding of snapshots and guest inputs; defines `PROTOCOL` |
 | `src/host.js` / `src/guest.js` | Each side of an online game (host-authoritative) |
 | `src/snapshot.js` | Host builds snapshots; guest interpolates between them |
@@ -67,6 +68,7 @@ Claude Code users: `.claude/launch.json` defines this server as `towers`
 | `tools/gallery.html` | Every flower at every level, every cat (standing and swinging) and every monster, drawn with the real render code. `?zoom=5` for close-ups |
 | `tools/screens.html` | Every screen (menu, guide, pick, game, chest, pause, end screens, overlays) drawn with the real render code on realistic games, including a long endless run with huge numbers, so text that doesn't fit shows at a glance. `?only=pause` filters by name |
 | `tools/tests.html`, `tools/tests.js` | The test suite: prices, maps, monsters, endless mode, whole autopilot games, saved games, online encoding, drawing. Runs in the browser |
+| `tools/fakepeer.js` | A stand-in for PeerJS over `BroadcastChannel`: open the game with `?fakenet` in several tabs of one browser to test online play without the internet (`&tick` too if background tabs freeze) |
 | `tools/maps.html` | Every map from `maps.json` drawn whole with the real render code (roads, ponds, bridges, scatter, cottage, entrances) |
 | `turn/` | Cloudflare Worker that makes TURN relay credentials, and how to deploy it (`turn/README.md`) |
 | `serve.py` | No-cache local server |
@@ -168,6 +170,17 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
   `again`, the host answers `start` and the guest makes a fresh input link);
   Esc or another mode leaves. The guest ignores snapshots until `start`, since
   the old game's may still be arriving.
+- **Versus races** (5 on the menu, `versus.js`, the "versus races" section of
+  `main.js`). Each team is an ordinary host game (host plus guests); the two
+  hosts link their rooms (`room.connect`), introducing themselves with a
+  `hello` whose `role` is `rival`. The room that was linked to is the
+  referee: it chooses the map and mode and sends `race` (a challenge with a
+  fresh seed), and both sides start it with `s.versus` set. A side that has
+  picked holds (`s.hold`) until the rival's status says it has picked too
+  (`releaseHold`). Then the hosts swap `status` messages 4 times a second,
+  each passes the rival's on to its guests (`versus`), and pausing sends
+  `pause` across. The sims never talk to each other, so each side's game
+  stays exactly as deterministic as before.
 - **Saves online** are made and loaded by the host. A loaded online save
   either resumes at once (partner still connected) or opens a room and
   resumes when P2 joins (`pendingSave`).
@@ -234,7 +247,10 @@ Check changes like this:
    This is the main source for balance decisions; online, only the host has
    it. `runBot()` returns the same log as `game`.
 6. **Online**: open two browser windows; host with 3, join with 4 using the
-   room code. Test with the same build in both. When touching the menu or
+   room code. Test with the same build in both. Without the internet (or in a
+   browser that can't do WebRTC), add `?fakenet` to every tab's URL: the tabs
+   then connect to each other directly (`tools/fakepeer.js`). For versus,
+   one tab per team host, each pressing 5, plus a tab per teammate. When touching the menu or
    saves, also check: pause → M takes both to the menu still connected, 3
    there starts a new game for both, and an online save loaded by the host
    brings the guest back in.

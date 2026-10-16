@@ -58,15 +58,17 @@ export const modeName = (s) => (s.sprint ? (s.hard ? 'Sprint · Hard' : 'Sprint'
 // sharedScreen: both cats share one camera, so they can't wander further apart than the view.
 // loadouts / cats / hard: last game's flower picks, characters and difficulty, pre-selected on the pick screen.
 // sprint: the short mode. locked: a challenge or a versus race, whose map and mode can't be changed.
+// versus: one side of a race (versus.js); once its flowers are picked it holds
+// (s.hold) until the other team is ready too, so both start at the same moment.
 // The map lives on the state (s.m, one of MAPS), so any number of games can
 // exist side by side: the balance bot's, a guest's view, the real one.
-export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, loadouts = [], cats = [], map = 0, hard = false, sprint = false, locked = false } = {}) {
+export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, loadouts = [], cats = [], map = 0, hard = false, sprint = false, locked = false, versus = false } = {}) {
   const m = MAPS[map] || MAPS[0];
   const s = {
     m,
     t: 0, nextId: 1, rng: seed, seed, wrng: waveSeed(seed), wave: 0, phase: 'pick', timer: 0, queue: [], spawnWait: 0,
     lives: DIFFICULTY.cottageHealth, maxLives: DIFFICULTY.cottageHealth, baseHitT: 0, lastAlarm: -99, players: [], flowers: [], enemies: [], drops: [], bombs: [], projs: [], clouds: [],
-    fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, sharedScreen, map: m.index, hard: !!hard, sprint: !!sprint, locked: !!locked,
+    fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, sharedScreen, map: m.index, hard: !!hard, sprint: !!sprint, locked: !!locked, versus: !!versus, hold: false,
     items: [], // power-ups dropped by elites, waiting to be picked up
     perks: {}, chest: null, chestDue: false, // boss chests: the team's perks, the open chest, one is owed
     seen: {}, // monster types met so far (each gets one warning banner)
@@ -691,6 +693,15 @@ export function continueEndless(s) {
   saveCheckpoint(s);
 }
 
+// ---- Versus races ------------------------------------------------------------------
+// Both teams have picked: the race starts (main.js calls this on each side).
+export function releaseHold(s) {
+  if (!s.hold) return;
+  s.hold = false;
+  banner(s, 'Go! The same waves for both teams. Plant fast!');
+  ev(s, 'boss');
+}
+
 // ---- Score ---------------------------------------------------------------------
 // One number to compare games by (balance.json → score): waves cleared, the
 // cottage left and monsters bonked, more on Hard.
@@ -709,7 +720,7 @@ function saveCheckpoint(s) {
   s.checkpoint = structuredClone({ ...s, m: null, checkpoint: null, fx: [], events: [] });
 }
 
-export const canRetry = (s) => !!s.checkpoint && !s.won;
+export const canRetry = (s) => !!s.checkpoint && !s.won && !s.versus; // a race can't be rewound
 
 export function retryWave(s) {
   if (!canRetry(s)) return;
@@ -1360,7 +1371,8 @@ function updatePick(s, inputs) {
     s.players.forEach((p, k) => { p.loadout = p.pick.chosen.slice(); p.sel = 0; p.x = s.m.start.x + k * T; p.y = s.m.start.y; });
     s.phase = 'prep';
     s.timer = firstWaveDelay(s);
-    banner(s, s.sprint ? `Sprint: ${lastWave(s)} quick waves. Plant fast!` : 'Plant your flowers!');
+    if (!s.versus) banner(s, s.sprint ? `Sprint: ${lastWave(s)} quick waves. Plant fast!` : 'Plant your flowers!');
+    s.hold = s.versus; // until the other team has picked too (main.js lets go)
     ev(s, 'wave');
     log.startLog(s);
     saveCheckpoint(s);
@@ -1369,7 +1381,7 @@ function updatePick(s, inputs) {
 
 export function step(s, inputs, dt) {
   if (s.phase === 'pick') { updatePick(s, inputs); return; }
-  if (s.over || s.won) return;
+  if (s.over || s.won || s.hold) return;
   if (s.chest) { updateChest(s, inputs, dt); return; } // everything waits for the picks
   s.t += dt;
   s.baseHitT = Math.max(0, s.baseHitT - dt);

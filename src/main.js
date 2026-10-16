@@ -4,13 +4,14 @@
 //   local     – this browser runs the game for 1 or 2 players on one keyboard
 //   host      – this browser runs the game; player 2's inputs arrive over the network (host.js)
 //   guest     – this browser only sends inputs and draws snapshots from the host (guest.js)
-import { createState, step, continueEndless, retryWave, canRetry, setChallenge, scoreOf, modeName } from './sim.js';
+import { createState, step, continueEndless, retryWave, canRetry, setChallenge, scoreOf, modeName, MODES, releaseHold } from './sim.js';
 import { randomSeed, encodeCode, decodeCode, codeOf, dailyChallenge, shareText } from './challenge.js';
 import { finishLog, currentLog, gameSummary } from './stats.js';
 import { render, setView, VIEW_W, MAP_H, BASE_W, BASE_H } from './render.js';
 import { initAudio, play, toggleMute, setMusicMood } from './audio.js';
 import { juiceEvent, hitStopping } from './juice.js';
-import { hostGame, joinGame } from './net.js';
+import { openRoom, joinGame } from './net.js';
+import { raceStatus, raceResult } from './versus.js';
 import { applySnapshot, applyEffects, interpolate, newGuestState } from './snapshot.js';
 import { decodeFast, PROTOCOL } from './schema.js';
 import { createHostLink } from './host.js';
@@ -18,6 +19,9 @@ import { createGuestLink } from './guest.js';
 import { saveGame, loadGame } from './save.js';
 import { spawnEffect, spawnTrails, updateEffects, resetEffects } from './fx.js';
 import { MAPS, HUD_H, DATA_HASH, FLOWER_ORDER } from './data.js';
+
+// ?fakenet: online play between tabs of this browser, without the internet (tools/fakepeer.js)
+if (new URLSearchParams(location.search).has('fakenet')) await import('../tools/fakepeer.js');
 
 const canvas = document.getElementById('game');
 const lobby = document.getElementById('lobby');
@@ -158,12 +162,13 @@ addEventListener('keydown', (e) => {
   const inGame = mode === 'local' || mode === 'host' || mode === 'guest';
   const stopped = inGame && state && (state.over || state.won || ui.paused);
   if (code === 'KeyM' && inGame && (stopped || ui.disconnected)) { backToMenu(); return; }
-  if (code === 'KeyS' && ui.paused && inGame) { saveToFile(); return; }
+  const racing = !!ui.versus?.race;
+  if (code === 'KeyS' && ui.paused && inGame) { if (racing) flashNote("A race can't be saved"); else saveToFile(); return; }
   if (code === 'KeyX' && inGame && state && (state.over || state.won) && state.phase !== 'pick') { copyResult(); return; }
   if (mode === 'menu') {
     // still connected after a game: 3 or Enter plays again together, any other mode leaves
     if (ui.online && (code === 'Digit3' || code === 'Numpad3' || code === 'Enter')) { playAgainOnline(); return; }
-    if (ui.online && /^(Digit|Numpad)[124]$/.test(code)) leaveOnline();
+    if (ui.online && /^(Digit|Numpad)[1245]$/.test(code)) leaveOnline();
     if (code === 'KeyO') openSaveFile();
     if (code === 'KeyD') setDaily();
     if (code === 'KeyK') { if (ui.challenge) { ui.challenge = null; flashNote('Challenge cleared'); } else showCodeEntry(); }
@@ -171,11 +176,14 @@ addEventListener('keydown', (e) => {
     if (code === 'Digit2' || code === 'Numpad2') startLocal(2);
     if (code === 'Digit3' || code === 'Numpad3') startHost();
     if (code === 'Digit4' || code === 'Numpad4') showJoin();
+    if (code === 'Digit5' || code === 'Numpad5') startVersus();
     return;
   }
   if (code === 'KeyP') togglePause();
   if (!stopped || ui.disconnected) return;
   const ask = (t) => net.send({ t }); // online the host decides
+  // a race can't be rewound, restarted alone or carried on: Enter asks for a rematch
+  if (racing) { if (code === 'Enter' && (state.over || state.won)) { if (mode === 'guest') ask('rematch'); else rematch(); } return; }
   if (code === 'KeyC' && state.won && !ui.paused) { if (mode === 'guest') ask('continue'); else keepGoing(); }
   if (code === 'KeyR') { if (mode === 'guest') ask('retry'); else retry(); }
   if (code === 'KeyT') { if (mode === 'guest') ask('restart'); else newGame(); }
@@ -197,7 +205,8 @@ function saveGameLog(how) {
   state.logSaved = true;
   if (!state.stats.waves.length && !(state.stats.cur && state.wave > 0)) return; // nothing played yet
   const entry = finishLog(state, how);
-  entry.mode = mode === 'host' ? 'online co-op (host)' : nPlayers > 1 ? 'local co-op' : 'solo';
+  entry.mode = ui.versus?.race ? 'versus race (host)' : mode === 'host' ? 'online co-op (host)' : nPlayers > 1 ? 'local co-op' : 'solo';
+  if (ui.versus?.race) entry.race = { rival: ui.versus.rival, result: ui.versus.result };
   // the end screen's numbers; an online guest gets the same ones
   if (how !== 'quit') {
     ui.summary = gameSummary(entry);
@@ -285,15 +294,16 @@ let lastMap = 0, lastHard = false, lastSprint = false;
 // two flips would cancel out and the game would flicker in and out of pause.
 function togglePause() {
   if (mode === 'guest') net.send({ t: 'pause', on: !ui.paused });
-  else if (mode === 'local' || mode === 'host') ui.paused = !ui.paused;
+  else if (mode === 'local' || mode === 'host') setPaused(!ui.paused);
 }
 
 // A new game starts on the pick screen with the last map, cats and flowers chosen.
 function newGame() {
   saveGameLog('quit');
   if (state && state.players) { lastLoadouts = state.players.map((p) => p.loadout || p.pick.chosen); lastCats = state.players.map((p) => p.cat); lastMap = state.map; lastHard = !!state.hard; lastSprint = !!state.sprint; }
-  state = createState(nPlayers, randomSeed(), { sharedScreen: mode === 'local' && nPlayers > 1, loadouts: lastLoadouts, cats: lastCats, map: lastMap, hard: lastHard, sprint: lastSprint });
-  if (ui.challenge) setChallenge(state, ui.challenge); // the same waves as everyone else with this code
+  const race = ui.versus?.race;
+  state = createState(nPlayers, randomSeed(), { sharedScreen: mode === 'local' && nPlayers > 1, loadouts: lastLoadouts, cats: lastCats, map: lastMap, hard: lastHard, sprint: lastSprint, versus: !!race });
+  if (race || ui.challenge) setChallenge(state, race || ui.challenge); // the same waves as everyone else with this code
   ui.cam.snap = true;
   ui.paused = false;
   ui.summary = null;
@@ -378,6 +388,8 @@ function startLocal(n) { mode = 'local'; nPlayers = n; newGame(); }
 // Leaving a game online keeps the connection: both players go back to the
 // main menu together and can start another game from there.
 function backToMenu() {
+  if (rivalLink) { rivalLink.kick(); rivalLink = null; }
+  ui.versus = null;
   const together = net?.connected && ((mode === 'host' && guestOk) || (mode === 'guest' && !ui.disconnected));
   if (together) { net.send({ t: 'menu' }); menuTogether(); return; }
   saveGameLog('quit');
@@ -395,6 +407,7 @@ function backToMenu() {
 
 function menuTogether(note) {
   saveGameLog('quit');
+  ui.versus = null;
   if (mode === 'host' && state?.players) { lastLoadouts = state.players.map((p) => p.loadout || p.pick.chosen); lastCats = state.players.map((p) => p.cat); lastMap = state.map; lastHard = !!state.hard; lastSprint = !!state.sprint; }
   ui.online = mode === 'host' ? 'host' : 'guest';
   awaitingStart = ui.online === 'guest'; // snapshots of the old game may still be on the way
@@ -422,6 +435,8 @@ function playAgainOnline() {
 function leaveOnline() {
   if (net) net.close();
   net = null;
+  room = teamLink = rivalLink = null;
+  ui.versus = null;
   ui.online = null;
   ui.netLabel = '';
   guestOk = false;
@@ -434,50 +449,85 @@ function hideLobby() { lobby.hidden = true; lobby.innerHTML = ''; }
 const isLocalhost = ['localhost', '127.0.0.1', '[::1]', ''].includes(location.hostname) || location.protocol === 'file:';
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+// The host's room (net.js openRoom): its teammate link, and in a versus race
+// the link to the other team's host. `net` stands for the teammate, so the
+// rest of this file talks to "the guest" the same way however it got here.
+let room = null, teamLink = null, rivalLink = null;
+function openHostRoom(onCode, onFail) {
+  host.reset();
+  room = openRoom({
+    onOpen: (code) => { roomCode = code; onCode(code); },
+    // we linked to another room: introduce ourselves as its rival
+    onLink: (link) => { if (link.out) link.send({ t: 'hello', role: 'rival', ...VERSION, players: teamSize() }); },
+    onData: (link, raw) => onLinkMessage(link, raw instanceof ArrayBuffer ? decodeFast(raw) : raw),
+    onClose: (link) => { if (link === teamLink) teammateLeft(); else if (link === rivalLink) rivalLeft(); },
+    onError: (msg, linking) => { if (linking) versusNote(`Couldn't link to that team: ${msg}`); else onFail(msg); },
+  });
+  net = {
+    send: (m) => teamLink?.send(m),
+    sendFast: (b) => teamLink?.sendFast(b),
+    get connected() { return !!teamLink?.connected; },
+    get congested() { return !!teamLink?.congested; },
+    kick() { teamLink?.kick(); },
+    close() { room.close(); },
+  };
+}
+const teamSize = () => 1 + (guestOk && teamLink?.connected ? 1 : 0);
+
 function startHost() {
   mode = 'hostWait';
-  host.reset();
   showLobby('<h2>Host an online game</h2><p>Getting a room code…</p><p class="hint">Esc to cancel</p>');
-  net = hostGame({
-    onOpen: (code) => {
-      roomCode = code;
-      const link = `${location.origin}${location.pathname}?join=${code}`;
-      const share = isLocalhost
-        ? '<p class="hint">Your friend needs their own copy of the game (or put it online, e.g. GitHub Pages), then presses <b>4</b> and enters the code.</p>'
-        : `<p><button id="copy">Copy invite link</button></p><p class="hint">…or they open the game, press <b>4</b> and enter the code.</p>`;
-      const resume = pendingSave ? `<p>Your saved game (${esc(pendingSave.m.name)}, wave ${pendingSave.wave}) carries on once they join.</p>` : '';
-      showLobby(`<h2>Waiting for player 2…</h2><p>Room code</p><div class="code">${code}</div>${resume}${share}<p class="hint">Esc to cancel</p>`);
-      const btn = document.getElementById('copy');
-      if (btn) btn.onclick = () => navigator.clipboard.writeText(link).then(() => { btn.textContent = 'Copied!'; });
-    },
-    // The guest introduces itself first (see onGuestMessage); nothing starts until then.
-    onConnect: () => { guestOk = false; },
-    onData: (m) => onGuestMessage(m instanceof ArrayBuffer ? decodeFast(m) : m),
-    onClose: () => {
-      if (!guestOk) return;
-      if (ui.online) { leaveOnline(); flashNote('P2 left the online game'); return; }
-      guestOk = false; host.reset(); ui.netLabel = `P2 disconnected — they can rejoin with code ${roomCode}`; play('leak');
-    },
-    onError: (msg) => showLobby(`<h2>Couldn't host</h2><p>${esc(msg)}</p><p class="hint">Esc to go back</p>`),
-  });
+  openHostRoom((code) => {
+    const link = `${location.origin}${location.pathname}?join=${code}`;
+    const share = isLocalhost
+      ? '<p class="hint">Your friend needs their own copy of the game (or put it online, e.g. GitHub Pages), then presses <b>4</b> and enters the code.</p>'
+      : `<p><button id="copy">Copy invite link</button></p><p class="hint">…or they open the game, press <b>4</b> and enter the code.</p>`;
+    const resume = pendingSave ? `<p>Your saved game (${esc(pendingSave.m.name)}, wave ${pendingSave.wave}) carries on once they join.</p>` : '';
+    showLobby(`<h2>Waiting for player 2…</h2><p>Room code</p><div class="code">${code}</div>${resume}${share}<p class="hint">Esc to cancel</p>`);
+    copyButton('copy', link);
+  }, (msg) => showLobby(`<h2>Couldn't host</h2><p>${esc(msg)}</p><p class="hint">Esc to go back</p>`));
+}
+function copyButton(id, text) {
+  const btn = document.getElementById(id);
+  if (btn) btn.onclick = () => navigator.clipboard.writeText(text).then(() => { btn.textContent = 'Copied!'; });
 }
 
 // Only a guest running the same game version and data may play.
 const VERSION = { protocol: PROTOCOL, data: DATA_HASH };
 let guestOk = false;
 
-function welcomeGuest(m) {
+function onLinkMessage(link, m) {
+  if (!m || typeof m.t !== 'string') return;
+  if (!link.role) {
+    if (m.t === 'hello' && m.role === 'rival') welcomeRival(link, m);
+    else if (m.t === 'hello') welcomeGuest(link, m);
+    else if (m.t === 'rivalOk' && link.out) rivalAccepted(link, m);
+    else if (m.t === 'reject' && link.out) { versusNote(m.reason === 'busy' ? 'That team is already racing someone else' : m.reason === 'notVersus' ? "That code isn't a versus room (they press 5 to make one)" : 'That team has a different version of the game: both reload the page (Cmd/Ctrl+Shift+R)'); link.kick(); }
+    return;
+  }
+  if (link === teamLink) onGuestMessage(m);
+  else if (link === rivalLink) onRivalMessage(m);
+}
+
+function welcomeGuest(link, m) {
+  const reject = (reason) => { link.send({ t: 'reject', reason, ...VERSION }); link.kick(); };
   if (m.protocol !== VERSION.protocol || m.data !== VERSION.data) {
-    net.send({ t: 'reject', ...VERSION });
-    net.kick();
+    reject('version');
     if (mode === 'hostWait') showLobby(`<h2>Waiting for player 2…</h2><p>Room code</p><div class="code">${roomCode}</div><p>Someone tried to join with a different version of the game. Both of you: reload the page (Cmd/Ctrl+Shift+R) to get the latest one.</p><p class="hint">Esc to cancel</p>`);
+    else if (mode === 'versusLobby') versusNote('A teammate tried to join with a different version of the game: both reload the page');
     else ui.netLabel = `P2 has a different version of the game — room ${roomCode}`;
     return;
   }
+  // a game started without a second cat has no place for one
+  if (mode === 'host' && state?.players && state.players.length < 2) { reject('full'); return; }
+  if (teamLink && teamLink !== link) teamLink.kick(); // a new guest replaces a dropped one, so a friend can rejoin with the same code
+  teamLink = link;
+  link.role = 'guest';
   guestOk = true;
-  hideLobby();
   host.reset(); // also drops sounds and effects queued while nobody was connected
   ui.netLabel = `Online · room ${roomCode} · P2 connected`;
+  if (mode === 'versusLobby') { updateVersusLobby(); rivalLink?.send({ t: 'team', players: teamSize() }); play('grown'); return; }
+  hideLobby();
   if (mode === 'hostWait') {
     mode = 'host';
     nPlayers = 2;
@@ -486,18 +536,173 @@ function welcomeGuest(m) {
   play('grown');
 }
 
-function onGuestMessage(m) {
-  if (!m || typeof m.t !== 'string') return;
-  if (m.t === 'hello') { welcomeGuest(m); return; }
+function teammateLeft() {
   if (!guestOk) return;
+  if (ui.online) { leaveOnline(); flashNote('P2 left the online game'); return; }
+  guestOk = false; host.reset();
+  if (mode === 'versusLobby') { updateVersusLobby(); rivalLink?.send({ t: 'team', players: teamSize() }); return; }
+  ui.netLabel = `P2 disconnected — they can rejoin with code ${roomCode}`; play('leak');
+}
+
+function onGuestMessage(m) {
   if (m.t === 'in') host.receiveInputs(m.inputs);
-  else if (m.t === 'pause') ui.paused = typeof m.on === 'boolean' ? m.on : !ui.paused;
-  else if (m.t === 'restart' && state && (state.over || state.won || ui.paused)) newGame();
-  else if (m.t === 'continue' && state?.won) keepGoing();
+  else if (m.t === 'pause') setPaused(typeof m.on === 'boolean' ? m.on : !ui.paused);
+  else if (m.t === 'restart' && state && (state.over || state.won || ui.paused) && !ui.versus) newGame();
+  else if (m.t === 'continue' && state?.won && !ui.versus) keepGoing();
   else if (m.t === 'retry' && state && (state.over || ui.paused)) retry();
+  else if (m.t === 'rematch' && ui.versus) rematch();
   else if (m.t === 'ping' && Number.isFinite(m.at)) net.send({ t: 'pong', at: m.at });
   else if (m.t === 'menu' && mode === 'host') menuTogether('P2 went back to the menu');
   else if (m.t === 'again' && mode === 'menu' && ui.online === 'host') playAgainOnline();
+}
+
+// ---- versus races ------------------------------------------------------------------
+// Each team's host opens a versus room (5 on the menu); one of them types in
+// the other's code to link the two. The room that was linked to is the
+// referee: it picks the map and mode and starts the race, and both games then
+// play that challenge (same seed, same waves). Teammates join their own
+// host's room as usual (4). During the race each host sends its team's
+// numbers (versus.js raceStatus) to the other a few times a second and passes
+// the rival's on to its teammate. ui.versus = { referee, race, rival, result }.
+function startVersus(rivalCode = '') {
+  if (ui.online) leaveOnline();
+  mode = 'versusLobby';
+  ui.versus = { referee: false, race: null, rival: null, result: null };
+  showLobby('<h2>Versus race</h2><p>Getting a room code…</p><p class="hint">Esc to cancel</p>');
+  openHostRoom((code) => {
+    const maps = MAPS.map((m, i) => `<option value="${i}"${i === lastMap ? ' selected' : ''}>${esc(m.name)}</option>`).join('');
+    const modes = MODES.map((o, i) => `<option value="${i}"${o.sprint && !o.hard ? ' selected' : ''}>${modeName(o)}</option>`).join('');
+    const invite = isLocalhost ? '' : `<br><button id="copyTeam" class="small" type="button">Copy teammate link</button><button id="copyRival" class="small" type="button">Copy rival link</button>`;
+    showLobby(`<h2>Versus race</h2>
+      <p>Your team's room code</p><div class="code">${code}</div>
+      <p class="hint">Teammate: presses <b>4</b> and enters this code. Rival team: their host presses <b>5</b> and enters it below. ${invite}</p>
+      <p id="team"></p>
+      <form id="rivalform"><input id="rival" maxlength="4" autocomplete="off" spellcheck="false" placeholder="ABCD" value="${esc(rivalCode)}"><button>Link to the rival team</button></form>
+      <p id="rivalstatus" class="hint"></p>
+      <div id="race" hidden><p><select id="map">${maps}</select> <select id="mode">${modes}</select></p><p><button id="go" type="button">Start the race</button></p></div>
+      <p class="hint">Esc to cancel</p>`);
+    copyButton('copyTeam', `${location.origin}${location.pathname}?join=${code}`);
+    copyButton('copyRival', `${location.origin}${location.pathname}?versus=${code}`);
+    const input = document.getElementById('rival');
+    input.oninput = () => { input.value = input.value.toUpperCase().replace(/[^A-Z]/g, ''); };
+    document.getElementById('rivalform').onsubmit = (ev) => {
+      ev.preventDefault();
+      initAudio();
+      if (input.value === code) { versusNote("That's your own code: type in the other team's"); return; }
+      if (input.value.length === 4 && !rivalLink) { room.connect(input.value); versusNote(`Linking to ${input.value}…`); }
+    };
+    document.getElementById('go').onclick = () => {
+      const o = MODES[+document.getElementById('mode').value];
+      startRace({ seed: randomSeed(), map: +document.getElementById('map').value, hard: o.hard, sprint: o.sprint }, true);
+    };
+    updateVersusLobby();
+    if (rivalCode.length === 4) document.getElementById('rivalform').requestSubmit();
+    else canvas.focus();
+  }, (msg) => showLobby(`<h2>Couldn't open a room</h2><p>${esc(msg)}</p><p class="hint">Esc to go back</p>`));
+}
+
+function versusNote(txt) { const el = document.getElementById('rivalstatus'); if (el) el.textContent = txt; else flashNote(txt); }
+
+// The lobby's lines about who is here.
+function updateVersusLobby() {
+  if (mode !== 'versusLobby') return;
+  const team = document.getElementById('team'), race = document.getElementById('race'), form = document.getElementById('rivalform');
+  if (!team) return;
+  team.textContent = teamSize() > 1 ? 'Your team: you and P2' : 'Your team: just you (a teammate can still join)';
+  const linked = !!rivalLink?.connected;
+  form.hidden = linked;
+  race.hidden = !(linked && ui.versus.referee);
+  const n = ui.versus.rivalPlayers || 1;
+  if (linked) versusNote(ui.versus.referee ? `Rival team linked (${n === 1 ? 'one player' : `${n} players`}). Choose the map and mode, then start.` : `Linked! The other team (${n === 1 ? 'one player' : `${n} players`}) chooses the map and starts the race.`);
+}
+
+function welcomeRival(link, m) {
+  const reject = (reason) => { link.send({ t: 'reject', reason, ...VERSION }); link.kick(); };
+  if (m.protocol !== VERSION.protocol || m.data !== VERSION.data) { reject('version'); versusNote('A rival team tried to link with a different version of the game: both reload the page'); return; }
+  if (mode !== 'versusLobby') { reject('notVersus'); return; }
+  if (rivalLink?.connected) { reject('busy'); return; }
+  rivalLink = link;
+  link.role = 'rival';
+  ui.versus.referee = true;
+  ui.versus.rivalPlayers = m.players || 1;
+  link.send({ t: 'rivalOk', players: teamSize() });
+  updateVersusLobby();
+  play('grown');
+}
+
+function rivalAccepted(link, m) {
+  if (rivalLink?.connected || mode !== 'versusLobby') { link.kick(); return; }
+  rivalLink = link;
+  link.role = 'rival';
+  ui.versus.referee = false;
+  ui.versus.rivalPlayers = m.players || 1;
+  updateVersusLobby();
+  play('grown');
+}
+
+function onRivalMessage(m) {
+  const V = ui.versus;
+  if (!V) return;
+  if (m.t === 'team') { V.rivalPlayers = m.players || 1; updateVersusLobby(); }
+  else if (m.t === 'race' && !V.referee && Number.isFinite(m.seed)) startRace({ seed: m.seed, map: m.map, hard: !!m.hard, sprint: !!m.sprint }, false);
+  else if (m.t === 'status' && m.status) V.rival = { ...m.status, left: false };
+  else if (m.t === 'pause' && V.race) setPaused(!!m.on, true);
+  else if (m.t === 'again' && V.referee) rematch();
+}
+
+function rivalLeft() {
+  rivalLink = null;
+  const V = ui.versus;
+  if (!V) return;
+  if (mode === 'versusLobby') { V.referee = false; versusNote('The rival team left. Link to another one, or wait for one to link to you.'); updateVersusLobby(); return; }
+  if (V.race) { V.rival = { ...(V.rival || {}), left: true }; flashNote('The rival team left the race'); if (ui.paused) setPaused(false); }
+}
+
+// Both sides start the same challenge; the referee sends it to the other.
+function startRace(race, send) {
+  const V = ui.versus;
+  V.race = race; V.rival = null; V.result = null; V.lastStatus = 0;
+  if (send) rivalLink?.send({ t: 'race', ...race });
+  hideLobby();
+  canvas.focus();
+  mode = 'host';
+  nPlayers = teamSize();
+  host.reset();
+  newGame();
+}
+
+// After a race: the referee starts another with a new seed (same map and mode).
+function rematch() {
+  const V = ui.versus;
+  if (!V?.race) return;
+  if (!rivalLink?.connected) { flashNote('The rival team has left: M for the menu'); return; }
+  if (!V.referee) { rivalLink.send({ t: 'again' }); flashNote('Asked the other team for a rematch…'); return; }
+  startRace({ ...V.race, seed: randomSeed() }, true);
+}
+
+// Every frame of a race: tell the rival how we're doing, start once both
+// teams have picked, and pass the race on to our teammate.
+function updateRace(now) {
+  const V = ui.versus;
+  if (!V?.race || !state?.players) return;
+  const mine = raceStatus(state);
+  const changed = mine.picked !== V.sentPicked || mine.over !== V.sentOver || mine.won !== V.sentWon;
+  if (rivalLink?.connected && (changed || now - V.lastStatus > 250)) {
+    rivalLink.send({ t: 'status', status: mine });
+    V.lastStatus = now; V.sentPicked = mine.picked; V.sentOver = mine.over; V.sentWon = mine.won;
+    if (guestOk && net.connected) net.send({ t: 'versus', rival: V.rival, result: V.result });
+  }
+  if (state.hold && (V.rival?.picked || V.rival?.left || !rivalLink?.connected)) releaseHold(state);
+  const was = V.result;
+  V.result = V.rival?.left ? null : raceResult(mine, V.rival);
+  if (V.result && !was && !state.over && !state.won) flashNote(V.result === 'win' ? 'The rivals fell: you have won the race! Play on for the score' : 'The rivals are out of reach…');
+}
+
+// Pausing a race pauses both teams (a pause from the rival isn't sent back).
+function setPaused(on, fromRival = false) {
+  if (ui.paused === on) return;
+  ui.paused = on;
+  if (ui.versus?.race && rivalLink?.connected && !fromRival) rivalLink.send({ t: 'pause', on });
 }
 
 function showJoin(prefill = '') {
@@ -542,6 +747,9 @@ function startJoin(code) {
       } else if (m.t === 'summary') {
         // kept until the guest's view (which trails the host a little) shows the game ending
         if (mode === 'guest') guestSummary = m.summary;
+      } else if (m.t === 'versus') {
+        // our host is racing another team: its numbers, for the HUD and end screen
+        if (mode === 'guest' || mode === 'joining') ui.versus = { guest: true, race: true, rival: m.rival, result: m.result };
       } else if (m.t === 'menu') {
         if (mode === 'guest') menuTogether('The host went back to the menu');
       } else if (m.t === 'start') {
@@ -550,7 +758,8 @@ function startJoin(code) {
         ui.netLabel = `Online · room ${code} · ${Math.round(performance.now() - m.at)} ms`;
       } else if (m.t === 'reject') {
         rejected = true;
-        showLobby(`<h2>Different game versions</h2><p>The host has a different version of the game${m.protocol !== VERSION.protocol ? '' : ' (different balance or maps)'}. Both of you: reload the page (Cmd/Ctrl+Shift+R) to get the latest one.</p><p class="hint">Esc to go back</p>`);
+        if (m.reason === 'full') showLobby('<h2>The game has started</h2><p>The host started without a place for another cat. Ask them to go back to the menu and start again once you are in.</p><p class="hint">Esc to go back</p>');
+        else showLobby(`<h2>Different game versions</h2><p>The host has a different version of the game${m.protocol !== VERSION.protocol ? '' : ' (different balance or maps)'}. Both of you: reload the page (Cmd/Ctrl+Shift+R) to get the latest one.</p><p class="hint">Esc to go back</p>`);
       }
     },
     onClose: () => {
@@ -612,6 +821,7 @@ function pump() {
       }
     }
     if (state && (state.over || state.won) && !state.logSaved) saveGameLog(state.won ? 'won' : 'lost');
+    if (mode === 'host') updateRace(now);
     drainEffects(state, mode === 'host');
     if (!stopped && !ui.paused) { updateEffects(elapsed); spawnTrails(state, elapsed); }
     playEvents(state.events, mode === 'host');
@@ -743,8 +953,9 @@ document.addEventListener('visibilitychange', followVisibility);
 followVisibility();
 
 // Invite links: ?join=ABCD opens the join screen with the code filled in.
-const invite = new URLSearchParams(location.search).get('join');
+const params = new URLSearchParams(location.search), invite = params.get('join'), rivalInvite = params.get('versus');
 if (invite) showJoin(invite.toUpperCase().slice(0, 4));
+else if (rivalInvite) startVersus(rivalInvite.toUpperCase().slice(0, 4));
 
 // Debug hooks for automated play-testing.
 window.__game = { get state() { return state; }, get mode() { return mode; }, get net() { return net; }, get pred() { return guest && guest.pred; }, ui, startLocal, held, pressed };
