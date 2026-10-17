@@ -282,15 +282,17 @@
     { "enemy": "swarm",    "fromWave": 2, "weight": 3, "cost": 2,   "group": 5 },
     { "enemy": "runner",   "fromWave": 3, "weight": 2, "cost": 1.3, "group": 1 },
     { "enemy": "dasher",   "fromWave": 3, "weight": 3, "cost": 1.5, "group": 1 },
-    { "enemy": "flyer",    "fromWave": 4, "weight": 1.5, "cost": 2.4, "group": 1 },
+    { "enemy": "woolly",   "fromWave": [4, 5], "weight": 2, "cost": 1.6, "group": 1 },
+    { "enemy": "flyer",    "fromWave": 4, "weight": 1, "cost": 3,   "group": 1 },
     { "enemy": "splitter", "fromWave": 4, "weight": 3, "cost": 3,   "group": 1 },
     { "enemy": "aphid",    "fromWave": 5, "weight": 2, "cost": 1.6, "group": 1 },
     { "enemy": "shield",   "fromWave": 5, "weight": 2, "cost": 2.5, "group": 1 },
     { "enemy": "tank",     "fromWave": 6, "weight": 2, "cost": 4.5, "group": 1 },
+    { "enemy": "charger",  "fromWave": [6, 7], "weight": 2, "cost": 3,   "group": 1 },
     { "enemy": "mole",     "fromWave": 6, "weight": 3, "cost": 2,   "group": 1 },
     { "enemy": "healer",   "fromWave": 7, "weight": 2, "cost": 3,   "group": 1 },
     { "enemy": "hive",     "fromWave": 7, "weight": 2, "cost": 5,   "group": 1 },
-    { "enemy": "wasp",     "fromWave": 8, "weight": 1, "cost": 4.5, "group": 3 }
+    { "enemy": "wasp",     "fromWave": 8, "weight": 0.6, "cost": 6, "group": 3 }
   ],
 
   "waveSets": {
@@ -302,7 +304,7 @@
       { "enemy": "dasher",   "fromWave": 3,      "weight": 2, "cost": 1.5, "group": 1 },
       { "enemy": "splitter", "fromWave": 4,      "weight": 2, "cost": 3,   "group": 1 },
       { "enemy": "charger",  "fromWave": [5, 6], "weight": 2, "cost": 3,   "group": 1 },
-      { "enemy": "flyer",    "fromWave": [4, 7], "weight": 1, "cost": 2.4, "group": 1 },
+      { "enemy": "flyer",    "fromWave": [4, 7], "weight": 0.7, "cost": 3,   "group": 1 },
       { "enemy": "shield",   "fromWave": 5,      "weight": 2, "cost": 2.5, "group": 1 },
       { "enemy": "hopper",   "fromWave": [5, 6], "weight": 3, "cost": 2,   "group": 1 },
       { "enemy": "tank",     "fromWave": 6,      "weight": 2, "cost": 4.5, "group": 1 },
@@ -310,7 +312,7 @@
       { "enemy": "healer",   "fromWave": 7,      "weight": 2, "cost": 3,   "group": 1 },
       { "enemy": "mole",     "fromWave": [7, 8], "weight": 2, "cost": 2,   "group": 1 },
       { "enemy": "hive",     "fromWave": 8,      "weight": 1, "cost": 5,   "group": 1 },
-      { "enemy": "wasp",     "fromWave": [8, 9], "weight": 1, "cost": 3,   "group": 2 }
+      { "enemy": "wasp",     "fromWave": [8, 9], "weight": 0.6, "cost": 4,   "group": 2 }
     ],
     "wild": [
       { "enemy": "grunt",    "fromWave": 1,      "weight": 5, "cost": 1,   "group": 1 },
@@ -322,7 +324,7 @@
       { "enemy": "woolly",   "fromWave": [5, 6], "weight": 2, "cost": 1.6, "group": 1 },
       { "enemy": "mole",     "fromWave": 5,      "weight": 3, "cost": 2,   "group": 1 },
       { "enemy": "charger",  "fromWave": [6, 7], "weight": 2, "cost": 3,   "group": 1 },
-      { "enemy": "flyer",    "fromWave": [5, 8], "weight": 1, "cost": 2.4, "group": 1 },
+      { "enemy": "flyer",    "fromWave": [5, 8], "weight": 0.7, "cost": 3,   "group": 1 },
       { "enemy": "aphid",    "fromWave": 6,      "weight": 2, "cost": 1.6, "group": 1 },
       { "enemy": "shield",   "fromWave": 6,      "weight": 2, "cost": 2.5, "group": 1 },
       { "enemy": "tank",     "fromWave": 7,      "weight": 2, "cost": 4.5, "group": 1 },
