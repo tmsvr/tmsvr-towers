@@ -545,6 +545,12 @@ test('Waves', 'hard mode: monsters have hard.enemyHp health and hard.waveSize as
   near(hard.n / normal.n, H.waveSize, 0.12, `${hard.n} monsters instead of ${normal.n}`);
 });
 
+test('Maps', 'maps with more entrances pay more per monster', () => {
+  const k = BALANCE.economy.entranceCoins;
+  for (const m of MAPS) near(m.coinDrops, (m.entrances / 2) ** k, 1e-9, `${m.name} coin drops`);
+  ok(MAPS.find((m) => m.id === 'pinwheel').coinDrops > MAPS.find((m) => m.id === 'lakeside').coinDrops, 'Pinwheel pays more than Lakeside');
+});
+
 test('Waves', 'hard mode: monsters drop hard.coins as many coins', () => {
   const coinsFrom = (hard) => {
     let n = 0;

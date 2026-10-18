@@ -31,6 +31,10 @@ function waveSet(def) {
   return BAL.waveSets[def.waveSet];
 }
 
+// Where monsters come in (roads that share an entry point count once). Each
+// one needs its own flowers, so maps with more of them pay more per monster.
+const entrances = (def) => new Set(def.paths.map((p) => p[0].join())).size;
+
 function prepareMap(def, index) {
   const w = def.width, h = def.height;
   const center = ([x, y]) => ({ x: (x + 0.5) * T, y: (y + 0.5) * T });
@@ -120,7 +124,7 @@ function prepareMap(def, index) {
     for (let y = o.y; y < o.y + o.h; y++) for (let x = o.x; x < o.x + o.w; x++) addSolid(y * w + x, s);
   }
   return {
-    index, id: def.id, name: def.name, desc: def.desc, W: w, H: h, waves: waveSet(def), waveSize: def.waveSize ?? 1, startCoins: def.startCoins ?? 1, coinDrops: def.coinDrops ?? 1, worldW: w * T, worldH: h * T,
+    index, id: def.id, name: def.name, desc: def.desc, W: w, H: h, waves: waveSet(def), waveSize: def.waveSize ?? 1, startCoins: def.startCoins ?? 1, entrances: entrances(def), coinDrops: (def.coinDrops ?? 1) * (entrances(def) / 2) ** (BAL.economy.entranceCoins ?? 0), worldW: w * T, worldH: h * T,
     paths, base: center(def.base), baseTile: def.base, start: center(def.start), pathTiles, blocked, yard, obstacles, solids, decks,
   };
 }
