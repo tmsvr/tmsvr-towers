@@ -18,6 +18,13 @@ const FAST_LANE = { negotiated: true, id: 100, ordered: false, maxRetransmits: 0
 // Bytes waiting to go out before we stop adding snapshots. Queueing more
 // would only make every later one arrive later.
 const BACKLOG = { fast: 16 * 1024, reliable: 64 * 1024 };
+// Players whose networks block direct connections need their traffic relayed
+// through a TURN server. PeerJS brings a free shared one (UDP only, best
+// effort); this Worker (turn/worker.js) hands out Cloudflare's, which also
+// relays over TCP and TLS on port 443 and so gets through strict firewalls.
+// Empty: PeerJS's own servers only.
+const ICE_URL = 'https://petal-turn.timester12.workers.dev';
+const ICE_WAIT = 3000; // ms; without an answer by then, connect with PeerJS's servers
 
 const randomCode = () => Array.from({ length: 4 }, () => LETTERS[Math.floor(Math.random() * LETTERS.length)]).join('');
 
@@ -82,6 +89,25 @@ function lanes() {
   };
 }
 
+// PeerJS options with Cloudflare's servers when the Worker answers, otherwise
+// PeerJS's defaults. The credentials last 4 hours; they are reused for one.
+let ice = null;
+function peerOptions() {
+  if (!ICE_URL) return Promise.resolve({ debug: 0 });
+  if (!ice || performance.now() - ice.at > 3600e3) {
+    const promise = fetch(ICE_URL, { signal: AbortSignal.timeout(ICE_WAIT) })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then(({ iceServers }) => ({ debug: 0, config: { iceServers } }))
+      .catch((err) => {
+        console.warn('No TURN relay; connecting with PeerJS defaults', err);
+        if (ice?.promise === promise) ice = null; // try again next time
+        return { debug: 0 };
+      });
+    ice = { at: performance.now(), promise };
+  }
+  return ice.promise;
+}
+
 function requirePeer(onError) {
   if (window.Peer) return true;
   onError("Couldn't load the networking library. Online play needs an internet connection.");
@@ -97,9 +123,10 @@ export function hostGame({ onOpen, onConnect, onData, onClose, onError }) {
   const link = lanes();
   if (!requirePeer(onError)) return OFFLINE;
 
-  const open = () => {
+  const open = () => peerOptions().then((opts) => {
+    if (closed) return;
     const code = randomCode();
-    peer = new window.Peer(PREFIX + code, { debug: 0 });
+    peer = new window.Peer(PREFIX + code, opts);
     peer.on('open', () => onOpen(code));
     peer.on('connection', (c) => {
       c.on('open', () => {
@@ -117,7 +144,7 @@ export function hostGame({ onOpen, onConnect, onData, onClose, onError }) {
     });
     // The signalling link can drop while the game connection is fine; reconnect so rejoining still works.
     peer.on('disconnected', () => { if (!closed && !peer.destroyed) peer.reconnect(); });
-  };
+  });
   open();
 
   return {
@@ -132,20 +159,23 @@ export function hostGame({ onOpen, onConnect, onData, onClose, onError }) {
 }
 
 export function joinGame(code, { onOpen, onData, onClose, onError }) {
-  let closed = false;
+  let closed = false, peer = null;
   const link = lanes();
   if (!requirePeer(onError)) return OFFLINE;
-  const peer = new window.Peer({ debug: 0 });
-  peer.on('open', () => {
-    const conn = peer.connect(PREFIX + code.toUpperCase(), { reliable: true });
-    conn.on('open', () => { link.attach(conn, onData); onOpen(); });
-    wire(conn, { onData, onClose: () => { link.detach(conn); if (!closed) onClose(); } });
+  peerOptions().then((opts) => {
+    if (closed) return;
+    peer = new window.Peer(opts);
+    peer.on('open', () => {
+      const conn = peer.connect(PREFIX + code.toUpperCase(), { reliable: true });
+      conn.on('open', () => { link.attach(conn, onData); onOpen(); });
+      wire(conn, { onData, onClose: () => { link.detach(conn); if (!closed) onClose(); } });
+    });
+    peer.on('error', (err) => { if (!closed) onError(errorText(err)); });
   });
-  peer.on('error', (err) => { if (!closed) onError(errorText(err)); });
   return {
     send: (msg) => link.send(msg),
     sendFast: (msg) => link.sendFast(msg),
-    close() { closed = true; peer.destroy(); },
+    close() { closed = true; peer && peer.destroy(); },
     get connected() { return link.open; },
     get congested() { return link.congested; },
   };

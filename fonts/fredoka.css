@@ -1,0 +1,10 @@
+/* Fredoka (SIL Open Font License), served from here rather than Google Fonts
+   so visitors' browsers don't contact Google. One variable font file covers
+   every weight the game uses; only the Latin letters, like Google's subset. */
+@font-face {
+  font-family: 'Fredoka';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url(fredoka-latin.woff2) format('woff2');
+}

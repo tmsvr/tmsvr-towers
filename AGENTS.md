@@ -16,8 +16,12 @@ idea backlog is `IDEAS.md`.
   waves, economy, cats) and `maps.json` (map layouts). Code reads them at
   startup; balance changes almost never need code changes.
 - **Online co-op** is peer to peer over WebRTC through PeerJS (loaded from
-  jsDelivr in `index.html`), using PeerJS's free public broker. There is no
-  server of our own.
+  jsDelivr in `index.html`, pinned by an `integrity` hash: a new PeerJS
+  version needs a new hash), using PeerJS's free public broker. The only
+  server of our own is optional: a Cloudflare Worker (`turn/`) that hands out
+  TURN relay credentials for players behind strict firewalls.
+- **No third-party requests besides those.** The Fredoka font is served from
+  `fonts/`, not Google Fonts, so visitors' browsers don't contact Google.
 - **Hosting** is GitHub Pages, served straight from the `main` branch root.
 
 ## Run it locally
@@ -39,6 +43,7 @@ Claude Code users: `.claude/launch.json` defines this server as `towers`
 | Path | What it is |
 |---|---|
 | `index.html` | The page: canvas, lobby DOM for online play, CSS, PeerJS script tag |
+| `fonts/` | The Fredoka font (Latin letters, every weight in one file), its CSS and license |
 | `balance.json` | Every gameplay number, in tiles and seconds. `_help` explains the fields |
 | `maps.json` | Maps: roads (waypoints), cottage, start, obstacles, `waveSize`, `startCoins`, `waveSet`, scatter. `_help` explains the fields |
 | `src/data.js` | Loads both JSON files (top-level `await fetch`), converts to pixel units, derives flower stats per level, prepares maps (decks, bridges, colliders), computes `DATA_HASH` |
@@ -48,7 +53,7 @@ Claude Code users: `.claude/launch.json` defines this server as `towers`
 | `src/fx.js`, `src/juice.js` | Visual-only effects (particles, damage numbers, squash, hit-stop) |
 | `src/audio.js` | Procedural sound effects and adaptive music |
 | `src/main.js` | Entry point: keyboard input, fixed-step game loop, menus, camera, lobby, game logs (L key), canvas sizing |
-| `src/net.js` | PeerJS wrapper: a reliable channel and a fast, unreliable one |
+| `src/net.js` | PeerJS wrapper: a reliable channel and a fast, unreliable one. Fetches TURN servers from `ICE_URL` first, falling back to PeerJS's own |
 | `src/schema.js` | Binary encoding of snapshots and guest inputs; defines `PROTOCOL` |
 | `src/host.js` / `src/guest.js` | Each side of an online game (host-authoritative) |
 | `src/snapshot.js` | Host builds snapshots; guest interpolates between them |
@@ -62,6 +67,7 @@ Claude Code users: `.claude/launch.json` defines this server as `towers`
 | `tools/screens.html` | Every screen (menu, guide, pick, game, chest, pause, end screens, overlays) drawn with the real render code on realistic games, including a long endless run with huge numbers, so text that doesn't fit shows at a glance. `?only=pause` filters by name |
 | `tools/tests.html`, `tools/tests.js` | The test suite: prices, maps, monsters, endless mode, whole autopilot games, saved games, online encoding, drawing. Runs in the browser |
 | `tools/maps.html` | Every map from `maps.json` drawn whole with the real render code (roads, ponds, bridges, scatter, cottage, entrances) |
+| `turn/` | Cloudflare Worker that makes TURN relay credentials, and how to deploy it (`turn/README.md`) |
 | `serve.py` | No-cache local server |
 | `.nojekyll` | Tells GitHub Pages to serve files untouched |
 

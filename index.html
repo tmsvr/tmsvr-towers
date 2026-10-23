@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Petal Patrol</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="preload" href="fonts/fredoka-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link href="fonts/fredoka.css" rel="stylesheet">
 <style>
   html, body { margin: 0; height: 100%; background: #141b22; display: flex; align-items: center; justify-content: center; overflow: hidden; }
   canvas { display: block; outline: none; box-shadow: 0 0 50px rgba(0,0,0,0.6); } /* main.js sizes it to fill the window */
@@ -38,7 +38,8 @@
 <body>
 <canvas id="game" tabindex="0"></canvas>
 <div id="lobby" hidden></div>
-<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<!-- integrity: the browser refuses the file if the CDN ever serves anything but this exact release -->
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js" integrity="sha384-nlUQ8ZqCbvStErob+biJNzSgltf6urV3VGqhfIfzhmg9RXmpeRm76ELw0pYnKlTR" crossorigin="anonymous"></script>
 <script type="module" src="src/main.js"></script>
 </body>
 </html>
