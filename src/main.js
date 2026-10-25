@@ -4,7 +4,7 @@
 //   local     – this browser runs the game for 1 or 2 players on one keyboard
 //   host      – this browser runs the game for up to 4 cats; the guests' inputs arrive over the network (host.js)
 //   guest     – this browser only sends inputs and draws snapshots from the host (guest.js)
-import { createState, step, continueEndless, retryWave, canRetry, setChallenge, scoreOf, modeName, MODES, releaseHold, releaseWave, endRace, receivePack } from './sim.js';
+import { createState, step, continueEndless, retryWave, canRetry, setChallenge, scoreOf, modeName, MODES, releaseHold, releaseWave, rushWave, endRace, receivePack } from './sim.js';
 import { randomSeed, encodeCode, decodeCode, codeOf, dailyChallenge, shareText } from './challenge.js';
 import { finishLog, currentLog, gameSummary } from './stats.js';
 import { render, setView, VIEW_W, MAP_H, BASE_W, BASE_H } from './render.js';
@@ -752,14 +752,15 @@ function updateRace(now) {
   const V = ui.versus;
   if (!V?.race || !state?.players) return;
   const mine = raceStatus(state);
-  const changed = mine.picked !== V.sentPicked || mine.over !== V.sentOver || mine.won !== V.sentWon || mine.waiting !== V.sentWaiting;
+  const changed = mine.picked !== V.sentPicked || mine.over !== V.sentOver || mine.won !== V.sentWon || mine.waiting !== V.sentWaiting || mine.rush !== V.sentRush;
   if (rivalLink?.connected && (changed || now - V.lastStatus > 250)) {
     rivalLink.send({ t: 'status', status: mine });
-    V.lastStatus = now; V.sentPicked = mine.picked; V.sentOver = mine.over; V.sentWon = mine.won; V.sentWaiting = mine.waiting;
+    V.lastStatus = now; V.sentPicked = mine.picked; V.sentOver = mine.over; V.sentWon = mine.won; V.sentWaiting = mine.waiting; V.sentRush = mine.rush;
     net.send({ t: 'versus', rival: V.rival, result: V.result });
   }
   if (state.hold && (V.rival?.picked || V.rival?.left || !rivalLink?.connected)) releaseHold(state);
   const gone = V.rival?.left || !rivalLink?.connected;
+  if (!gone && V.rival?.rush) rushWave(state, V.rival.rush); // they pressed Enter: our break is over too
   if (state.waiting && (gone || V.rival?.waiting === state.wave + 1)) releaseWave(state, state.wave + 1);
   if (V.rival?.fell) endRace(state); // their cottage fell: the race is ours, and over
   // monsters our cats sent go across at once

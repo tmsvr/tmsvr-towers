@@ -776,7 +776,7 @@ test('Versus', 'a race side holds after picking until it is let go, and can\'t b
   eq(s.timer, t0, 'the first-wave timer waits'); eq(s.t, 0, 'nothing moves');
   sim.releaseHold(s);
   tick(s);
-  ok(!s.hold && s.timer < t0, 'running once let go');
+  ok(!s.hold && s.timer < BALANCE.versus.firstWaveDelay, 'running once let go');
   ok(!sim.canRetry(s), 'a race has no retries');
 });
 
@@ -813,6 +813,22 @@ test('Versus', "a race's boss chests never offer cottage repairs", () => {
     ok(s.chest, 'a chest');
     ok(s.chest.offers.every((o) => o.every((id) => !BALANCE.bossChest.notInRaces.includes(id.split(':')[0]))), `seed ${seed}`);
   }
+});
+
+test('Versus', 'a longer first break; Enter in a break calls the next wave for both teams', () => {
+  const s = sim.createState(1, 9, { map: 0, versus: true, sprint: true });
+  s.players[0].pick.chosen = ['thorn', 'frost', 'daisy', 'snap']; s.players[0].pick.ready = true;
+  tick(s); sim.releaseHold(s);
+  near(s.timer, BALANCE.versus.firstWaveDelay, 1e-9, 'the race\'s first break');
+  ok(!sim.rushWave(s, 2), 'a call for another wave does nothing');
+  ok(sim.rushWave(s, 1), 'the rivals called wave 1');
+  for (let i = 0; i < 5; i++) tick(s);
+  ok(s.waiting && s.timer <= 0, 'our break is over: waiting to start together');
+  const r = raceGame(); r.queue = []; r.enemies = []; tick(r);
+  eq(r.phase, 'prep', 'a break');
+  eq(raceStatus(r).rush, 1, 'only wave 1 called so far');
+  tick(r, { ready: true }); tick(r);
+  eq(raceStatus(r).rush, 2, 'Enter calls wave 2 for the rivals too');
 });
 
 test('Versus', 'every wave waits for both teams; a fallen cottage ends the race for the other team too', () => {

@@ -14,6 +14,7 @@ export function raceStatus(s) {
     over: !!s.over, won: !!s.won, fell: !!s.over && !s.raceWon, players: s.players.length, cats: s.players.map((p) => p.cat), picked: s.phase !== 'pick', meter: s.meter || 0,
     // our packs still on their way to them, so they can watch them land
     waiting: s.waiting ? s.wave + 1 : 0, // ready for that wave, waiting for the rivals
+    rush: s.rush || 0, // we pressed Enter for that wave: it starts for them too
     threat: (s.threats || []).reduce((a, th) => a + th.share, 0), threatT: s.threats?.length ? Math.min(...s.threats.map((th) => th.t)) : 0,
   };
 }

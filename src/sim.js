@@ -7,7 +7,7 @@ import {
   T, U, VIEW_W, MAP_H, TOTAL_WAVES, MAPS, ENEMIES, INTROS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, GROW_TIME, FLOWER_HP, WEAR_PER_SEC, WEAR_MULT, HEAL_RATE, HEAL_COST,
   POISON_TIME, START_COINS, LOADOUT_SIZE, loadoutSize, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, plantCost, GLOBAL_RANGE, PLAYER, CATS, CAT_ORDER, bloomOf, ELITES, SHIELD, CHEST, PERKS,
-  SPRINT, SCORE, SEND,
+  SPRINT, SCORE, SEND, VERSUS,
 } from './data.js';
 import { prune, clamp, nextSeed, randomFrom } from './util.js';
 import * as log from './stats.js';
@@ -666,6 +666,7 @@ function updateWaves(s, dt, ready) {
   if (s.phase === 'prep') {
     s.timer -= dt;
     if (ready) s.timer = Math.min(s.timer, 0);
+    if (ready && s.versus) s.rush = s.wave + 1; // and in a race, the rivals' break ends too (main.js tells them)
     if (s.timer > 0) return;
     // In a race both teams start every wave together: wait here until the
     // rivals are ready for it too (main.js calls releaseWave).
@@ -715,6 +716,16 @@ export function continueEndless(s) {
 
 // ---- Versus races ------------------------------------------------------------------
 // Both teams have picked: the race starts (main.js calls this on each side).
+// The rivals pressed Enter in their break: ours ends now too, ready or not.
+// If we're still fighting the wave before, our break will be over as soon as it begins.
+export function rushWave(s, n) {
+  if (!s.versus || s.over || s.won || s.phase !== 'prep' || s.wave + 1 !== n || s.timer <= 0) return false;
+  s.timer = 0;
+  text(s, s.m.base.x, s.m.base.y - T * 1.2, 'The rivals called the next wave!', '#ffb86b');
+  ev(s, 'wave');
+  return true;
+}
+
 // Both teams are ready for wave n: it starts for both at once.
 export function releaseWave(s, n) { s.goWave = Math.max(s.goWave || 0, n); }
 
@@ -730,6 +741,7 @@ export function endRace(s) {
 export function releaseHold(s) {
   if (!s.hold) return;
   s.hold = false;
+  s.timer = VERSUS.firstWaveDelay ?? s.timer; // a little longer to plant: both teams start from nothing
   banner(s, 'Go! The same waves for both teams. Plant fast!');
   ev(s, 'boss');
 }

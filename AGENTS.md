@@ -193,7 +193,10 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
   stays exactly as deterministic as before.
 - **Waves start together.** At the end of a break a race side stops
   (`s.waiting`) until `releaseWave(s, n)`; main.js calls it once the rival's
-  status says it is waiting for the same wave (or the rival left). The
+  status says it is waiting for the same wave (or the rival left). Enter in
+  a race break sets `s.rush`; the rival's side sees it in the status and
+  calls `rushWave`, which ends its break too. The first break is
+  `balance.json → versus.firstWaveDelay` (set in `releaseHold`). The
   first cottage to fall loses: `status.fell`, and the other side calls
   `endRace` (`s.over` with `s.raceWon`, cottage intact). `raceResult` in
   `versus.js` has the rules. Chest perks in `bossChest.notInRaces` (the

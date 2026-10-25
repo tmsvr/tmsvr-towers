@@ -156,8 +156,10 @@ cat picks 4 flowers instead of 3.
 
 The panel at the top shows the rivals' cats, how they're doing, both scores
 and whether they can block. Every wave starts for both teams at the same
-moment: a team that is ready first (its break ran out, or it pressed Enter)
-waits for the other. **The first cottage to fall loses**, and the race ends
+moment: a team whose break runs out first waits for the other. The first
+break is longer (45 s), so both teams can plant. **Enter in a break starts the
+next wave for both teams**: the rivals' break ends at once, so calling a wave
+early is a way to catch them before they've planted. **The first cottage to fall loses**, and the race ends
 there for both teams. If both teams win every wave, the one with more cottage
 left wins, then the higher score. Boss chests never offer the cottage repair
 in a race.

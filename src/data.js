@@ -251,6 +251,7 @@ export const DIFFICULTY = BAL.difficulty;
 export const SPRINT = BAL.sprint;
 export const SCORE = BAL.score;
 // Sending monsters to the rivals in a versus race; SEND.enabled can be flipped at runtime (the tests do).
+export const VERSUS = BAL.versus || {};
 export const SEND = { ...BAL.send, enabled: !!BAL.send?.enabled };
 export const START_COINS = { solo: ECONOMY.startCoinsSolo, coop: ECONOMY.startCoinsCoop };
 
