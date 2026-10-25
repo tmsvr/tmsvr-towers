@@ -201,7 +201,11 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
   `balance.json → versus.firstWaveDelay` (set in `releaseHold`). The
   first cottage to fall loses: `status.fell`, and the other side calls
   `endRace` (`s.over` with `s.raceWon`, cottage intact). `raceResult` in
-  `versus.js` has the rules. Chest perks in `bossChest.notInRaces` (the
+  `versus.js` has the rules. When a race side's game ends, its host sends its
+  end-screen summary (`gameSummary` plus `score`) across as `rivalSummary`;
+  each host keeps the rival's in `ui.versus.rivalSummary` and passes it to its
+  guests in `versus`, and the end screen compares the teams (`drawTeams` in
+  `render.js`). Chest perks in `bossChest.notInRaces` (the
   cottage repair) are never offered in a race.
 - **Sending monsters** (`balance.json → send`, the end of the "Versus races"
   section of `sim.js`). Kills of a wave's own monsters fill `s.meter`

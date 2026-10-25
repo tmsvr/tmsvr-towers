@@ -1046,6 +1046,8 @@ test('Games', 'the end screen summary adds up', () => {
   for (const f of S.flowers) eq(f.dmg, Math.round(r.game.totals.damage[f.type] || 0), `${f.type} damage`);
   const fromFlowers = r.game.flowers.reduce((a, f) => a + f.dmg, 0);
   near(S.cats.reduce((a, c) => a + c.garden, 0), fromFlowers, 2, 'flower damage split between the cats');
+  ok(S.versus && ['sent', 'blocked', 'got'].every((k) => Number.isFinite(S.versus[k])), 'the race numbers, for comparing teams');
+  ok(JSON.parse(JSON.stringify(S)).cats.length === 2, 'it travels as JSON to the rival team');
 });
 
 // ---- Bloom abilities (IDEAS R1) -----------------------------------------------------

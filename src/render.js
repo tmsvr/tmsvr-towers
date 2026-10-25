@@ -2270,25 +2270,54 @@ function endTitle(s) {
 }
 const rivalWords = () => (race.rival?.left ? 'The rival team left the race' : race.result ? `${rivalName(race.rival)}: ${raceLine(race.rival)}` : `Still racing: ${rivalName(race.rival)}, ${raceLine(race.rival)}`);
 
-function drawEndScreen(c, s, ui, time) {
-  const won = s.won, S = ui.summary;
-  const [title, col] = endTitle(s);
-  const keys = stopKeys(s, '  ·  L: game log');
-  const head = won ? `All ${lastWave(s)} waves defended  ·  ${num(s.kills)} monsters bonked` : `You reached ${s.endless ? 'endless ' : ''}wave ${s.wave}  ·  ${num(s.kills)} monsters bonked`;
-  if (!S) { drawOverlay(c, title, [head, scoreLine(s, ui), ...(race ? [rivalWords()] : []), keys], col); return; }
-  dim(c, 'rgba(12,18,26,0.88)');
-  // the two panels are as tall as their contents (a solo game has one cat, few flowers), centred
-  const rowH = 46, many = S.cats.length > 2, blockH = many ? 86 : 150; // 3-4 cats get shorter blocks
-  const h = clamp(Math.max(70 + S.flowers.length * rowH + (S.best ? 34 : 0), 52 + S.cats.length * (blockH + 8)), 250, 430);
-  const top = Math.round((BASE_H - h) / 2) + 6;
-  label(c, title, BASE_W / 2, top - 92, 46, col, 'center', 700, OUT);
-  const where = won ? `All ${lastWave(s)} waves` : S.wave > lastWave(s) ? `Endless wave ${S.wave}` : `Wave ${S.wave}/${lastWave(s)}`;
-  label(c, fitText(c, `${where}  ·  ${clock(S.seconds)}  ·  ${num(S.kills)} monsters bonked  ·  cottage ${S.cottage}/${S.maxCottage}`, BASE_W - 40, 18), BASE_W / 2, top - 50, 18, '#e8f1f7', 'center', 500, null);
-  const code = race ? '' : `  ·  replay code ${codeOf(s)} (K on the menu)`;
-  label(c, fitText(c, `${scoreLine(s, ui)}  ·  ${modeName(s)}${code}`, BASE_W - 40, 17, 700), BASE_W / 2, top - 22, 17, '#ffe27a', 'center', 700, null);
+// A race's end screen: our team against the rivals, row by row, the better
+// number in green. The rivals' numbers come from their host's summary
+// (race.rivalSummary); until it arrives, the few their status carries.
+const sumOf = (list, f) => (list || []).reduce((a, x) => a + (Number(f(x)) || 0), 0);
+const fin = (v) => (Number.isFinite(v) ? v : null);
+function teamRows(S, R, r, myScore) {
+  const coins = (X) => X && sumOf(X.cats, (k) => k.earned), catDmg = (X) => X && sumOf(X.cats, (k) => k.baton + k.bomb);
+  const garden = (X) => X && sumOf(X.flowers, (f) => f.dmg), planted = (X) => X && sumOf(X.flowers, (f) => f.planted);
+  const vs = (X, k) => X && fin(X.versus?.[k]);
+  const star = (X) => (X?.best && FLOWERS[X.best.type] ? `${FLOWERS[X.best.type].name} (lv ${fin(X.best.lvl) ?? '?'})` : X ? '—' : null);
+  // [label, ours, theirs, which is better: 1 more, -1 less, 0 neither]
+  return [
+    ['Reached wave', S.wave, fin(R?.wave) ?? fin(r?.wave), 1],
+    ['Cottage left', S.cottage, fin(R?.cottage) ?? fin(r?.lives), 1],
+    ['Score', myScore, fin(R?.score) ?? fin(r?.score), 1],
+    ['Monsters bonked', S.kills, fin(R?.kills) ?? fin(r?.kills), 1],
+    ['Coins earned', coins(S), coins(R), 1],
+    ['Flower damage', garden(S), garden(R), 1],
+    ['Cat damage (baton, bombs)', catDmg(S), catDmg(R), 1],
+    ['Flowers planted', planted(S), planted(R), 0],
+    ['Packs sent', vs(S, 'sent'), vs(R, 'sent'), 1],
+    ['Packs blocked', vs(S, 'blocked'), vs(R, 'blocked'), 1],
+    ['Monsters sent at them', vs(R, 'got'), vs(S, 'got'), 1], // what each team's packs brought the other
+    ['Star flower', star(S), star(R), 0],
+  ];
+}
+function drawTeams(c, s, S, x, y, w, h) {
+  const R = race.rivalSummary, r = race.rival;
+  rrect(c, x, y, w, h, 14, 'rgba(255,255,255,0.06)', 'rgba(255,255,255,0.15)', 1.5);
+  const ox = x + w - 170, tx = x + w - 18; // our column and theirs, right-aligned
+  label(c, 'Teams', x + 18, y + 24, 20, '#ffe27a', 'left', 700, null);
+  label(c, 'Your team', ox, y + 22, 16, '#ffe27a', 'right', 700, null);
+  label(c, fitText(c, rivalName(r), 150, 16, 700), tx, y + 22, 16, '#ff9a5a', 'right', 700, null);
+  label(c, fitText(c, S.cats.map((k) => CATS[k.cat]?.name || k.cat).join(', '), 150, 11), ox, y + 40, 11, '#8fa5b3', 'right', 500, null);
+  label(c, R ? 'their final numbers' : 'waiting for their numbers…', tx, y + 40, 11, '#8fa5b3', 'right', 500, null);
+  const rows = teamRows(S, R, r, S.score ?? scoreOf(s)), rowH = Math.min(26, (h - 62) / rows.length);
+  rows.forEach(([name, a, b, better], i) => {
+    const ry = y + 62 + i * rowH;
+    if (i % 2 === 0) rrect(c, x + 8, ry - rowH / 2, w - 16, rowH, 6, 'rgba(255,255,255,0.04)');
+    label(c, name, x + 18, ry, 13, '#cfe0ea', 'left', 500, null);
+    const nums = typeof a === 'number' && typeof b === 'number', win = nums && better && a !== b ? ((a > b) === (better > 0) ? 1 : -1) : 0;
+    const show = (v) => (v == null ? '…' : typeof v === 'number' ? (Number.isInteger(v) || v >= 100 ? num(Math.round(v)) : v.toFixed(1)) : fitText(c, String(v), 150, 14)); // half a blocked pack stays 0.5
+    label(c, show(a), ox, ry, 14, win > 0 ? '#8dff9a' : '#fff', 'right', win > 0 ? 700 : 500, null);
+    label(c, show(b), tx, ry, 14, win < 0 ? '#8dff9a' : b == null ? '#6f8291' : '#fff', 'right', win < 0 ? 700 : 500, null);
+  });
+}
 
-  // flowers: damage per type, biggest first
-  const fx = 32, fw = 540;
+function drawFlowerList(c, S, fx, top, fw, h, rowH, time) {
   rrect(c, fx, top, fw, h, 14, 'rgba(255,255,255,0.06)', 'rgba(255,255,255,0.15)', 1.5);
   label(c, 'Flowers', fx + 18, top + 24, 20, '#ffe27a', 'left', 700, null);
   label(c, 'damage', fx + fw - 18, top + 24, 13, '#8fa5b3', 'right', 600, null);
@@ -2311,7 +2340,30 @@ function drawEndScreen(c, s, ui, time) {
     const F = FLOWERS[S.best.type];
     label(c, fitText(c, `Star flower: ${F?.name || S.best.type} (level ${S.best.lvl})  ·  ${num(S.best.dmg)} damage  ·  ${num(S.best.kills)} kills`, fw - 36, 14, 600), fx + 18, top + h - 22, 14, '#ffe27a', 'left', 600, null);
   }
+}
 
+function drawEndScreen(c, s, ui, time) {
+  const won = s.won, S = ui.summary;
+  const [title, col] = endTitle(s);
+  const keys = stopKeys(s, '  ·  L: game log');
+  const head = won ? `All ${lastWave(s)} waves defended  ·  ${num(s.kills)} monsters bonked` : `You reached ${s.endless ? 'endless ' : ''}wave ${s.wave}  ·  ${num(s.kills)} monsters bonked`;
+  if (!S) { drawOverlay(c, title, [head, scoreLine(s, ui), ...(race ? [rivalWords()] : []), keys], col); return; }
+  dim(c, 'rgba(12,18,26,0.88)');
+  // the two panels are as tall as their contents (a solo game has one cat, few flowers), centred
+  const rowH = 46, many = S.cats.length > 2, blockH = many ? 86 : 150; // 3-4 cats get shorter blocks
+  const left = race ? 62 + 12 * 26 : 70 + S.flowers.length * rowH + (S.best ? 34 : 0); // a race compares the teams instead of listing flowers
+  const h = clamp(Math.max(left, 52 + S.cats.length * (blockH + 8)), 250, 430);
+  const top = Math.round((BASE_H - h) / 2) + 6;
+  label(c, title, BASE_W / 2, top - 92, 46, col, 'center', 700, OUT);
+  const where = won ? `All ${lastWave(s)} waves` : S.wave > lastWave(s) ? `Endless wave ${S.wave}` : `Wave ${S.wave}/${lastWave(s)}`;
+  label(c, fitText(c, `${where}  ·  ${clock(S.seconds)}  ·  ${num(S.kills)} monsters bonked  ·  cottage ${S.cottage}/${S.maxCottage}`, BASE_W - 40, 18), BASE_W / 2, top - 50, 18, '#e8f1f7', 'center', 500, null);
+  const code = race ? '' : `  ·  replay code ${codeOf(s)} (K on the menu)`;
+  label(c, fitText(c, `${scoreLine(s, ui)}  ·  ${modeName(s)}${code}`, BASE_W - 40, 17, 700), BASE_W / 2, top - 22, 17, '#ffe27a', 'center', 700, null);
+
+  // flowers: damage per type, biggest first (in a race: the two teams side by side)
+  const fx = 32, fw = 540;
+  if (race) drawTeams(c, s, S, fx, top, fw, h);
+  else drawFlowerList(c, S, fx, top, fw, h, rowH, time);
   // cats: coins and damage each
   const cx = fx + fw + 16, cw = BASE_W - cx - 32;
   rrect(c, cx, top, cw, h, 14, 'rgba(255,255,255,0.06)', 'rgba(255,255,255,0.15)', 1.5);

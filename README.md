@@ -163,7 +163,9 @@ the rivals are still fighting): their break ends at once, so calling a wave
 early is a way to catch them before they've planted. **The first cottage to fall loses**, and the race ends
 there for both teams. If both teams win every wave, the one with more cottage
 left wins, then the higher score. Boss chests never offer the cottage repair
-in a race.
+in a race. The end screen puts the two teams side by side (waves, cottage,
+score, monsters bonked, coins, flower and cat damage, packs sent and blocked,
+star flower), the better number in green, next to your own team's cats.
 
 **Sending monsters.** Bonking your wave fills the send meter. **X** spends
 part of it on a pack of monsters for the rivals. A pack doesn't land at once:

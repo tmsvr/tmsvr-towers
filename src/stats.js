@@ -320,6 +320,7 @@ export function gameSummary(log) {
     flowers: Object.values(flowers).sort((a, b) => b.dmg - a.dmg),
     best: best && best.dmg > 0 ? { type: best.type, lvl: topLevel(best), dmg: best.dmg, kills: best.kills } : null,
     cats,
+    versus: t.versus, // a race: packs sent and blocked, monsters the rivals sent
     bitten: Object.entries(t.cottageDamage).filter(([, v]) => v >= 1).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => [k, Math.round(v)]),
   };
 }

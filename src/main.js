@@ -214,8 +214,9 @@ function saveGameLog(how) {
   if (ui.versus?.race) entry.race = { rival: ui.versus.rival, result: ui.versus.result };
   // the end screen's numbers; an online guest gets the same ones
   if (how !== 'quit') {
-    ui.summary = gameSummary(entry);
+    ui.summary = { ...gameSummary(entry), score: scoreOf(state) };
     if (mode === 'host') net.send({ t: 'summary', summary: ui.summary });
+    if (ui.versus?.race) rivalLink?.send({ t: 'rivalSummary', summary: ui.summary }); // so their end screen can compare
   }
   // an endless game is saved again each time it ends; keep only its latest log
   const others = savedLogs().filter((g) => g.date !== entry.date);
@@ -710,6 +711,7 @@ function onRivalMessage(m) {
   if (m.t === 'team') { V.rivalPlayers = m.players || 1; updateVersusLobby(); }
   else if (m.t === 'race' && !V.referee && Number.isFinite(m.seed)) startRace({ seed: m.seed, map: m.map, hard: !!m.hard, sprint: !!m.sprint }, false);
   else if (m.t === 'status' && m.status) V.rival = { ...m.status, left: false };
+  else if (m.t === 'rivalSummary' && V.race && m.summary && typeof m.summary === 'object') V.rivalSummary = m.summary;
   else if (m.t === 'send' && V.race && state?.players && Number.isFinite(m.share)) receivePack(state, m.share);
   else if (m.t === 'pause' && V.race) setPaused(!!m.on, true);
   else if (m.t === 'again' && V.referee) rematch();
@@ -726,7 +728,7 @@ function rivalLeft() {
 // Both sides start the same challenge; the referee sends it to the other.
 function startRace(race, send) {
   const V = ui.versus;
-  V.race = race; V.rival = null; V.result = null; V.lastStatus = 0;
+  V.race = race; V.rival = null; V.result = null; V.rivalSummary = null; V.lastStatus = 0;
   if (send) rivalLink?.send({ t: 'race', ...race });
   hideLobby();
   canvas.focus();
@@ -756,7 +758,7 @@ function updateRace(now) {
   if (rivalLink?.connected && (changed || now - V.lastStatus > 250)) {
     rivalLink.send({ t: 'status', status: mine });
     V.lastStatus = now; V.sentPicked = mine.picked; V.sentOver = mine.over; V.sentWon = mine.won; V.sentWaiting = mine.waiting; V.sentRush = mine.rush;
-    net.send({ t: 'versus', rival: V.rival, result: V.result });
+    net.send({ t: 'versus', rival: V.rival, result: V.result, rivalSummary: V.rivalSummary });
   }
   if (state.hold && (V.rival?.picked || V.rival?.left || !rivalLink?.connected)) releaseHold(state);
   const gone = V.rival?.left || !rivalLink?.connected;
@@ -834,7 +836,7 @@ function startJoin(code) {
         if (mode === 'joining') showLobby(`<h2>Connected!</h2><p>You are P${m.pid + 1}. Waiting for the host to start…</p><p class="hint">Esc to leave</p>`);
       } else if (m.t === 'versus') {
         // our host is racing another team: its numbers, for the HUD and end screen
-        if (mode === 'guest' || mode === 'joining') ui.versus = { guest: true, race: true, rival: m.rival, result: m.result };
+        if (mode === 'guest' || mode === 'joining') ui.versus = { guest: true, race: true, rival: m.rival, result: m.result, rivalSummary: m.rivalSummary || null };
       } else if (m.t === 'menu') {
         if (mode === 'guest') menuTogether('The host went back to the menu');
       } else if (m.t === 'start') {
