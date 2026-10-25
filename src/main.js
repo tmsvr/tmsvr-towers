@@ -760,8 +760,12 @@ function updateRace(now) {
   }
   if (state.hold && (V.rival?.picked || V.rival?.left || !rivalLink?.connected)) releaseHold(state);
   const gone = V.rival?.left || !rivalLink?.connected;
+  state.rivalBreak = gone || V.rival?.phase === 'prep'; // Enter calls a wave only while both teams are in a break
   if (!gone && V.rival?.rush) rushWave(state, V.rival.rush); // they pressed Enter: our break is over too
-  if (state.waiting && (gone || V.rival?.waiting === state.wave + 1)) releaseWave(state, state.wave + 1);
+  // Go when they're waiting for the same wave, or have already started it
+  // (their 'waiting' can last one frame, too short to be seen).
+  const next = state.wave + 1;
+  if (state.waiting && (gone || V.rival?.waiting === next || (V.rival?.wave ?? 0) >= next)) releaseWave(state, next);
   if (V.rival?.fell) endRace(state); // their cottage fell: the race is ours, and over
   // monsters our cats sent go across at once
   for (const o of state.outbox || []) rivalLink?.send({ t: 'send', share: o.share });

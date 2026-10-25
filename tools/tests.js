@@ -827,8 +827,12 @@ test('Versus', 'a longer first break; Enter in a break calls the next wave for b
   const r = raceGame(); r.queue = []; r.enemies = []; tick(r);
   eq(r.phase, 'prep', 'a break');
   eq(raceStatus(r).rush, 1, 'only wave 1 called so far');
+  r.rivalBreak = false; const t0 = r.timer;
   tick(r, { ready: true }); tick(r);
-  eq(raceStatus(r).rush, 2, 'Enter calls wave 2 for the rivals too');
+  ok(raceStatus(r).rush === 1 && r.timer > t0 - 0.1 && !r.waiting, 'the rivals are still fighting: Enter does nothing');
+  r.rivalBreak = true;
+  tick(r, { ready: true }); tick(r);
+  eq(raceStatus(r).rush, 2, 'both in a break: Enter calls wave 2 for the rivals too');
 });
 
 test('Versus', 'every wave waits for both teams; a fallen cottage ends the race for the other team too', () => {

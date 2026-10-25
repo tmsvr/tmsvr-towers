@@ -71,7 +71,7 @@ export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, l
     m,
     t: 0, nextId: 1, rng: seed, seed, wrng: waveSeed(seed), wave: 0, phase: 'pick', timer: 0, queue: [], spawnWait: 0,
     lives: DIFFICULTY.cottageHealth, maxLives: DIFFICULTY.cottageHealth, baseHitT: 0, lastAlarm: -99, players: [], flowers: [], enemies: [], drops: [], bombs: [], projs: [], clouds: [],
-    fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, sharedScreen, map: m.index, hard: !!hard, sprint: !!sprint, locked: !!locked, versus: !!versus, hold: false, waiting: false, goWave: 0,
+    fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, sharedScreen, map: m.index, hard: !!hard, sprint: !!sprint, locked: !!locked, versus: !!versus, hold: false, waiting: false, goWave: 0, rivalBreak: true,
     meter: 0, outbox: [], incoming: [], threats: [], // versus: the team's send meter, packs to send, packs landed in a break, packs on their way ({share, t})
     items: [], // power-ups dropped by elites, waiting to be picked up
     perks: {}, chest: null, chestDue: false, // boss chests: the team's perks, the open chest, one is owed
@@ -665,6 +665,12 @@ function staggerMapWide(s) {
 function updateWaves(s, dt, ready) {
   if (s.phase === 'prep') {
     s.timer -= dt;
+    // In a race Enter calls the next wave for both teams, but only while both
+    // are in a break (main.js keeps s.rivalBreak): it can't cut a wave short.
+    if (ready && s.versus && !s.rivalBreak) {
+      if (!s.waiting) text(s, s.m.base.x, s.m.base.y - T * 1.2, 'The rivals are still fighting: wait for their break', '#a9bccb');
+      ready = false;
+    }
     if (ready) s.timer = Math.min(s.timer, 0);
     if (ready && s.versus) s.rush = s.wave + 1; // and in a race, the rivals' break ends too (main.js tells them)
     if (s.timer > 0) return;

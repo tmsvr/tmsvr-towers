@@ -158,7 +158,8 @@ The panel at the top shows the rivals' cats, how they're doing, both scores
 and whether they can block. Every wave starts for both teams at the same
 moment: a team whose break runs out first waits for the other. The first
 break is longer (45 s), so both teams can plant. **Enter in a break starts the
-next wave for both teams**: the rivals' break ends at once, so calling a wave
+next wave for both teams**, as long as both teams are in a break (not while
+the rivals are still fighting): their break ends at once, so calling a wave
 early is a way to catch them before they've planted. **The first cottage to fall loses**, and the race ends
 there for both teams. If both teams win every wave, the one with more cottage
 left wins, then the higher score. Boss chests never offer the cottage repair

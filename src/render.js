@@ -1804,7 +1804,7 @@ function drawHud(c, s, time, ui) {
   label(c, `${Math.ceil(s.lives)} / ${s.maxLives}`, 115, y0 + 30.5, 12, '#ffffff', 'center', 700);
   const tag = s.sprint ? (s.hard ? ' · sprint, hard' : ' · sprint') : s.hard ? ' · hard' : '';
   label(c, fitText(c, (s.endless ? `Wave ${s.wave} · endless` : `Wave ${Math.max(1, s.wave)}/${lastWave(s)}`) + tag, 228, 16, 600), 14, y0 + 58, 16, s.endless || s.hard || s.sprint ? '#ffb86b' : '#e8f1f7', 'left', 600, null);
-  const status = s.phase === 'pick' ? 'Choosing flowers' : s.phase === 'prep' ? (s.waiting ? 'Waiting for the rivals' : `Next in ${Math.ceil(s.timer)}s · Enter${s.versus ? ': for both teams' : ''}`) : `${s.enemies.length + s.queue.length} enemies left`;
+  const status = s.phase === 'pick' ? 'Choosing flowers' : s.phase === 'prep' ? (s.waiting ? 'Waiting for the rivals' : `Next in ${Math.ceil(s.timer)}s${!s.versus ? ' · Enter' : s.rivalBreak ? ' · Enter: for both teams' : ' · rivals still fighting'}`) : `${s.enemies.length + s.queue.length} enemies left`;
   label(c, status, 14, y0 + 78, 12, '#a9bccb', 'left', 500, null);
   label(c, isMuted() ? '🔇' : '', 220, y0 + 30, 14, '#fff', 'center', 500, null);
 
