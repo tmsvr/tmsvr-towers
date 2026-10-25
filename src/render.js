@@ -10,7 +10,7 @@
 // with each entity carrying the fields schema.js sends for it.
 import {
   T, U, VIEW_W as BASE_W, MAP_H as BASE_MAP_H, HUD_H, TOTAL_WAVES, MAPS,
-  FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, GLOBAL_RANGE, ENEMIES, INTROS,
+  FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, loadoutSize, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, GLOBAL_RANGE, ENEMIES, INTROS,
   BLOOM, bloomOf, ELITES, CHEST, ECONOMY, SEND,
 } from './data.js';
 import { tileOf, canBuildAt, uprootRefund, catStats, plantPrice, upgradeLeft, healLeft, lastWave, modeName, scoreOf, wavesCleared } from './sim.js';
@@ -1852,7 +1852,7 @@ function drawHud(c, s, time, ui) {
       label(c, ui.keyLabel(ui.keysFor(p.id).use), lx + 31, y0 + 49, 9, p.item ? '#bff7ff' : '#6f8291', 'center', 700, null);
       lx += 42;
     }
-    const slots = (p.loadout || p.pick.chosen).length || LOADOUT_SIZE, step = Math.min(104, Math.floor((x0 + pw - 6 - lx) / slots));
+    const slots = (p.loadout || p.pick.chosen).length || loadoutSize(s), step = Math.min(104, Math.floor((x0 + pw - 6 - lx) / slots));
     (p.loadout || p.pick.chosen).forEach((t, j) => {
       const sx = lx + j * step, sy = y0 + 42, sw = step - 4, sh = 38;
       const sel = p.loadout && p.building && j === p.sel;
@@ -2057,7 +2057,7 @@ function drawMapCarousel(c, s, ui, time) {
 
 function drawPick(c, s, ui, time) {
   dim(c, 'rgba(12,18,26,0.85)', false);
-  label(c, `Choose a map, a cat and ${LOADOUT_SIZE} flowers`, BASE_W / 2, 20, 22, '#ffe27a', 'center', 700, OUT);
+  label(c, `Choose a map, a cat and ${loadoutSize(s)} flowers`, BASE_W / 2, 20, 22, '#ffe27a', 'center', 700, OUT);
   label(c, 'I: flower guide', BASE_W - 16, 20, 13, '#8fa5b3', 'right', 600, null);
   drawMapCarousel(c, s, ui, time);
   // cats: each one can only be taken by one player
@@ -2115,13 +2115,13 @@ function drawPick(c, s, ui, time) {
   s.players.forEach((p, i) => {
     const k = ui.keysFor(p.id);
     const y = y0 + ch + (s.players.length > 2 ? 14 + i * 20 : 20 + i * 24); // 4 rows still fit above the HUD
-    const n = p.pick.chosen.length;
+    const n = p.pick.chosen.length, size = loadoutSize(s);
     const L = ui.keyLabel;
     const keys = p.pick.row === 0 ? (s.locked ? `map and mode are set by the challenge · [${L(k.down)}] cats` : `[${L(k.left)}/${L(k.right)}] change map · [${L(k.build)}] mode · [${L(k.down)}] cats`)
       : p.pick.row === 1 ? `[${L(k.left)}/${L(k.right)}] change cat · [${L(k.up)}] map · [${L(k.down)}] flowers`
       : `[${L(k.left)}/${L(k.right)}] move · [${L(k.build)}] pick · [${L(k.up)}] cats · [${L(k.atk)}] ready`;
     const who = `${CATS[p.cat].name}, `;
-    const msg = p.pick.ready ? `Ready with ${CATS[p.cat].name}! ✓` : n < LOADOUT_SIZE ? `${who}${n}/${LOADOUT_SIZE} flowers   ${keys}` : `${who}${LOADOUT_SIZE}/${LOADOUT_SIZE} — [${L(k.atk)}] when ready   ${keys}`;
+    const msg = p.pick.ready ? `Ready with ${CATS[p.cat].name}! ✓` : n < size ? `${who}${n}/${size} flowers   ${keys}` : `${who}${size}/${size} — [${L(k.atk)}] when ready   ${keys}`;
     rrect(c, BASE_W / 2 - 360, y - 11, 32, 22, 11, PLAYER.scarves[p.id]);
     label(c, `P${p.id + 1}`, BASE_W / 2 - 344, y + 0.5, 12, '#fff', 'center', 700, null);
     label(c, fitText(c, msg, 700, 14, 600), BASE_W / 2 - 318, y + 1, 14, p.pick.ready ? '#8dff9a' : '#e8f1f7', 'left', 600, null);

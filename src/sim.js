@@ -6,7 +6,7 @@
 import {
   T, U, VIEW_W, MAP_H, TOTAL_WAVES, MAPS, ENEMIES, INTROS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, GROW_TIME, FLOWER_HP, WEAR_PER_SEC, WEAR_MULT, HEAL_RATE, HEAL_COST,
-  POISON_TIME, START_COINS, LOADOUT_SIZE, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, plantCost, GLOBAL_RANGE, PLAYER, CATS, CAT_ORDER, bloomOf, ELITES, SHIELD, CHEST, PERKS,
+  POISON_TIME, START_COINS, LOADOUT_SIZE, loadoutSize, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, plantCost, GLOBAL_RANGE, PLAYER, CATS, CAT_ORDER, bloomOf, ELITES, SHIELD, CHEST, PERKS,
   SPRINT, SCORE, SEND,
 } from './data.js';
 import { prune, clamp, nextSeed, randomFrom } from './util.js';
@@ -86,7 +86,7 @@ export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, l
     s.players.push({
       id: i, x: m.start.x + i * T, y: m.start.y, dir: 0, atkCd: 0, swingT: 0, coins, stun: 0, cat, stam: 1, tired: false, sprinting: false, restT: 0,
       bombs: PLAYER.bombMax, sel: 0, building: false, moving: false, mode: 'grow', onFlowerId: null, working: null, msgCd: 0,
-      loadout: null, pick: { row: 1, cursor: 0, chosen: (loadouts[i] || []).filter((t) => FLOWERS[t]).slice(0, LOADOUT_SIZE), ready: false },
+      loadout: null, pick: { row: 1, cursor: 0, chosen: (loadouts[i] || []).filter((t) => FLOWERS[t]).slice(0, versus ? loadoutSize({ versus }) : LOADOUT_SIZE), ready: false },
       prevMx: 0, prevMy: 0, prevAtk: false,
       item: null, // the power-up this cat carries
       perks: {}, // this cat's own perks from boss chests
@@ -1406,14 +1406,14 @@ function updatePick(s, inputs) {
         const t = FLOWER_ORDER[pk.cursor];
         const i = pk.chosen.indexOf(t);
         if (i >= 0) { pk.chosen.splice(i, 1); ev(s, 'cycle'); }
-        else if (pk.chosen.length < LOADOUT_SIZE) { pk.chosen.push(t); ev(s, 'plant'); }
+        else if (pk.chosen.length < loadoutSize(s)) { pk.chosen.push(t); ev(s, 'plant'); }
         else ev(s, 'deny');
       }
     }
     const atkTap = inp.atk && !p.prevAtk;
     p.prevAtk = !!inp.atk;
     if (atkTap) {
-      if (pk.chosen.length === LOADOUT_SIZE) { pk.ready = !pk.ready; ev(s, pk.ready ? 'grown' : 'cycle'); }
+      if (pk.chosen.length === loadoutSize(s)) { pk.ready = !pk.ready; ev(s, pk.ready ? 'grown' : 'cycle'); }
       else ev(s, 'deny');
     }
   }

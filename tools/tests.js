@@ -751,6 +751,17 @@ test('Challenges', 'mode, seed and lock survive a snapshot', () => {
   eq(codeOf({ ...g }), codeOf(s), 'the guest shows the same code');
 });
 
+test('Versus', 'each cat picks one more flower in a race', () => {
+  for (const versus of [false, true]) {
+    const s = sim.createState(1, 9, { map: 0, versus }), p = s.players[0], want = versus ? LOADOUT_SIZE + 1 : LOADOUT_SIZE;
+    p.pick.chosen = []; p.pick.row = 2;
+    for (let i = 0; i < FLOWER_ORDER.length; i++) { p.pick.cursor = i; tick(s, { buildTap: true }); tick(s); }
+    eq(p.pick.chosen.length, want, versus ? 'race' : 'normal game');
+    tick(s, { atk: true }); tick(s);
+    ok(s.phase !== 'pick', 'can start with that many');
+  }
+});
+
 test('Versus', 'a race side holds after picking until it is let go, and can\'t be retried', () => {
   const s = sim.createState(1, 9, { map: 0, versus: true });
   s.players[0].pick.chosen = ['thorn', 'frost', 'daisy']; s.players[0].pick.ready = true;

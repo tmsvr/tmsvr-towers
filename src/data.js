@@ -154,6 +154,8 @@ for (const [id, e] of Object.entries(BAL.enemies)) {
 export const FLOWER_ORDER = Object.keys(BAL.flowers);
 const LV = BAL.flowerLevels;
 export const LOADOUT_SIZE = LV.loadoutSize;
+// How many flowers each cat picks in this game: versus races allow more.
+export const loadoutSize = (s) => (s?.versus ? LV.versusLoadoutSize ?? LV.loadoutSize : LV.loadoutSize);
 export const MAX_LEVEL = LV.maxLevel;
 export const FLOWERS = {};
 for (const [id, f] of Object.entries(BAL.flowers)) {

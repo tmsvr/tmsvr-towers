@@ -118,7 +118,7 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
   sprite heads) are keyed by that scale (`ui.dpr`).
 - **Game phases.** Menu → pick screen (`s.phase === 'pick'`: map, mode
   (`MODES` in `sim.js`: Normal, Hard, Sprint, Sprint · Hard, as `s.hard` and
-  `s.sprint`, plant key on the map row), cat, 3 flowers per player) → waves →
+  `s.sprint`, plant key on the map row), cat, 3 flowers per player, 4 in a versus race: `loadoutSize(s)`) → waves →
   won/over overlay. After a win, C carries on into endless mode
   (`continueEndless`): wave 11 is a smaller breather, then waves barely grow
   in number while boss count climbs (`breatherWaveSize`, `endless*` in

@@ -93,6 +93,8 @@ show('Pick screen, solo', sim.createState(1, 1, { map: 0 }), ui());
 const pick4 = sim.createState(4, 1, { map: 0 });
 pick4.players.forEach((p, i) => { p.pick.chosen = [['thorn', 'frost', 'daisy'], ['daisy', 'stink'], ['daisy'], ['daisy', 'sunflower', 'firelily']][i]; p.pick.ready = i === 3; p.pick.row = [2, 1, 2, 2][i]; p.pick.cursor = i; });
 show('Pick screen, 4 cats online', pick4, ui({ mode: () => 'host' }));
+const pickVs = sim.createState(2, 1, { map: 0, versus: true, locked: true }); pickVs.players[0].pick.chosen = ['thorn', 'frost', 'daisy', 'sunflower']; pickVs.players[1].pick.chosen = ['thorn', 'frost'];
+show('Pick screen, versus race (4 flowers each)', pickVs, ui({ mode: () => 'host' }));
 
 givePerks(duo);
 show('Game, co-op, with a banner and intro cards', duo, ui({ cam: camOn(duo, duo.players[0]) }), () => {
@@ -112,7 +114,7 @@ duo.enemies.forEach((e, i) => { e.sent = i % 2 === 0; }); duo.meter = 1.3;
 show('Game, versus race, with a teammate', duo, ui({ cam: camOn(duo, duo.players[0]), netLabel: 'Online · room HDPM · P2 connected', perf: '42 ms · 60 fps · 18 ms', mode: () => 'host', versus: { race: {}, rival } }));
 show('Game, versus race, monsters from the rivals (purple rings)', duo, ui({ cam: camOn(duo, duo.enemies.find((e) => e.sent && !e.dead) || duo.players[0]), mode: () => 'host', versus: { race: {}, rival } }));
 duo.enemies.forEach((e) => { e.sent = false; }); duo.meter = 0;
-const held = sim.createState(1, 1, { map: 0, versus: true }); held.players[0].pick.chosen = ['thorn', 'frost', 'daisy']; held.players[0].pick.ready = true; sim.step(held, [{}], 1 / 60);
+const held = sim.createState(1, 1, { map: 0, versus: true }); held.players[0].pick.chosen = ['thorn', 'frost', 'daisy', 'sunflower']; held.players[0].pick.ready = true; sim.step(held, [{}], 1 / 60);
 show('Game, versus race, waiting for the rivals to pick', held, ui({ versus: { race: {}, rival: { ...rival, picked: false, wave: 0 } } }));
 
 const chestOf = (s) => ({ offers: s.players.map((p, i) => i ? ['thumb', 'roof', 'pouch'] : ['paws', 'roots', `fourth:${FLOWER_ORDER.find((t) => !p.loadout.includes(t))}`]), cursor: s.players.map(() => 1), picked: s.players.map(() => null), lock: 0 });

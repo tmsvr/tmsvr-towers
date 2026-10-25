@@ -44,6 +44,7 @@
     "difficulty.morePlayers": "Online games can have 3 or 4 cats. For each number of cats: waveSize and enemyHp multiply the co-op wave size and monster health (coopWaveSize, coopEnemyHp), and shieldHits more bomb hits break a boss shield. Tuned with the autopilot so 3 and 4 cats end about like 2 (the third cat helps more than the fourth).",
     "sprint": "Sprint mode (chosen on the pick screen, like Hard): a short game of waves.length waves. Each one plays like the normal wave it names (health, size, monsters, bosses on every bossEvery-th), so a Sprint skips the easy middle. The first wave comes after firstWaveDelay seconds, the breaks are timeBetweenWaves long, and to make up for the skipped waves cats start with startCoins times the usual coins and monsters drop coinDrops times as many. After a win, endless carries on from wave 11's numbers.",
     "score": "The score on the end screen and in the copied result: perWave for every wave cleared, perCottage for each point of cottage health left, perKill for every monster, all times hard on Hard. Only compare scores of the same mode, map and number of players (a challenge code fixes the first two).",
+    "flowerLevels.versusLoadoutSize": "How many flower types each cat picks in a versus race, instead of loadoutSize.",
     "send": "Versus races only: sending monsters to the rivals. enabled = false switches it off. Bonking the monsters of a wave fills the team's meter by meterPerWave over the whole wave (monsters that split off, spawned ones and sent ones don't count), a boss kill adds bossBonus, and the meter holds at most max. Any cat's send key (X) spends cost of it on a pack: pack times the size of the wave the rivals are playing, made of the monsters their wave has (no bosses), sent to them at once (or with their next wave, in a break). Sent monsters drop coins times their usual coins.",
     "bossChest": "Boss chests (IDEAS R3). enabled = false switches them off. A wave in which a boss died ends with a chest: the game pauses and each cat picks one of `choices` random perks; for the first `lockSeconds` nothing can be picked, so keys pressed while finishing the wave don't take one by accident. A perk can be taken at most `maxEach` times (team perks by the whole team, the others by each cat). roof: the cottage gains `cottage` health, up to its max. roots: flowers wear `wear` times as fast. stems: aphids chew `aphids` times as hard. fourth: one more flower type in your loadout. thumb: your planting, upgrades and healing cost `price` times as much. paws: you grow and heal `growSpeed` times as fast. pouch: you carry `bombs` more bombs and they recharge `recharge` times as long."
   },
@@ -151,6 +152,7 @@
   "flowerLevels": {
     "maxLevel": 5,
     "loadoutSize": 3,
+    "versusLoadoutSize": 4,
     "upgradeCostMultipliers": [0.6, 0.9, 1.2, 1.6],
     "priceStep": 10,
     "plantPrice": 0.5,

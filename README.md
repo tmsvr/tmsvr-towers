@@ -141,8 +141,9 @@ them into a chat.
 ### Versus races
 
 Two teams race on the same challenge, each in its own garden, each team on
-its own computers: same map, same mode, same waves. A team is one or two
-players (the host plus one teammate who joins with 4).
+its own computers: same map, same mode, same waves. A team is one to four
+players (the host plus up to three teammates who join with 4). In a race each
+cat picks 4 flowers instead of 3.
 
 1. Each team's host presses **5**. That opens a versus room with a code.
 2. One host types the other team's code in and clicks **Link to the rival
