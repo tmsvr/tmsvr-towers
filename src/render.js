@@ -1804,7 +1804,7 @@ function drawHud(c, s, time, ui) {
   label(c, `${Math.ceil(s.lives)} / ${s.maxLives}`, 115, y0 + 30.5, 12, '#ffffff', 'center', 700);
   const tag = s.sprint ? (s.hard ? ' · sprint, hard' : ' · sprint') : s.hard ? ' · hard' : '';
   label(c, fitText(c, (s.endless ? `Wave ${s.wave} · endless` : `Wave ${Math.max(1, s.wave)}/${lastWave(s)}`) + tag, 228, 16, 600), 14, y0 + 58, 16, s.endless || s.hard || s.sprint ? '#ffb86b' : '#e8f1f7', 'left', 600, null);
-  const status = s.phase === 'pick' ? 'Choosing flowers' : s.phase === 'prep' ? `Next in ${Math.ceil(s.timer)}s · Enter` : `${s.enemies.length + s.queue.length} enemies left`;
+  const status = s.phase === 'pick' ? 'Choosing flowers' : s.phase === 'prep' ? (s.waiting ? 'Waiting for the rivals' : `Next in ${Math.ceil(s.timer)}s · Enter`) : `${s.enemies.length + s.queue.length} enemies left`;
   label(c, status, 14, y0 + 78, 12, '#a9bccb', 'left', 500, null);
   label(c, isMuted() ? '🔇' : '', 220, y0 + 30, 14, '#fff', 'center', 500, null);
 
@@ -1914,7 +1914,14 @@ function drawRace(c, s, ui, time) {
     const mine = scoreOf(s), lead = mine > r.score ? '#8dff9a' : mine < r.score ? '#ff9a8a' : '#a9bccb';
     label(c, fitText(c, `score: you ${num(mine)}  ·  them ${num(r.score)}  ·  ${theirBlocks(r)}`, tw, 12, 600), x + 58, y + 33, 12, lead, 'left', 600, null);
   }
-  if (meter && s.threats?.length) drawThreat(c, s, ui, Math.round(VIEW_W / 2), y + 52, time);
+  const threat = meter && s.threats?.length;
+  if (threat) drawThreat(c, s, ui, Math.round(VIEW_W / 2), y + 52, time);
+  if (s.waiting && !s.over) {
+    // ready for the next wave before the rivals: a small note, not a popup
+    const wy = y + (threat ? 98 : 52), ww = 400, wx = Math.round(VIEW_W / 2 - ww / 2);
+    rrect(c, wx, wy, ww, 26, 13, 'rgba(20,28,36,0.85)', '#ff9a5a', 1.5);
+    label(c, fitText(c, `Wave ${s.wave + 1} starts when the rivals are ready too${'.'.repeat(1 + (Math.floor(time * 2) % 3))}`, ww - 24, 13, 600), VIEW_W / 2, wy + 13.5, 13, '#ffd9b8', 'center', 600, null);
+  }
   if (s.hold) {
     rrect(c, VIEW_W / 2 - 250, MAP_H / 2 - 34, 500, 68, 16, 'rgba(20,28,36,0.9)', '#ff9a5a', 2);
     label(c, 'Waiting for the rivals to pick…', VIEW_W / 2, MAP_H / 2 - 8, 22, '#fff', 'center', 700, null);

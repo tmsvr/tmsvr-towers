@@ -649,6 +649,7 @@ test('Retry', 'from the pause screen mid-wave or in a break, never after a win',
 // The monsters of the next wave, without playing it.
 function nextQueue(s) {
   s.phase = 'prep'; s.queue = []; s.enemies = [];
+  if (s.versus) sim.releaseWave(s, s.wave + 1);
   tick(s, { ready: true });
   return s.queue.map((e) => `${e.type}/${e.path}/${e.elite ? e.elite.join('+') : ''}`).join(' ');
 }
@@ -779,16 +780,17 @@ test('Versus', 'a race side holds after picking until it is let go, and can\'t b
   ok(!sim.canRetry(s), 'a race has no retries');
 });
 
-test('Versus', 'who wins a race: survive, then waves cleared, then cottage, then score', () => {
-  const st = (o) => ({ won: false, over: false, cleared: 0, lives: 0, score: 0, picked: true, ...o });
-  eq(raceResult(st({ won: true, cleared: 6, lives: 120 }), st({ won: true, cleared: 6, lives: 90 })), 'win', 'more cottage left');
-  eq(raceResult(st({ won: true, cleared: 6, lives: 90 }), st({ won: true, cleared: 6, lives: 120 })), 'lose', 'less cottage left');
-  eq(raceResult(st({ over: true, cleared: 4, score: 5000 }), st({ over: true, cleared: 3, score: 9000 })), 'win', 'further beats a higher score');
-  eq(raceResult(st({ over: true, cleared: 3, score: 9000 }), st({ over: true, cleared: 3, score: 9000 })), 'draw', 'the same');
-  eq(raceResult(st({ over: true, cleared: 2 }), st({ cleared: 2 })), null, 'the rivals can still fall in the same wave');
-  eq(raceResult(st({ over: true, cleared: 2 }), st({ cleared: 3 })), 'lose', 'the rivals are already further');
-  eq(raceResult(st({ cleared: 4 }), st({ over: true, cleared: 3 })), 'win', 'we are already further than where they fell');
+test('Versus', 'who wins a race: the first cottage to fall loses; else cottage left, then score', () => {
+  const st = (o) => ({ won: false, over: false, fell: false, cleared: 0, lives: 0, score: 0, picked: true, ...o });
+  eq(raceResult(st({ cleared: 2, lives: 10 }), st({ over: true, fell: true, cleared: 2 })), 'win', 'their cottage fell first');
+  eq(raceResult(st({ over: true, fell: true, cleared: 2 }), st({ cleared: 2, lives: 10 })), 'lose', 'ours fell first');
+  eq(raceResult(st({ over: true, cleared: 2, lives: 10 }), st({ over: true, fell: true, cleared: 2 })), 'win', 'still a win once our game has stopped');
+  eq(raceResult(st({ won: true, cleared: 6, lives: 120 }), st({ won: true, cleared: 6, lives: 90 })), 'win', 'both won: more cottage left');
+  eq(raceResult(st({ won: true, cleared: 6, lives: 90 }), st({ won: true, cleared: 6, lives: 120 })), 'lose', 'both won: less cottage left');
+  eq(raceResult(st({ over: true, fell: true, cleared: 3, score: 9000 }), st({ over: true, fell: true, cleared: 3, score: 8000 })), 'win', 'both fell at once: the score');
+  eq(raceResult(st({ over: true, fell: true, cleared: 3, score: 9000 }), st({ over: true, fell: true, cleared: 3, score: 9000 })), 'draw', 'the same');
   eq(raceResult(st({ won: true, cleared: 6, lives: 50 }), st({ cleared: 5 })), null, 'they can still win with more cottage');
+  eq(raceResult(st({ cleared: 4 }), st({ cleared: 4 })), null, 'both still playing');
   eq(raceResult(st({}), null), null, 'no rival yet');
   const s = game({ cats: ['bomber'] });
   const r = raceStatus(s);
@@ -799,10 +801,37 @@ test('Versus', 'who wins a race: survive, then waves cleared, then cottage, then
 function raceGame(seed = 21) {
   const s = sim.createState(2, seed, { map: 0, versus: true, cats: ['bomber', 'gardener'] });
   s.players.forEach((p) => { p.pick.chosen = ['thorn', 'frost', 'daisy']; p.pick.ready = true; });
-  tick(s); sim.releaseHold(s);
+  tick(s); sim.releaseHold(s); sim.releaseWave(s, 1);
   tick(s, { ready: true });
   return s;
 }
+
+test('Versus', "a race's boss chests never offer cottage repairs", () => {
+  for (let seed = 1; seed <= 30; seed++) {
+    const s = raceGame(seed);
+    s.chestDue = true; s.queue = []; s.enemies = []; tick(s); // the wave ends with a chest
+    ok(s.chest, 'a chest');
+    ok(s.chest.offers.every((o) => o.every((id) => !BALANCE.bossChest.notInRaces.includes(id.split(':')[0]))), `seed ${seed}`);
+  }
+});
+
+test('Versus', 'every wave waits for both teams; a fallen cottage ends the race for the other team too', () => {
+  const s = raceGame();
+  eq(s.phase, 'wave', 'wave 1 started once released');
+  s.queue = []; s.enemies = []; tick(s);
+  eq(s.phase, 'prep', 'wave 1 cleared');
+  tick(s, { ready: true }); for (let i = 0; i < 30; i++) tick(s);
+  ok(s.waiting && s.phase === 'prep' && s.wave === 1, 'ready early: waits for the rivals');
+  ok(raceStatus(s).waiting === 2, 'and tells them');
+  sim.releaseWave(s, 2); tick(s);
+  ok(!s.waiting && s.phase === 'wave' && s.wave === 2, 'both ready: wave 2 starts');
+  sim.endRace(s);
+  ok(s.over && !raceStatus(s).fell, 'the race stops here, our cottage still standing');
+  const t = s.t; tick(s);
+  eq(s.t, t, 'nothing moves after that');
+  const lost = raceGame(); lost.lives = 0; lost.over = true; // how the sim ends a game whose cottage fell
+  ok(raceStatus(lost).fell, 'a cottage that fell says so');
+});
 
 test('Sending monsters', 'bonking the wave fills the meter; monsters that split off or were sent don\'t count', () => {
   const S = BALANCE.send, s = raceGame();

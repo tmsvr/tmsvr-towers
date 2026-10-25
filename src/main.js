@@ -4,7 +4,7 @@
 //   local     – this browser runs the game for 1 or 2 players on one keyboard
 //   host      – this browser runs the game for up to 4 cats; the guests' inputs arrive over the network (host.js)
 //   guest     – this browser only sends inputs and draws snapshots from the host (guest.js)
-import { createState, step, continueEndless, retryWave, canRetry, setChallenge, scoreOf, modeName, MODES, releaseHold, receivePack } from './sim.js';
+import { createState, step, continueEndless, retryWave, canRetry, setChallenge, scoreOf, modeName, MODES, releaseHold, releaseWave, endRace, receivePack } from './sim.js';
 import { randomSeed, encodeCode, decodeCode, codeOf, dailyChallenge, shareText } from './challenge.js';
 import { finishLog, currentLog, gameSummary } from './stats.js';
 import { render, setView, VIEW_W, MAP_H, BASE_W, BASE_H } from './render.js';
@@ -746,24 +746,28 @@ function rematch() {
 }
 
 // Every frame of a race: tell the rival how we're doing, start once both
-// teams have picked, and pass the race on to our teammate.
+// teams have picked, start each wave once both teams are ready for it, stop
+// when either cottage falls, and pass the race on to our teammates.
 function updateRace(now) {
   const V = ui.versus;
   if (!V?.race || !state?.players) return;
   const mine = raceStatus(state);
-  const changed = mine.picked !== V.sentPicked || mine.over !== V.sentOver || mine.won !== V.sentWon;
+  const changed = mine.picked !== V.sentPicked || mine.over !== V.sentOver || mine.won !== V.sentWon || mine.waiting !== V.sentWaiting;
   if (rivalLink?.connected && (changed || now - V.lastStatus > 250)) {
     rivalLink.send({ t: 'status', status: mine });
-    V.lastStatus = now; V.sentPicked = mine.picked; V.sentOver = mine.over; V.sentWon = mine.won;
+    V.lastStatus = now; V.sentPicked = mine.picked; V.sentOver = mine.over; V.sentWon = mine.won; V.sentWaiting = mine.waiting;
     net.send({ t: 'versus', rival: V.rival, result: V.result });
   }
   if (state.hold && (V.rival?.picked || V.rival?.left || !rivalLink?.connected)) releaseHold(state);
+  const gone = V.rival?.left || !rivalLink?.connected;
+  if (state.waiting && (gone || V.rival?.waiting === state.wave + 1)) releaseWave(state, state.wave + 1);
+  if (V.rival?.fell) endRace(state); // their cottage fell: the race is ours, and over
   // monsters our cats sent go across at once
   for (const o of state.outbox || []) rivalLink?.send({ t: 'send', share: o.share });
   if (state.outbox) state.outbox.length = 0;
   const was = V.result;
   V.result = V.rival?.left ? null : raceResult(mine, V.rival);
-  if (V.result && !was && !state.over && !state.won) flashNote(V.result === 'win' ? 'The rivals fell: you have won the race! Play on for the score' : 'The rivals are out of reach…');
+  if (V.result && !was && V.result === 'win' && V.rival?.fell) flashNote("The rivals' cottage fell: you win the race!");
 }
 
 // Pausing a race pauses both teams (a pause from the rival isn't sent back).

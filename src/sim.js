@@ -71,7 +71,7 @@ export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, l
     m,
     t: 0, nextId: 1, rng: seed, seed, wrng: waveSeed(seed), wave: 0, phase: 'pick', timer: 0, queue: [], spawnWait: 0,
     lives: DIFFICULTY.cottageHealth, maxLives: DIFFICULTY.cottageHealth, baseHitT: 0, lastAlarm: -99, players: [], flowers: [], enemies: [], drops: [], bombs: [], projs: [], clouds: [],
-    fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, sharedScreen, map: m.index, hard: !!hard, sprint: !!sprint, locked: !!locked, versus: !!versus, hold: false,
+    fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, sharedScreen, map: m.index, hard: !!hard, sprint: !!sprint, locked: !!locked, versus: !!versus, hold: false, waiting: false, goWave: 0,
     meter: 0, outbox: [], incoming: [], threats: [], // versus: the team's send meter, packs to send, packs landed in a break, packs on their way ({share, t})
     items: [], // power-ups dropped by elites, waiting to be picked up
     perks: {}, chest: null, chestDue: false, // boss chests: the team's perks, the open chest, one is owed
@@ -666,7 +666,12 @@ function updateWaves(s, dt, ready) {
   if (s.phase === 'prep') {
     s.timer -= dt;
     if (ready) s.timer = Math.min(s.timer, 0);
-    if (s.timer <= 0) startWave(s);
+    if (s.timer > 0) return;
+    // In a race both teams start every wave together: wait here until the
+    // rivals are ready for it too (main.js calls releaseWave).
+    if (s.versus && (s.goWave || 0) < s.wave + 1) { s.timer = 0; s.waiting = true; return; }
+    s.waiting = false;
+    startWave(s);
     return;
   }
   if (s.queue.length) {
@@ -710,6 +715,18 @@ export function continueEndless(s) {
 
 // ---- Versus races ------------------------------------------------------------------
 // Both teams have picked: the race starts (main.js calls this on each side).
+// Both teams are ready for wave n: it starts for both at once.
+export function releaseWave(s, n) { s.goWave = Math.max(s.goWave || 0, n); }
+
+// The rivals' cottage fell: the race is over and this team, still standing,
+// has won it. The game stops here like a lost one, without the cottage falling.
+export function endRace(s) {
+  if (!s.versus || s.over || s.won) return;
+  s.over = true; s.raceWon = true;
+  log.logWaveEnd(s, 'rivalFell');
+  ev(s, 'win');
+}
+
 export function releaseHold(s) {
   if (!s.hold) return;
   s.hold = false;
@@ -755,8 +772,7 @@ function sendPack(s, p) {
 // A pack from the rivals: it is on its way, landing in SEND.warning seconds.
 export function receivePack(s, share) {
   if (!s.versus || s.over || s.won || s.phase === 'pick' || !(share > 0 && share <= 1)) return false;
-  (s.threats ||= []).push({ share, t: SEND.warning });
-  banner(s, `Rival attack! It lands in ${Math.round(SEND.warning)} s: send monsters back to block it`);
+  (s.threats ||= []).push({ share, t: SEND.warning }); // the warning bar at the top says the rest
   ev(s, 'shieldUp');
   return true;
 }
@@ -775,7 +791,7 @@ function landPack(s, share) {
   const pack = buildQueue(s, Math.max(1, lv), { share });
   if (s.phase === 'wave') { s.queue.unshift(...pack); s.spawnWait = Math.min(s.spawnWait, 0.6); }
   else s.incoming.push(...pack);
-  banner(s, s.phase === 'wave' ? `The rivals' attack is here: ${pack.length} monsters!` : `The rivals' ${pack.length} monsters come with the next wave!`);
+  text(s, s.m.base.x, s.m.base.y - T * 1.2, s.phase === 'wave' ? `+${pack.length} from the rivals!` : `+${pack.length} rival monsters next wave`, '#d9a8ff');
   ev(s, 'elite');
   log.logGot(s, pack.length);
   return pack.length;
@@ -815,7 +831,8 @@ export function retryWave(s) {
 const perkCount = (s, p, id) => (CHEST.perks[id].team ? s.perks[id] : p.perks?.[id]) || 0;
 
 function rollOffers(s, p) {
-  const pool = PERKS.filter((id) => perkCount(s, p, id) < CHEST.maxEach && (id !== 'fourth' || p.loadout.length < FLOWER_ORDER.length));
+  const off = s.versus ? CHEST.notInRaces || [] : []; // e.g. no cottage repairs in a race
+  const pool = PERKS.filter((id) => perkCount(s, p, id) < CHEST.maxEach && !off.includes(id) && (id !== 'fourth' || p.loadout.length < FLOWER_ORDER.length));
   const out = [];
   while (out.length < CHEST.choices && pool.length) {
     const id = pool.splice(Math.floor(rnd(s) * pool.length), 1)[0];

@@ -155,10 +155,12 @@ cat picks 4 flowers instead of 3.
    ready waits for the other, then both start at the same moment.
 
 The panel at the top shows the rivals' cats, how they're doing, both scores
-and whether they can block. The team that survives longer wins; if both
-survive (or fall in the same wave), the one with more cottage left wins, then
-the higher score. Once the rivals fall behind for good, you've won, but you
-can keep playing for the score.
+and whether they can block. Every wave starts for both teams at the same
+moment: a team that is ready first (its break ran out, or it pressed Enter)
+waits for the other. **The first cottage to fall loses**, and the race ends
+there for both teams. If both teams win every wave, the one with more cottage
+left wins, then the higher score. Boss chests never offer the cottage repair
+in a race.
 
 **Sending monsters.** Bonking your wave fills the send meter. **X** spends
 part of it on a pack of monsters for the rivals. A pack doesn't land at once:

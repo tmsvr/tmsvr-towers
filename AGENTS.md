@@ -191,6 +191,13 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
   each passes the rival's on to its guests (`versus`), and pausing sends
   `pause` across. The sims never talk to each other, so each side's game
   stays exactly as deterministic as before.
+- **Waves start together.** At the end of a break a race side stops
+  (`s.waiting`) until `releaseWave(s, n)`; main.js calls it once the rival's
+  status says it is waiting for the same wave (or the rival left). The
+  first cottage to fall loses: `status.fell`, and the other side calls
+  `endRace` (`s.over` with `s.raceWon`, cottage intact). `raceResult` in
+  `versus.js` has the rules. Chest perks in `bossChest.notInRaces` (the
+  cottage repair) are never offered in a race.
 - **Sending monsters** (`balance.json → send`, the end of the "Versus races"
   section of `sim.js`). Kills of a wave's own monsters fill `s.meter`
   (`fillMeter`); the `send` input spends it and queues `{share}` in

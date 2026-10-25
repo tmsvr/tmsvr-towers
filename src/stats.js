@@ -6,7 +6,7 @@
 // Besides the per-wave summaries, the log keeps (format 3):
 //  - timeline: what happened when, as compact arrays [t, kind, ...]:
 //      [t, 'wave', n]                        a wave starts
-//      [t, 'end', n, how, cottage]           a wave ends ('cleared' | 'lost' | 'won')
+//      [t, 'end', n, how, cottage]           a wave ends ('cleared' | 'lost' | 'won' | 'rivalFell': a race ended by the rivals' cottage)
 //      [t, 'plant', p, fid, type, tx, ty]    player p puts a seedling on tile tx, ty
 //      [t, 'lvl', p, fid, lvl, coins]        flower fid reaches lvl (1 = done growing); p finished it, coins = p's coins after
 //      [t, 'heal', p, fid, hp]               p starts healing flower fid (at hp health)
@@ -104,7 +104,7 @@ export function logWaveStart(s) {
   ev(s, 'wave', s.wave);
 }
 
-// how: 'cleared' | 'lost' | 'won'
+// how: 'cleared' | 'lost' | 'won' | 'rivalFell'
 export function logWaveEnd(s, how) {
   const w = cur(s);
   if (!w) return;

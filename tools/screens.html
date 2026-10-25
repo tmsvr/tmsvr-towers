@@ -116,6 +116,9 @@ show('Game, versus race, monsters from the rivals (purple rings)', duo, ui({ cam
 duo.threats = [{ share: 0.15, t: 2.4 }, { share: 0.15, t: 8 }]; duo.meter = 0.8;
 show('Game, versus race, a rival attack on its way', duo, ui({ cam: camOn(duo, duo.players[0]), mode: () => 'host', versus: { race: {}, rival: { ...rival, threat: 0.15, threatT: 5.2 } } }));
 duo.threats = [];
+const waitPhase = [duo.phase, duo.waiting]; duo.phase = 'prep'; duo.waiting = true;
+show('Game, versus race, ready for the next wave before the rivals', duo, ui({ cam: camOn(duo, duo.players[0]), mode: () => 'host', versus: { race: {}, rival } }));
+[duo.phase, duo.waiting] = waitPhase;
 duo.enemies.forEach((e) => { e.sent = false; }); duo.meter = 0;
 const held = sim.createState(1, 1, { map: 0, versus: true }); held.players[0].pick.chosen = ['thorn', 'frost', 'daisy', 'sunflower']; held.players[0].pick.ready = true; sim.step(held, [{}], 1 / 60);
 show('Game, versus race, waiting for the rivals to pick', held, ui({ versus: { race: {}, rival: { ...rival, picked: false, wave: 0 } } }));
@@ -140,6 +143,7 @@ const S4 = gameSummary(runBot({ players: 4, seed: 2, map: 0, maxMinutes: 40 }).g
 quad.over = true;
 show('Defeat, 4 cats', quad, ui({ cam: camOn(quad, quad.players[0]), summary: S4 }));
 show('Defeat, solo', solo, ui({ cam: camOn(solo, solo.players[0]), summary: sSolo }));
+show('End, versus race won when the rivals\' cottage fell', solo, ui({ cam: camOn(solo, solo.players[0]), summary: sSolo, versus: { race: {}, result: 'win', rival: { ...rival, over: true, fell: true } } }), () => { solo.over = true; solo.raceWon = true; });
 show('Victory, versus race won', duo, ui({ cam: camOn(duo, duo.players[0]), summary: sSolo, versus: { race: {}, result: 'win', rival: { ...rival, over: true } } }), () => { duo.won = true; duo.over = false; });
 show('Defeat, versus race still going (no summary yet)', solo, ui({ cam: camOn(solo, solo.players[0]), versus: { race: {}, result: null, rival } }));
 duo.won = false; duo.over = true;
