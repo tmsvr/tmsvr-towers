@@ -200,7 +200,8 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
   while threats are pending cancels them first (soonest first) and only the
   rest goes across, like garbage in Tetris. On landing, `buildQueue` with
   `share` makes the pack from that side's own wave (no bosses, no elites)
-  with the game's `rnd`, never `wrnd`, so the challenge's waves stay the same. Pack entries and their monsters carry
+  with the game's `rnd`, never `wrnd`, so the challenge's waves stay the same.
+  A race's pick screen has no map row (the referee chose it in the lobby). Pack entries and their monsters carry
   `sent` (purple ring, `SEND.coins` of the coins, no meter).
 - **Saves online** are made and loaded by the host. A loaded online save
   either resumes at once (the others still connected) or opens a room and

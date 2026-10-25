@@ -4,13 +4,14 @@
 // and whoever holds out better wins. Pure helpers here; main.js does the
 // talking (the 'race', 'status', 'pause' and 'send' messages).
 import { wavesCleared, scoreOf, lastWave } from './sim.js';
+import { CATS } from './data.js';
 
 // What one team tells the other about its game, a few times a second.
 export function raceStatus(s) {
   return {
     wave: s.wave, last: lastWave(s), phase: s.phase, cleared: wavesCleared(s),
     lives: Math.max(0, Math.ceil(s.lives)), maxLives: s.maxLives, kills: s.kills, score: scoreOf(s),
-    over: !!s.over, won: !!s.won, players: s.players.length, picked: s.phase !== 'pick', meter: s.meter || 0,
+    over: !!s.over, won: !!s.won, players: s.players.length, cats: s.players.map((p) => p.cat), picked: s.phase !== 'pick', meter: s.meter || 0,
     // our packs still on their way to them, so they can watch them land
     threat: (s.threats || []).reduce((a, th) => a + th.share, 0), threatT: s.threats?.length ? Math.min(...s.threats.map((th) => th.t)) : 0,
   };
@@ -36,6 +37,13 @@ export function raceResult(mine, theirs) {
   if (done(mine) && !mine.won && theirs.cleared > mine.cleared) return 'lose';
   if (done(theirs) && !theirs.won && mine.cleared > theirs.cleared) return 'win';
   return null;
+}
+
+// The rival team by its cats: "Brick & Zip", "Brick, Zip & Fern".
+export function rivalName(st) {
+  const names = (st?.cats || []).map((c) => CATS[c]?.name).filter(Boolean);
+  if (!names.length) return st?.players > 1 ? `Rivals (${st.players})` : 'Rival';
+  return names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} & ${names.at(-1)}`;
 }
 
 // What the race looks like from here, in a few words (HUD and end screen).

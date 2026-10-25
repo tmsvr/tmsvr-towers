@@ -633,13 +633,16 @@ function startVersus(rivalCode = '') {
     const modes = MODES.map((o, i) => `<option value="${i}"${o.sprint && !o.hard ? ' selected' : ''}>${modeName(o)}</option>`).join('');
     const invite = isLocalhost ? '' : `<br><button id="copyTeam" class="small" type="button">Copy teammate link</button><button id="copyRival" class="small" type="button">Copy rival link</button>`;
     showLobby(`<h2>Versus race</h2>
-      <p>Your team's room code</p><div class="code">${code}</div>
-      <p class="hint">Teammate: presses <b>4</b> and enters this code. Rival team: their host presses <b>5</b> and enters it below. ${invite}</p>
-      <p id="team"></p>
-      <form id="rivalform"><input id="rival" maxlength="4" autocomplete="off" spellcheck="false" placeholder="ABCD" value="${esc(rivalCode)}"><button>Link to the rival team</button></form>
-      <p id="rivalstatus" class="hint"></p>
-      <div id="race" hidden><p><select id="map">${maps}</select> <select id="mode">${modes}</select></p><p><button id="go" type="button">Start the race</button></p></div>
-      <p class="hint">Esc to cancel</p>`);
+      <p class="hint">Two teams, the same waves. The team that holds out longer wins.</p>
+      <div class="code">${code}</div>
+      <p class="hint">Your code. Teammates press <b>4</b> and type it in. ${invite}</p>
+      <div class="side" id="teamside"><h3>Your team</h3><p id="team"></p></div>
+      <div class="side" id="rivalside"><h3>Rival team</h3>
+        <p id="rivalstatus"></p>
+        <form id="rivalform"><input id="rival" maxlength="4" autocomplete="off" spellcheck="false" placeholder="ABCD" value="${esc(rivalCode)}"><button>Link</button></form>
+      </div>
+      <div class="side" id="race" hidden><h3>The race (you choose: they linked to you)</h3><p><select id="map">${maps}</select> <select id="mode">${modes}</select></p><p><button id="go" type="button">Start the race</button></p><p class="hint">Then everyone picks a cat and flowers.</p></div>
+      <p class="hint">Esc to leave</p>`);
     copyButton('copyTeam', `${location.origin}${location.pathname}?join=${code}`);
     copyButton('copyRival', `${location.origin}${location.pathname}?versus=${code}`);
     const input = document.getElementById('rival');
@@ -667,12 +670,14 @@ function updateVersusLobby() {
   if (mode !== 'versusLobby') return;
   const team = document.getElementById('team'), race = document.getElementById('race'), form = document.getElementById('rivalform');
   if (!team) return;
-  team.textContent = teamSize() > 1 ? `Your team: ${playerList()}${teamSize() < MAX_PLAYERS ? ' (more can join)' : ''}` : 'Your team: just you (teammates can still join, up to 3)';
+  team.textContent = teamSize() > 1 ? `${playerList()}${teamSize() < MAX_PLAYERS ? ' · more can join' : ''}` : 'Just you so far (up to 4 can play)';
   const linked = !!rivalLink?.connected;
   form.hidden = linked;
   race.hidden = !(linked && ui.versus.referee);
-  const n = ui.versus.rivalPlayers || 1;
-  if (linked) versusNote(ui.versus.referee ? `Rival team linked (${n === 1 ? 'one player' : `${n} players`}). Choose the map and mode, then start.` : `Linked! The other team (${n === 1 ? 'one player' : `${n} players`}) chooses the map and starts the race.`);
+  document.getElementById('rivalside')?.classList.toggle('ok', linked);
+  const n = ui.versus.rivalPlayers || 1, them = n === 1 ? 'one player' : `${n} players`;
+  if (linked) versusNote(ui.versus.referee ? `✓ Linked (${them}). You choose the map and mode below.` : `✓ Linked (${them}). Their host chooses the map and mode and starts the race: wait here.`);
+  else if (!document.getElementById('rivalstatus').textContent) versusNote("Not linked yet. One host types the other's code here (either way round works):");
 }
 
 function welcomeRival(link, m) {

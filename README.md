@@ -146,18 +146,19 @@ players (the host plus up to three teammates who join with 4). In a race each
 cat picks 4 flowers instead of 3.
 
 1. Each team's host presses **5**. That opens a versus room with a code.
-2. One host types the other team's code in and clicks **Link to the rival
-   team** (or opens the **Copy rival link** link). The room that was linked
-   to picks the map and mode (Sprint by default) and starts the race.
+2. One host types the other host's code into the **Rival team** box and
+   presses **Link** (either way round works). The host who was linked to
+   chooses the map and mode (Sprint by default) and starts the race.
 3. Teammates press **4** and enter their own host's code, before the race
    starts.
-4. Everyone picks cats and flowers; a team that's ready waits for the other,
-   then both start at the same moment.
+4. Everyone picks a cat and 4 flowers (the map is already set); a team that's
+   ready waits for the other, then both start at the same moment.
 
-The panel at the top shows how the rivals are doing. The team that survives
-longer wins; if both survive (or fall in the same wave), the one with more
-cottage left wins, then the higher score. Once the rivals fall behind for
-good, you've won, but you can keep playing for the score.
+The panel at the top shows the rivals' cats, how they're doing, both scores
+and whether they can block. The team that survives longer wins; if both
+survive (or fall in the same wave), the one with more cottage left wins, then
+the higher score. Once the rivals fall behind for good, you've won, but you
+can keep playing for the score.
 
 **Sending monsters.** Bonking your wave fills the send meter. **X** spends
 part of it on a pack of monsters for the rivals. A pack doesn't land at once:

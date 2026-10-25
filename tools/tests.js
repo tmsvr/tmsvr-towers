@@ -757,6 +757,9 @@ test('Versus', 'each cat picks one more flower in a race', () => {
     p.pick.chosen = []; p.pick.row = 2;
     for (let i = 0; i < FLOWER_ORDER.length; i++) { p.pick.cursor = i; tick(s, { buildTap: true }); tick(s); }
     eq(p.pick.chosen.length, want, versus ? 'race' : 'normal game');
+    p.pick.row = 1; tick(s, { my: -1 }); tick(s);
+    eq(p.pick.row, versus ? 1 : 0, versus ? "a race's map row can't be reached" : 'the map row');
+    p.pick.row = 2;
     tick(s, { atk: true }); tick(s);
     ok(s.phase !== 'pick', 'can start with that many');
   }

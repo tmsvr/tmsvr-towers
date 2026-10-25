@@ -1413,7 +1413,7 @@ function updatePick(s, inputs) {
     const inp = inputs[p.id] || {};
     const pk = p.pick;
     const mx = Math.sign(inp.mx || 0), my = Math.sign(inp.my || 0);
-    if (my && my !== p.prevMy && !pk.ready) { pk.row = clamp(pk.row + my, 0, 2); ev(s, 'cycle'); }
+    if (my && my !== p.prevMy && !pk.ready) { pk.row = clamp(pk.row + my, s.versus ? 1 : 0, 2); ev(s, 'cycle'); } // a race's map row is fixed
     p.prevMy = my;
     if (mx && mx !== p.prevMx && !pk.ready) {
       if (pk.row === 0 && s.locked) ev(s, 'deny'); // a challenge's map stays put

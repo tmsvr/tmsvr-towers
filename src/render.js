@@ -15,7 +15,7 @@ import {
 } from './data.js';
 import { tileOf, canBuildAt, uprootRefund, catStats, plantPrice, upgradeLeft, healLeft, lastWave, modeName, scoreOf, wavesCleared } from './sim.js';
 import { codeOf, encodeCode } from './challenge.js';
-import { raceLine } from './versus.js';
+import { raceLine, rivalName } from './versus.js';
 import { isMuted } from './audio.js';
 import { observeJuice, drawJuiceWorld, drawJuiceScreen, hitSquash, swingSquash, coinScale } from './juice.js';
 import { liveEffects } from './fx.js';
@@ -1904,18 +1904,21 @@ function drawRace(c, s, ui, time) {
   rrect(c, x, y, w, 44, 12, 'rgba(20,28,36,0.85)', '#ff9a5a', 2);
   rrect(c, x + 10, y + 11, 38, 22, 11, '#ff9a5a');
   label(c, 'VS', x + 29, y + 22.5, 13, '#2a2030', 'center', 700, null);
-  const who = r?.players > 1 ? `Rivals (${r.players})` : 'Rival', tw = w - 70 - (meter ? 150 : 0);
-  label(c, fitText(c, `${who}: ${raceLine(r)}`, tw, 15, 700), x + 58, y + 16, 15, '#fff', 'left', 700, null);
+  const tw = w - 70 - (meter ? 150 : 0);
+  label(c, fitText(c, `${rivalName(r)}: ${raceLine(r)}`, tw, 15, 700), x + 58, y + 16, 15, '#fff', 'left', 700, null);
   if (meter) drawSendMeter(c, s, ui, x + w - 148, y + 7, time);
   const res = V.result && RACE_WORDS[V.result];
   if (res) label(c, res[0], x + 58, y + 33, 12, res[1], 'left', 700, null);
   else if (r?.threat > 0 && !r.left) label(c, fitText(c, `Your attack lands on them in ${Math.max(1, Math.ceil(r.threatT))} s  ·  ${theirBlocks(r)}`, tw, 12, 700), x + 58, y + 33, 12, '#d9a8ff', 'left', 700, null);
-  else if (r?.picked && !r.left) label(c, fitText(c, `their score ${num(r.score)}  ·  ${num(r.kills)} bonked  ·  ${theirBlocks(r)}`, tw, 12, 500), x + 58, y + 33, 12, '#a9bccb', 'left', 500, null);
+  else if (r?.picked && !r.left) {
+    const mine = scoreOf(s), lead = mine > r.score ? '#8dff9a' : mine < r.score ? '#ff9a8a' : '#a9bccb';
+    label(c, fitText(c, `score: you ${num(mine)}  ·  them ${num(r.score)}  ·  ${theirBlocks(r)}`, tw, 12, 600), x + 58, y + 33, 12, lead, 'left', 600, null);
+  }
   if (meter && s.threats?.length) drawThreat(c, s, ui, Math.round(VIEW_W / 2), y + 52, time);
   if (s.hold) {
     rrect(c, VIEW_W / 2 - 250, MAP_H / 2 - 34, 500, 68, 16, 'rgba(20,28,36,0.9)', '#ff9a5a', 2);
     label(c, 'Waiting for the rivals to pick…', VIEW_W / 2, MAP_H / 2 - 8, 22, '#fff', 'center', 700, null);
-    label(c, 'Both teams start at the same moment', VIEW_W / 2, MAP_H / 2 + 18, 14, '#a9bccb', 'center', 500, null);
+    label(c, fitText(c, `Racing ${rivalName(r)}  ·  both teams start at the same moment`, 480, 14), VIEW_W / 2, MAP_H / 2 + 18, 14, '#a9bccb', 'center', 500, null);
   }
 }
 
@@ -2048,16 +2051,16 @@ function drawMapCarousel(c, s, ui, time) {
   const d = wrap(s.map - pos);
   pos = Math.abs(d) < 0.01 ? s.map : pos + d * Math.min(1, dt * 12);
   ui.mapPos = ((pos % N) + N) % N;
-  label(c, `Map ${s.map + 1} / ${N}`, 16, 20, 13, '#8fa5b3', 'left', 600, null);
+  label(c, s.versus ? 'Race map' : `Map ${s.map + 1} / ${N}`, 16, 20, 13, s.versus ? '#ff9a5a' : '#8fa5b3', 'left', 600, null);
   // the mode: the plant key on the map row switches it (Normal, Hard, Sprint, Sprint · Hard)
   const hw = 104, hx = 108, hot = s.hard || s.sprint;
   rrect(c, hx, 10, hw, 20, 10, hot ? 'rgba(255,106,90,0.25)' : 'rgba(255,255,255,0.06)', hot ? '#ff6a5a' : 'rgba(255,255,255,0.25)', 1.5);
   label(c, modeName(s), hx + hw / 2, 20.5, 12, hot ? '#ffb3a8' : '#cfe0ea', 'center', 700, null);
   // the challenge code: anyone who types it in meets these same waves
-  label(c, `${s.locked ? '🔒 ' : ''}Code ${codeOf(s)}`, BASE_W - 128, 20.5, 12, s.locked ? '#ffe27a' : '#8fa5b3', 'right', 600, null);
+  if (!s.versus) label(c, `${s.locked ? '🔒 ' : ''}Code ${codeOf(s)}`, BASE_W - 128, 20.5, 12, s.locked ? '#ffe27a' : '#8fa5b3', 'right', 600, null); // a race has no use for it
   for (let i = 0; i < N; i++) {
     const k = wrap(i - ui.mapPos);
-    if (Math.abs(k) > 2.6) continue;
+    if (Math.abs(k) > 2.6 || (s.versus && i !== s.map)) continue; // a race's map was set in the lobby: show just that one
     const m = MAPS[i], x = BASE_W / 2 + k * step - mw / 2, sel = s.map === i;
     c.globalAlpha = Math.abs(k) <= 1.5 ? 1 : Math.max(0, 1 - (Math.abs(k) - 1.5) / 1.1);
     rrect(c, x, y, mw, mh, 12, sel ? 'rgba(255,226,122,0.16)' : 'rgba(255,255,255,0.05)', sel ? '#ffe27a' : 'rgba(255,255,255,0.18)', sel ? 3 : 1.5);
@@ -2068,6 +2071,7 @@ function drawMapCarousel(c, s, ui, time) {
     if (sel) pickCursor(c, s, x, y, mw, mh, 15, 0, () => true, time);
   }
   // arrows at both ends: there are always more maps either way
+  if (s.versus) { label(c, 'Same map and waves for both teams', BASE_W / 2 + mw / 2 + 16, y + mh / 2, 14, '#ff9a5a', 'left', 600, null); return; }
   for (const dir of [-1, 1]) {
     const ax = dir < 0 ? 22 : BASE_W - 22, ay = y + mh / 2;
     circle(c, ax, ay, 15, 'rgba(20,28,36,0.9)', 'rgba(255,255,255,0.35)', 1.5);
@@ -2078,7 +2082,7 @@ function drawMapCarousel(c, s, ui, time) {
 
 function drawPick(c, s, ui, time) {
   dim(c, 'rgba(12,18,26,0.85)', false);
-  label(c, `Choose a map, a cat and ${loadoutSize(s)} flowers`, BASE_W / 2, 20, 22, '#ffe27a', 'center', 700, OUT);
+  label(c, s.versus ? `Choose a cat and ${loadoutSize(s)} flowers for the race` : `Choose a map, a cat and ${loadoutSize(s)} flowers`, BASE_W / 2, 20, 22, '#ffe27a', 'center', 700, OUT);
   label(c, 'I: flower guide', BASE_W - 16, 20, 13, '#8fa5b3', 'right', 600, null);
   drawMapCarousel(c, s, ui, time);
   // cats: each one can only be taken by one player
@@ -2139,7 +2143,7 @@ function drawPick(c, s, ui, time) {
     const n = p.pick.chosen.length, size = loadoutSize(s);
     const L = ui.keyLabel;
     const keys = p.pick.row === 0 ? (s.locked ? `map and mode are set by the challenge · [${L(k.down)}] cats` : `[${L(k.left)}/${L(k.right)}] change map · [${L(k.build)}] mode · [${L(k.down)}] cats`)
-      : p.pick.row === 1 ? `[${L(k.left)}/${L(k.right)}] change cat · [${L(k.up)}] map · [${L(k.down)}] flowers`
+      : p.pick.row === 1 ? `[${L(k.left)}/${L(k.right)}] change cat${s.versus ? '' : ` · [${L(k.up)}] map`} · [${L(k.down)}] flowers`
       : `[${L(k.left)}/${L(k.right)}] move · [${L(k.build)}] pick · [${L(k.up)}] cats · [${L(k.atk)}] ready`;
     const who = `${CATS[p.cat].name}, `;
     const msg = p.pick.ready ? `Ready with ${CATS[p.cat].name}! ✓` : n < size ? `${who}${n}/${size} flowers   ${keys}` : `${who}${size}/${size} — [${L(k.atk)}] when ready   ${keys}`;
@@ -2236,13 +2240,14 @@ const monsterName = (t) => (INTROS[t]?.[0] || t[0].toUpperCase() + t.slice(1) + 
 const retryWaveNo = (s) => (s.over || s.phase === 'wave' ? s.wave : s.wave + 1);
 function stopKeys(s, extra = '') {
   const retry = s.won || s.phase === 'pick' ? '' : `R: retry wave ${Math.max(1, retryWaveNo(s))}  ·  `;
-  const share = s.over || s.won ? 'X: copy result  ·  ' : '';
-  if (race) return `${share}${s.over || s.won ? 'Enter: rematch  ·  ' : ''}M: menu (leaves the race)${extra}`;
+  const share = s.over || s.won ? 'X: copy result for a chat  ·  ' : '';
+  if (race) return `${s.over || s.won ? 'Enter: rematch  ·  ' : ''}M: menu (leaves the race)${extra}`;
   return `${s.won ? 'C: keep going (endless)  ·  ' : ''}${retry}${share}T: new game  ·  M: menu${extra}`;
 }
 // The score line on the end screens, with this browser's best for the same game.
 function scoreLine(s, ui) {
   const b = ui.best, score = num(scoreOf(s));
+  if (race) return race.rival ? `Your score ${score}  ·  theirs ${num(race.rival.score)}` : `Your score ${score}`;
   if (!b) return `Score ${score}`;
   if (b.isNew) return `Score ${score}  ·  ${b.prev == null ? 'first score' : 'new best'} for ${b.what}!`;
   return `Score ${score}  ·  best ${num(b.prev)} for ${b.what}`;
@@ -2256,7 +2261,7 @@ function endTitle(s) {
   if (race.result === 'draw') return ["It's a draw!", '#ffe27a'];
   return [s.won ? 'Victory! Now wait…' : 'The garden fell…', s.won ? '#8dff9a' : '#ff7a6a'];
 }
-const rivalWords = () => (race.rival?.left ? 'The rival team left the race' : race.result ? `Rivals: ${raceLine(race.rival)}` : `Still racing: the rivals are on ${raceLine(race.rival)}`);
+const rivalWords = () => (race.rival?.left ? 'The rival team left the race' : race.result ? `${rivalName(race.rival)}: ${raceLine(race.rival)}` : `Still racing: ${rivalName(race.rival)}, ${raceLine(race.rival)}`);
 
 function drawEndScreen(c, s, ui, time) {
   const won = s.won, S = ui.summary;
@@ -2272,7 +2277,8 @@ function drawEndScreen(c, s, ui, time) {
   label(c, title, BASE_W / 2, top - 92, 46, col, 'center', 700, OUT);
   const where = won ? `All ${lastWave(s)} waves` : S.wave > lastWave(s) ? `Endless wave ${S.wave}` : `Wave ${S.wave}/${lastWave(s)}`;
   label(c, fitText(c, `${where}  ·  ${clock(S.seconds)}  ·  ${num(S.kills)} monsters bonked  ·  cottage ${S.cottage}/${S.maxCottage}`, BASE_W - 40, 18), BASE_W / 2, top - 50, 18, '#e8f1f7', 'center', 500, null);
-  label(c, fitText(c, `${scoreLine(s, ui)}  ·  ${modeName(s)}  ·  code ${codeOf(s)}`, BASE_W - 40, 17, 700), BASE_W / 2, top - 22, 17, '#ffe27a', 'center', 700, null);
+  const code = race ? '' : `  ·  replay code ${codeOf(s)} (K on the menu)`;
+  label(c, fitText(c, `${scoreLine(s, ui)}  ·  ${modeName(s)}${code}`, BASE_W - 40, 17, 700), BASE_W / 2, top - 22, 17, '#ffe27a', 'center', 700, null);
 
   // flowers: damage per type, biggest first
   const fx = 32, fw = 540;
