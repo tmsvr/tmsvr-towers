@@ -159,6 +159,14 @@ longer wins; if both survive (or fall in the same wave), the one with more
 cottage left wins, then the higher score. Once the rivals fall behind for
 good, you've won, but you can keep playing for the score.
 
+**Sending monsters.** Bonking your wave fills the send meter. **X** spends
+part of it on a pack of monsters for the rivals. A pack doesn't land at once:
+the rivals get an 8-second warning, and if they send in that time, their pack
+cancels yours first and only the rest comes back at you. So sending as much
+back only blocks: the trick is timing. Attack when their meter is empty (the
+panel says "they can't block"), and keep some of yours to block their big
+push.
+
 **Send them monsters.** Bonking your wave fills your team's purple send
 meter (a whole wave fills it once over, a boss adds half). When it's past the
 first tick, any cat presses **X** to send a pack to the rivals: 15% of the

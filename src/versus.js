@@ -11,6 +11,8 @@ export function raceStatus(s) {
     wave: s.wave, last: lastWave(s), phase: s.phase, cleared: wavesCleared(s),
     lives: Math.max(0, Math.ceil(s.lives)), maxLives: s.maxLives, kills: s.kills, score: scoreOf(s),
     over: !!s.over, won: !!s.won, players: s.players.length, picked: s.phase !== 'pick', meter: s.meter || 0,
+    // our packs still on their way to them, so they can watch them land
+    threat: (s.threats || []).reduce((a, th) => a + th.share, 0), threatT: s.threats?.length ? Math.min(...s.threats.map((th) => th.t)) : 0,
   };
 }
 

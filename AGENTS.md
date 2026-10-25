@@ -195,9 +195,12 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
   section of `sim.js`). Kills of a wave's own monsters fill `s.meter`
   (`fillMeter`); the `send` input spends it and queues `{share}` in
   `s.outbox`, which `main.js` sends across as `send`. The other side calls
-  `receivePack`: `buildQueue` with `share` makes the pack from that side's own
-  wave (no bosses, no elites) with the game's `rnd`, never `wrnd`, so the
-  challenge's waves stay the same. Pack entries and their monsters carry
+  `receivePack`, which only adds a threat (`s.threats`, `{share, t}`) that
+  lands `SEND.warning` seconds later (`updateThreats`, `landPack`). Sending
+  while threats are pending cancels them first (soonest first) and only the
+  rest goes across, like garbage in Tetris. On landing, `buildQueue` with
+  `share` makes the pack from that side's own wave (no bosses, no elites)
+  with the game's `rnd`, never `wrnd`, so the challenge's waves stay the same. Pack entries and their monsters carry
   `sent` (purple ring, `SEND.coins` of the coins, no meter).
 - **Saves online** are made and loaded by the host. A loaded online save
   either resumes at once (the others still connected) or opens a room and

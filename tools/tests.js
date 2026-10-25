@@ -830,18 +830,53 @@ test('Sending monsters', 'the send key spends the meter on a pack for the rivals
   ok(!solo.outbox?.length, 'nothing to send outside a race');
 });
 
-test('Sending monsters', 'a pack joins the wave at once, or the next wave in a break; it is marked and drops fewer coins', () => {
+// A rival pack arrives and its warning runs out on the next tick.
+const landNow = (s, share = BALANCE.send.pack) => {
+  const left = s.queue.length + s.incoming.length;
+  sim.receivePack(s, share); s.threats.at(-1).t = 1e-6; tick(s);
+  return s.queue.length + s.incoming.length - left;
+};
+
+test('Sending monsters', 'a rival pack waits as a warning, then lands', () => {
   const S = BALANCE.send, s = raceGame();
-  const left = s.queue.length, n = sim.receivePack(s, S.pack);
+  ok(sim.receivePack(s, S.pack), 'taken in');
+  eq(s.threats.length, 1, 'on its way'); near(s.threats[0].t, S.warning, 1e-9, 'lands in warning seconds');
+  const left = s.queue.length;
+  for (let i = 0; i < Math.floor((S.warning - 0.5) * 60); i++) tick(s);
+  ok(!s.queue.some((e) => e.sent) && !s.enemies.some((e) => e.sent), 'nothing has come yet');
+  for (let i = 0; i < 60; i++) tick(s);
+  eq(s.threats.length, 0, 'landed');
+  ok(s.queue.some((e) => e.sent) || s.enemies.some((e) => e.sent), 'its monsters are here');
+  ok(s.queue.length >= left - 30, 'wave still there');
+  ok(!sim.receivePack(game(), S.pack), 'nothing outside a race');
+});
+
+test('Sending monsters', 'sending while a rival pack is on its way blocks it first', () => {
+  const S = BALANCE.send, s = raceGame();
+  sim.receivePack(s, S.pack); sim.receivePack(s, S.pack);
+  s.meter = S.cost; tick(s, { send: true });
+  eq(s.threats.length, 1, 'one pack blocked'); eq(s.outbox.length, 0, 'nothing went across');
+  near(s.meter, 0, 1e-9, 'it cost the meter');
+  s.threats[0].share = S.pack / 2; tick(s);
+  s.meter = S.cost; tick(s, { send: true }, 1);
+  eq(s.threats.length, 0, 'the half pack blocked too');
+  eq(s.outbox.length, 1, 'and the rest sent'); near(s.outbox[0].share, S.pack / 2, 1e-9, 'half a pack across');
+  s.meter = S.cost; tick(s, { send: true });
+  near(s.outbox.at(-1).share, S.pack, 1e-9, 'nothing to block: a whole pack');
+  eq(s.stats.cur.versus.blocked, 1.5, 'logged as blocked packs');
+});
+
+test('Sending monsters', 'a pack joins the wave when it lands, or the next wave in a break; it is marked and drops fewer coins', () => {
+  const S = BALANCE.send, s = raceGame();
+  const n = landNow(s);
   ok(n > 0, 'some monsters came');
-  eq(s.queue.length, left + n, 'they join the wave');
   ok(s.queue.slice(0, n).every((e) => e.sent && !ENEMIES[e.type].boss), 'first in line, marked, no bosses');
   for (let i = 0; i < 60; i++) tick(s);
   ok(s.enemies.some((e) => e.sent), 'sent monsters are out');
   const brk = raceGame(22);
-  brk.phase = 'prep'; brk.queue = []; brk.enemies = [];
-  const m = sim.receivePack(brk, S.pack);
-  eq(brk.queue.length, 0, 'nothing comes during the break'); eq(brk.incoming.length, m, 'held for the next wave');
+  brk.phase = 'prep'; brk.timer = 30; brk.queue = []; brk.enemies = [];
+  const m = landNow(brk);
+  eq(brk.queue.length, 0, 'nothing comes during the break'); ok(m > 0 && brk.incoming.length === m, 'held for the next wave');
   tick(brk, { ready: true });
   ok(brk.queue.slice(0, m).every((e) => e.sent), 'the next wave starts with them');
   const coinsFrom = (sent) => {
@@ -862,8 +897,8 @@ test('Sending monsters', 'a pack doesn\'t change the waves: they stay those of t
   const play = (pack) => {
     const s = raceGame(77), waves = [];
     for (let w = 0; w < 3; w++) {
-      if (pack) sim.receivePack(s, BALANCE.send.pack);
-      s.queue = s.queue.filter((e) => !e.sent);
+      if (pack) landNow(s);
+      s.queue = s.queue.filter((e) => !e.sent); s.incoming = [];
       waves.push(nextQueue(s));
     }
     return waves;
@@ -875,10 +910,11 @@ test('Sending monsters', 'a pack doesn\'t change the waves: they stay those of t
 test('Sending monsters', 'the meter, sent monsters and the send key survive the trip', () => {
   const s = raceGame();
   s.meter = 1.25;
-  sim.receivePack(s, BALANCE.send.pack);
+  landNow(s); sim.receivePack(s, BALANCE.send.pack);
   for (let i = 0; i < 90; i++) tick(s);
   const m = decodeFast(encodeSnapshot(s, { seq: 1, at: 0, paused: false, acks: [0, 0] }));
   near(m.state.game.meter, 1.25, 0.01, 'meter');
+  eq(m.state.game.threats.length, 1, 'a pack on its way'); near(m.state.game.threats[0].t, s.threats[0].t, 0.1, 'its countdown');
   eq(m.state.enemies.filter((e) => e.sent).length, s.enemies.filter((e) => e.sent).length, 'sent monsters');
   const inp = decodeFast(encodeInputs([{ seq: 1, mx: 0, my: 0, send: true }]));
   ok(inp.inputs[0].send, 'the send key');

@@ -1909,12 +1909,33 @@ function drawRace(c, s, ui, time) {
   if (meter) drawSendMeter(c, s, ui, x + w - 148, y + 7, time);
   const res = V.result && RACE_WORDS[V.result];
   if (res) label(c, res[0], x + 58, y + 33, 12, res[1], 'left', 700, null);
-  else if (r?.picked && !r.left) label(c, `their score ${num(r.score)}  ·  ${num(r.kills)} bonked`, x + 58, y + 33, 12, '#a9bccb', 'left', 500, null);
+  else if (r?.threat > 0 && !r.left) label(c, fitText(c, `Your attack lands on them in ${Math.max(1, Math.ceil(r.threatT))} s  ·  ${theirBlocks(r)}`, tw, 12, 700), x + 58, y + 33, 12, '#d9a8ff', 'left', 700, null);
+  else if (r?.picked && !r.left) label(c, fitText(c, `their score ${num(r.score)}  ·  ${num(r.kills)} bonked  ·  ${theirBlocks(r)}`, tw, 12, 500), x + 58, y + 33, 12, '#a9bccb', 'left', 500, null);
+  if (meter && s.threats?.length) drawThreat(c, s, ui, Math.round(VIEW_W / 2), y + 52, time);
   if (s.hold) {
     rrect(c, VIEW_W / 2 - 250, MAP_H / 2 - 34, 500, 68, 16, 'rgba(20,28,36,0.9)', '#ff9a5a', 2);
     label(c, 'Waiting for the rivals to pick…', VIEW_W / 2, MAP_H / 2 - 8, 22, '#fff', 'center', 700, null);
     label(c, 'Both teams start at the same moment', VIEW_W / 2, MAP_H / 2 + 18, 14, '#a9bccb', 'center', 500, null);
   }
+}
+
+// How many of our packs the rivals could block right now.
+const theirBlocks = (r) => { const n = Math.floor((r.meter || 0) / SEND.cost + 1e-9); return n ? `they can block ×${n}` : "they can't block"; };
+
+// Rival packs on their way to us: when the first lands, and whether we can
+// block it (a pack we send cancels theirs first).
+function drawThreat(c, s, ui, cx, y, time) {
+  const soon = Math.min(...s.threats.map((th) => th.t)), packs = s.threats.reduce((a, th) => a + th.share, 0) / SEND.pack;
+  const canBlock = (s.meter || 0) >= SEND.cost, k = ui.keyLabel(ui.keysFor(ui.me?.() ?? 0).send || 'KeyX');
+  const w = 400, x = cx - w / 2, f = Math.max(0, Math.min(1, soon / SEND.warning));
+  c.globalAlpha = 0.8 + Math.sin(time * (soon < 3 ? 14 : 7)) * 0.2;
+  rrect(c, x, y, w, 40, 12, 'rgba(60,14,24,0.9)', '#ff5a6e', 2);
+  c.globalAlpha = 1;
+  const n = packs > 1.05 ? ` ×${Math.round(packs * 10) / 10}` : '';
+  label(c, `⚠ Rival attack${n} lands in ${Math.max(1, Math.ceil(soon))} s`, x + 14, y + 13, 14, '#fff', 'left', 700, null);
+  label(c, canBlock ? `[${k}] block it` : 'fill the meter to block', x + w - 14, y + 13, 12, canBlock ? '#8dff9a' : '#a9bccb', 'right', 700, null);
+  rrect(c, x + 12, y + 26, w - 24, 7, 3.5, 'rgba(0,0,0,0.45)');
+  rrect(c, x + 13, y + 27, Math.max(6, (w - 26) * f), 5, 2.5, soon < 3 ? '#ff5a6e' : '#ff9a5a');
 }
 
 // The team's send meter: how full, how many packs are ready, and the key.

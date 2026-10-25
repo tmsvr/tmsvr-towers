@@ -72,7 +72,7 @@ export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, l
     t: 0, nextId: 1, rng: seed, seed, wrng: waveSeed(seed), wave: 0, phase: 'pick', timer: 0, queue: [], spawnWait: 0,
     lives: DIFFICULTY.cottageHealth, maxLives: DIFFICULTY.cottageHealth, baseHitT: 0, lastAlarm: -99, players: [], flowers: [], enemies: [], drops: [], bombs: [], projs: [], clouds: [],
     fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, sharedScreen, map: m.index, hard: !!hard, sprint: !!sprint, locked: !!locked, versus: !!versus, hold: false,
-    meter: 0, outbox: [], incoming: [], // versus: the team's send meter, packs to send, packs received in a break
+    meter: 0, outbox: [], incoming: [], threats: [], // versus: the team's send meter, packs to send, packs landed in a break, packs on their way ({share, t})
     items: [], // power-ups dropped by elites, waiting to be picked up
     perks: {}, chest: null, chestDue: false, // boss chests: the team's perks, the open chest, one is owed
     seen: {}, // monster types met so far (each gets one warning banner)
@@ -719,8 +719,12 @@ export function releaseHold(s) {
 
 // Sending monsters (balance.json → send): bonking the team's wave fills a
 // meter; any cat's send key spends part of it on a pack for the rivals.
-// The sim only queues it (s.outbox); main.js carries it across, and the other
-// side's game takes it in with receivePack.
+// A pack doesn't land at once: it waits SEND.warning seconds as a threat the
+// rivals can see coming, and a pack they send in that time cancels it first
+// (like garbage in Tetris). Sending back as much only blocks, so what wins is
+// timing: hit them when their meter is empty, keep some back to block.
+// The sim only queues what goes out (s.outbox); main.js carries it across, and
+// the other side's game takes it in with receivePack.
 function fillMeter(s, amt) {
   const was = s.meter || 0;
   s.meter = Math.min(SEND.max, was + amt);
@@ -731,21 +735,47 @@ function sendPack(s, p) {
   if (!SEND.enabled || s.over || s.won) return;
   if ((s.meter || 0) < SEND.cost) { deny(s, p, p.x, p.y - T * 0.6, 'Bonk more monsters to fill the send meter'); return; }
   s.meter -= SEND.cost;
-  s.outbox.push({ share: SEND.pack, by: p.id });
-  text(s, p.x, p.y - T * 0.8, 'Sent to the rivals!', '#d9a8ff');
-  ev(s, 'throw');
-  log.logSend(s, p);
+  // Block what's coming first, soonest first; only the rest goes across.
+  let share = SEND.pack, blocked = 0;
+  s.threats ||= [];
+  for (const th of s.threats) {
+    const use = Math.min(share, th.share);
+    th.share -= use; share -= use; blocked += use;
+    if (share <= 1e-9) break;
+  }
+  s.threats = s.threats.filter((th) => th.share > 1e-9);
+  if (share > 1e-9) s.outbox.push({ share, by: p.id });
+  const all = blocked > 0 && share <= 1e-9;
+  text(s, p.x, p.y - T * 0.8, all ? 'Blocked!' : blocked > 0 ? 'Blocked, and sent the rest!' : 'Sent to the rivals!', all ? '#8dff9a' : '#d9a8ff');
+  ev(s, blocked > 0 ? 'shieldBreak' : 'throw');
+  if (blocked > 0) log.logBlock(s, p, blocked / SEND.pack);
+  if (share > 1e-9) log.logSend(s, p);
 }
 
-// A pack from the rivals: share times our current wave, straight in if a
-// wave is on, else with the next one. Returns how many monsters came.
+// A pack from the rivals: it is on its way, landing in SEND.warning seconds.
 export function receivePack(s, share) {
-  if (!s.versus || s.over || s.won || s.phase === 'pick' || !(share > 0 && share <= 1)) return 0;
+  if (!s.versus || s.over || s.won || s.phase === 'pick' || !(share > 0 && share <= 1)) return false;
+  (s.threats ||= []).push({ share, t: SEND.warning });
+  banner(s, `Rival attack! It lands in ${Math.round(SEND.warning)} s: send monsters back to block it`);
+  ev(s, 'shieldUp');
+  return true;
+}
+
+// Threats count down; one that reaches 0 lands: share times our current
+// wave, straight in if a wave is on, else with the next one.
+function updateThreats(s, dt) {
+  if (!s.threats?.length) return;
+  for (const th of s.threats) th.t -= dt;
+  for (const th of s.threats.filter((x) => x.t <= 0)) landPack(s, th.share);
+  s.threats = s.threats.filter((x) => x.t > 0);
+}
+
+function landPack(s, share) {
   const lv = levelOf(s, s.phase === 'wave' ? s.wave : s.wave + 1);
   const pack = buildQueue(s, Math.max(1, lv), { share });
   if (s.phase === 'wave') { s.queue.unshift(...pack); s.spawnWait = Math.min(s.spawnWait, 0.6); }
   else s.incoming.push(...pack);
-  banner(s, `The rivals sent you ${pack.length} monsters!`);
+  banner(s, s.phase === 'wave' ? `The rivals' attack is here: ${pack.length} monsters!` : `The rivals' ${pack.length} monsters come with the next wave!`);
   ev(s, 'elite');
   log.logGot(s, pack.length);
   return pack.length;
@@ -1437,6 +1467,7 @@ export function step(s, inputs, dt) {
   s.baseHitT = Math.max(0, s.baseHitT - dt);
   const ready = updatePlayers(s, dt, inputs);
   if (s.stats) log.logTick(s, dt, tileOf);
+  if (s.versus) updateThreats(s, dt);
   updateWaves(s, dt, ready);
   updateEnemies(s, dt);
   updateFlowers(s, dt);

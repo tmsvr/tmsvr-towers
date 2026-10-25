@@ -109,10 +109,13 @@ const quad = playUntil(4, 5);
 givePerks(quad);
 show('Game, online, 4 cats (P3\'s screen)', quad, ui({ cam: camOn(quad, quad.players[2]), netLabel: 'Online · room HDPM · 4 cats', perf: '42 ms · 60 fps · 18 ms', mode: () => 'guest', me: () => 2 }));
 // versus races: the rival's panel, and the wait for the rivals to pick
-const rival = { wave: 5, last: 6, phase: 'wave', cleared: 4, lives: 143, maxLives: 200, kills: 1234, score: 12345, over: false, won: false, players: 2, picked: true };
+const rival = { wave: 5, last: 6, phase: 'wave', cleared: 4, lives: 143, maxLives: 200, kills: 1234, score: 12345, over: false, won: false, players: 2, picked: true, meter: 0.7 };
 duo.enemies.forEach((e, i) => { e.sent = i % 2 === 0; }); duo.meter = 1.3;
 show('Game, versus race, with a teammate', duo, ui({ cam: camOn(duo, duo.players[0]), netLabel: 'Online · room HDPM · P2 connected', perf: '42 ms · 60 fps · 18 ms', mode: () => 'host', versus: { race: {}, rival } }));
 show('Game, versus race, monsters from the rivals (purple rings)', duo, ui({ cam: camOn(duo, duo.enemies.find((e) => e.sent && !e.dead) || duo.players[0]), mode: () => 'host', versus: { race: {}, rival } }));
+duo.threats = [{ share: 0.15, t: 2.4 }, { share: 0.15, t: 8 }]; duo.meter = 0.8;
+show('Game, versus race, a rival attack on its way', duo, ui({ cam: camOn(duo, duo.players[0]), mode: () => 'host', versus: { race: {}, rival: { ...rival, threat: 0.15, threatT: 5.2 } } }));
+duo.threats = [];
 duo.enemies.forEach((e) => { e.sent = false; }); duo.meter = 0;
 const held = sim.createState(1, 1, { map: 0, versus: true }); held.players[0].pick.chosen = ['thorn', 'frost', 'daisy', 'sunflower']; held.players[0].pick.ready = true; sim.step(held, [{}], 1 / 60);
 show('Game, versus race, waiting for the rivals to pick', held, ui({ versus: { race: {}, rival: { ...rival, picked: false, wave: 0 } } }));
