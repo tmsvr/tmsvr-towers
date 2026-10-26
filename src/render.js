@@ -2260,15 +2260,16 @@ function scoreLine(s, ui) {
   return `Score ${score}  ·  best ${num(b.prev)} for ${b.what}`;
 }
 
-// In a race the title says who won it, once that's decided.
+// In a race the title says who won it, once that's decided. Until then a
+// team that cleared every wave hasn't won: the rivals can still do better.
 function endTitle(s) {
   if (!race) return s.won ? ['Victory!', '#8dff9a'] : ['The garden fell…', '#ff7a6a'];
   if (race.result === 'win') return ['Your team wins the race!', '#8dff9a'];
   if (race.result === 'lose') return ['The rivals win the race', '#ff7a6a'];
   if (race.result === 'draw') return ["It's a draw!", '#ffe27a'];
-  return [s.won ? 'Victory! Now wait…' : 'The garden fell…', s.won ? '#8dff9a' : '#ff7a6a'];
+  return [s.won ? 'Waves cleared: wait for the rivals…' : 'The garden fell…', s.won ? '#ffe27a' : '#ff7a6a'];
 }
-const rivalWords = () => (race.rival?.left ? 'The rival team left the race' : race.result ? `${rivalName(race.rival)}: ${raceLine(race.rival)}` : `Still racing: ${rivalName(race.rival)}, ${raceLine(race.rival)}`);
+const rivalWords = () => (race.rival?.left ? 'The rival team left the race' : race.result ? `${rivalName(race.rival)}: ${raceLine(race.rival)}` : `Still racing: ${rivalName(race.rival)}, ${raceLine(race.rival)}  ·  decided when they finish`);
 
 // A race's end screen: our team against the rivals, row by row, the better
 // number in green. The rivals' numbers come from their host's summary
@@ -2312,7 +2313,8 @@ function drawTeams(c, s, S, x, y, w, h) {
     const ry = y + 62 + i * rowH;
     if (i % 2 === 0) rrect(c, x + 8, ry - rowH / 2, w - 16, rowH, 6, 'rgba(255,255,255,0.04)');
     label(c, name, x + 18, ry, 13, '#cfe0ea', 'left', 500, null);
-    const nums = typeof a === 'number' && typeof b === 'number', win = nums && better && a !== b ? ((a > b) === (better > 0) ? 1 : -1) : 0;
+    // no green until the race is decided: the rivals' numbers are still growing
+    const nums = race.result && typeof a === 'number' && typeof b === 'number', win = nums && better && a !== b ? ((a > b) === (better > 0) ? 1 : -1) : 0;
     const show = (v) => (v == null ? '…' : typeof v === 'number' ? (Number.isInteger(v) || v >= 100 ? num(Math.round(v)) : v.toFixed(1)) : fitText(c, String(v), 150, 14)); // half a blocked pack stays 0.5
     label(c, show(a), ox, ry, 14, win > 0 ? '#8dff9a' : '#fff', 'right', win > 0 ? 700 : 500, null);
     label(c, show(b), tx, ry, 14, win < 0 ? '#8dff9a' : b == null ? '#6f8291' : '#fff', 'right', win < 0 ? 700 : 500, null);

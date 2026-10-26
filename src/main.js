@@ -774,7 +774,10 @@ function updateRace(now) {
   if (state.outbox) state.outbox.length = 0;
   const was = V.result;
   V.result = V.rival?.left ? null : raceResult(mine, V.rival);
-  if (V.result && !was && V.result === 'win' && V.rival?.fell) flashNote("The rivals' cottage fell: you win the race!");
+  if (V.result && !was) {
+    if (V.result === 'win' && V.rival?.fell) flashNote("The rivals' cottage fell: you win the race!");
+    else if (state.won) flashNote(V.result === 'win' ? 'The rivals finished behind you: you win the race!' : V.result === 'lose' ? 'The rivals finished ahead: they win the race' : 'The rivals finished level: a draw!');
+  }
 }
 
 // Pausing a race pauses both teams (a pause from the rival isn't sent back).

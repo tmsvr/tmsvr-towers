@@ -167,7 +167,9 @@ there for both teams. If both teams win every wave, the one with more cottage
 left wins, then the higher score. Boss chests never offer the cottage repair
 in a race. The end screen puts the two teams side by side (waves, cottage,
 score, monsters bonked, coins, flower and cat damage, packs sent, rival packs
-blocked, packs that got through and the monsters those brought, star flower), the better number in green, next to your own team's cats.
+blocked, packs that got through and the monsters those brought, star flower), the better number in green once the race is decided, next to
+your own team's cats. Clearing every wave first doesn't win on its own: the
+screen waits for the rivals to finish, then says who won.
 
 **Sending monsters.** Bonking your wave fills the send meter. **X** spends
 part of it on a pack of monsters for the rivals. A pack doesn't land at once:
