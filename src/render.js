@@ -2264,12 +2264,12 @@ function scoreLine(s, ui) {
 // team that cleared every wave hasn't won: the rivals can still do better.
 function endTitle(s) {
   if (!race) return s.won ? ['Victory!', '#8dff9a'] : ['The garden fell…', '#ff7a6a'];
-  if (race.result === 'win') return ['Your team wins the race!', '#8dff9a'];
+  if (race.result === 'win') return [race.rival?.left ? 'The rivals left: you win!' : 'Your team wins the race!', '#8dff9a'];
   if (race.result === 'lose') return ['The rivals win the race', '#ff7a6a'];
   if (race.result === 'draw') return ["It's a draw!", '#ffe27a'];
   return [s.won ? 'Waves cleared: wait for the rivals…' : 'The garden fell…', s.won ? '#ffe27a' : '#ff7a6a'];
 }
-const rivalWords = () => (race.rival?.left ? 'The rival team left the race' : race.result ? `${rivalName(race.rival)}: ${raceLine(race.rival)}` : `Still racing: ${rivalName(race.rival)}, ${raceLine(race.rival)}  ·  decided when they finish`);
+const rivalWords = () => (race.rival?.left ? (race.result === 'win' ? 'The rival team left the race: a win by forfeit' : 'The rival team left the race') : race.result ? `${rivalName(race.rival)}: ${raceLine(race.rival)}` : `Still racing: ${rivalName(race.rival)}, ${raceLine(race.rival)}  ·  decided when they finish`);
 
 // A race's end screen: our team against the rivals, row by row, the better
 // number in green. The rivals' numbers come from their host's summary

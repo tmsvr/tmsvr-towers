@@ -908,6 +908,28 @@ test('Sending monsters', 'a rival pack waits as a warning, then lands', () => {
   ok(!sim.receivePack(game(), S.pack), 'nothing outside a race');
 });
 
+test('Sending monsters', "clearing the last wave fast doesn't dodge a pack on its way", () => {
+  const s = raceGame(), last = sim.lastWave(s);
+  sim.releaseWave(s, last); s.wave = last - 1; s.phase = 'prep'; s.timer = 0; tick(s);
+  eq(s.wave, last, 'the last wave is on');
+  sim.receivePack(s, BALANCE.send.pack);
+  s.queue = []; s.enemies.forEach((e) => { e.dead = true; }); tick(s);
+  ok(!s.won, 'not won while the pack is on its way');
+  s.threats[0].t = 1e-6; tick(s);
+  ok(!s.won && [...s.queue, ...s.enemies].some((e) => e.sent), 'it lands in the last wave');
+  s.queue = []; s.enemies = []; tick(s);
+  ok(s.won, 'then the wave is won');
+});
+
+test('Sending monsters', 'a pack is at most one send, and nothing goes to rivals who have finished', () => {
+  const S = BALANCE.send, s = raceGame();
+  ok(sim.receivePack(s, 1), 'an oversized pack is taken in');
+  near(s.threats[0].share, S.pack, 1e-9, 'as one pack');
+  s.threats = []; s.rivalDone = true; s.meter = S.cost;
+  tick(s, { send: true });
+  eq(s.outbox.length, 0, 'nothing sent'); near(s.meter, S.cost, 1e-9, 'and the meter kept');
+});
+
 test('Sending monsters', 'every pack is worth its budget: groups are cut to fit, so none overshoots', () => {
   const S = BALANCE.send, worth = [];
   for (let seed = 1; seed <= 12; seed++) {

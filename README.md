@@ -164,7 +164,11 @@ next wave for both teams**, as long as both teams are in a break (not while
 the rivals are still fighting): their break ends at once, so calling a wave
 early is a way to catch them before they've planted. **The first cottage to fall loses**, and the race ends
 there for both teams. If both teams win every wave, the one with more cottage
-left wins, then the higher score. Boss chests never offer the cottage repair
+left wins, then the higher score. A team that leaves (or loses its
+connection) after both teams have picked, before the race is decided, forfeits:
+the team that stayed wins. Teams can be of different sizes, and each team's
+waves are sized for its players, but one player alone against a team has a
+much harder game (the lobby warns). Boss chests never offer the cottage repair
 in a race. The end screen puts the two teams side by side (waves, cottage,
 score, monsters bonked, coins, flower and cat damage, packs sent, rival packs
 blocked, packs that got through and the monsters those brought, star flower), the better number in green once the race is decided, next to
@@ -184,7 +188,8 @@ meter (a whole wave fills it once over, a boss adds half). When it's past the
 first tick, any cat presses **X** to send a pack to the rivals: 15% of the
 wave they're playing, made of its kinds of monsters (never bosses). Every pack
 is worth the same: a swarm is cut down to what the pack pays for. One that
-lands in a break comes with their next wave. Sent monsters have a
+lands in a break comes with their next wave, and the last wave isn't won
+until every pack on its way has landed and been bonked. Sent monsters have a
 purple ring and drop half the coins, and killing them doesn't fill the
 meter, so packs can't bounce back and forth. Numbers: `balance.json → send`. Pausing pauses both
 teams. A race can't be retried or saved; **Enter** on the end screen asks for

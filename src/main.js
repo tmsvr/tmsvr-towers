@@ -641,6 +641,7 @@ function startVersus(rivalCode = '') {
       <div class="side" id="rivalside"><h3>Rival team</h3>
         <p id="rivalstatus"></p>
         <form id="rivalform"><input id="rival" maxlength="4" autocomplete="off" spellcheck="false" placeholder="ABCD" value="${esc(rivalCode)}"><button>Link</button></form>
+        <p id="uneven" class="hint" style="color:#ffb86b" hidden></p>
       </div>
       <div class="side" id="race" hidden><h3>The race (you choose: they linked to you)</h3><p><select id="map">${maps}</select> <select id="mode">${modes}</select></p><p><button id="go" type="button">Start the race</button></p><p class="hint">Then everyone picks a cat and flowers.</p></div>
       <p class="hint">Esc to leave</p>`);
@@ -677,6 +678,13 @@ function updateVersusLobby() {
   race.hidden = !(linked && ui.versus.referee);
   document.getElementById('rivalside')?.classList.toggle('ok', linked);
   const n = ui.versus.rivalPlayers || 1, them = n === 1 ? 'one player' : `${n} players`;
+  // Each team's waves are sized for its own players, but one cat alone against
+  // a team has a much harder game (the autopilot loses solo, wins as two).
+  const uneven = document.getElementById('uneven'), mine = teamSize();
+  uneven.hidden = !linked || n === mine;
+  uneven.textContent = Math.min(n, mine) === 1
+    ? `Uneven teams: ${mine} against ${n}. One player alone has a much harder game than a team: get a teammate, or play with the same number each.`
+    : `Uneven teams: ${mine} against ${n}. Each team's waves grow with its size, so it's close, but the same number each is fairest.`;
   if (linked) versusNote(ui.versus.referee ? `✓ Linked (${them}). You choose the map and mode below.` : `✓ Linked (${them}). Their host chooses the map and mode and starts the race: wait here.`);
   else if (!document.getElementById('rivalstatus').textContent) versusNote("Not linked yet. One host types the other's code here (either way round works):");
 }
@@ -722,13 +730,18 @@ function rivalLeft() {
   const V = ui.versus;
   if (!V) return;
   if (mode === 'versusLobby') { V.referee = false; versusNote('The rival team left. Link to another one, or wait for one to link to you.'); updateVersusLobby(); return; }
-  if (V.race) { V.rival = { ...(V.rival || {}), left: true }; flashNote('The rival team left the race'); if (ui.paused) setPaused(false); }
+  if (V.race) {
+    const undecided = !V.result && V.rival?.picked && state?.phase !== 'pick'; // updateRace makes it a forfeit
+    V.rival = { ...(V.rival || {}), left: true };
+    flashNote(undecided ? 'The rival team left the race: you win by forfeit!' : 'The rival team left the race');
+    if (ui.paused) setPaused(false);
+  }
 }
 
 // Both sides start the same challenge; the referee sends it to the other.
 function startRace(race, send) {
   const V = ui.versus;
-  V.race = race; V.rival = null; V.result = null; V.rivalSummary = null; V.lastStatus = 0;
+  V.race = race; V.rival = null; V.result = null; V.rivalSummary = null; V.lastStatus = 0; V.forfeit = false;
   if (send) rivalLink?.send({ t: 'race', ...race });
   hideLobby();
   canvas.focus();
@@ -763,18 +776,23 @@ function updateRace(now) {
   if (state.hold && (V.rival?.picked || V.rival?.left || !rivalLink?.connected)) releaseHold(state);
   const gone = V.rival?.left || !rivalLink?.connected;
   state.rivalBreak = gone || V.rival?.phase === 'prep'; // Enter calls a wave only while both teams are in a break
+  state.rivalDone = !gone && !!(V.rival?.won || V.rival?.over); // their game has stopped: packs would be lost
   if (!gone && V.rival?.rush) rushWave(state, V.rival.rush); // they pressed Enter: our break is over too
   // Go when they're waiting for the same wave, or have already started it
   // (their 'waiting' can last one frame, too short to be seen).
   const next = state.wave + 1;
   if (state.waiting && (gone || V.rival?.waiting === next || (V.rival?.wave ?? 0) >= next)) releaseWave(state, next);
   if (V.rival?.fell) endRace(state); // their cottage fell: the race is ours, and over
+  // They left (or lost the link) after both teams had picked, before the race
+  // was decided: a forfeit, the race is ours. A result decided before stands;
+  // a team that leaves while still picking leaves no race to win.
+  if (gone && V.rival?.picked && !V.result && !V.forfeit && state.phase !== 'pick') { V.forfeit = true; endRace(state); }
   // monsters our cats sent go across at once
   for (const o of state.outbox || []) rivalLink?.send({ t: 'send', share: o.share });
   if (state.outbox) state.outbox.length = 0;
   const was = V.result;
-  V.result = V.rival?.left ? null : raceResult(mine, V.rival);
-  if (V.result && !was) {
+  V.result = V.forfeit ? 'win' : gone ? was : raceResult(mine, V.rival);
+  if (V.result && !was && !V.forfeit) {
     if (V.result === 'win' && V.rival?.fell) flashNote("The rivals' cottage fell: you win the race!");
     else if (state.won) flashNote(V.result === 'win' ? 'The rivals finished behind you: you win the race!' : V.result === 'lose' ? 'The rivals finished ahead: they win the race' : 'The rivals finished level: a draw!');
   }

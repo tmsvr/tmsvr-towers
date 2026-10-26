@@ -71,7 +71,7 @@ export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, l
     m,
     t: 0, nextId: 1, rng: seed, seed, wrng: waveSeed(seed), wave: 0, phase: 'pick', timer: 0, queue: [], spawnWait: 0,
     lives: DIFFICULTY.cottageHealth, maxLives: DIFFICULTY.cottageHealth, baseHitT: 0, lastAlarm: -99, players: [], flowers: [], enemies: [], drops: [], bombs: [], projs: [], clouds: [],
-    fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, waveKills: 0, sharedScreen, map: m.index, hard: !!hard, sprint: !!sprint, locked: !!locked, versus: !!versus, hold: false, waiting: false, goWave: 0, rivalBreak: true,
+    fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, waveKills: 0, sharedScreen, map: m.index, hard: !!hard, sprint: !!sprint, locked: !!locked, versus: !!versus, hold: false, waiting: false, goWave: 0, rivalBreak: true, rivalDone: false,
     meter: 0, outbox: [], incoming: [], threats: [], // versus: the team's send meter, packs to send, packs landed in a break, packs on their way ({share, t})
     items: [], // power-ups dropped by elites, waiting to be picked up
     perks: {}, chest: null, chestDue: false, // boss chests: the team's perks, the open chest, one is owed
@@ -700,6 +700,9 @@ function updateWaves(s, dt, ready) {
       s.spawnWait = e.wait;
     }
   } else if (!s.enemies.some((e) => !e.dead)) {
+    // a race's last wave isn't won while a rival pack is still on its way: it
+    // would have nothing to come with, so clearing fast mustn't dodge it
+    if (s.wave >= lastWave(s) && !s.endless && s.threats?.length) return;
     if (s.wave >= lastWave(s) && !s.endless) { s.won = true; log.logWaveEnd(s, 'won'); ev(s, 'win'); return; }
     s.phase = 'prep';
     s.timer = breakTime(s);
@@ -778,6 +781,7 @@ function fillMeter(s, amt) {
 
 function sendPack(s, p) {
   if (!SEND.enabled || s.over || s.won) return;
+  if (s.rivalDone) { deny(s, p, p.x, p.y - T * 0.6, 'The rivals have finished: nothing to send to'); return; } // main.js keeps it
   if ((s.meter || 0) < SEND.cost) { deny(s, p, p.x, p.y - T * 0.6, 'Bonk more monsters to fill the send meter'); return; }
   s.meter -= SEND.cost;
   // Block what's coming first, soonest first; only the rest goes across.
@@ -799,7 +803,8 @@ function sendPack(s, p) {
 
 // A pack from the rivals: it is on its way, landing in SEND.warning seconds.
 export function receivePack(s, share) {
-  if (!s.versus || s.over || s.won || s.phase === 'pick' || !(share > 0 && share <= 1)) return false;
+  if (!s.versus || s.over || s.won || s.phase === 'pick' || !(share > 0)) return false;
+  share = Math.min(share, SEND.pack); // one send is at most a pack, whatever the message says
   (s.threats ||= []).push({ share, t: SEND.warning }); // the warning bar at the top says the rest
   ev(s, 'shieldUp');
   return true;

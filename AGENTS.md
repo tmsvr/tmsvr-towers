@@ -201,7 +201,11 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
   `balance.json → versus.firstWaveDelay` (set in `releaseHold`). The
   first cottage to fall loses: `status.fell`, and the other side calls
   `endRace` (`s.over` with `s.raceWon`, cottage intact). `raceResult` in
-  `versus.js` has the rules. When a race side's game ends, its host sends its
+  `versus.js` has the rules. A rival that leaves or drops after both have
+  picked, before the result, forfeits (`V.forfeit` in `updateRace`: `endRace`
+  and a win); a result decided before stands. Note that a broken link looks
+  like leaving to both sides, so then both see a forfeit win. The lobby warns
+  when team sizes differ (`#uneven`). When a race side's game ends, its host sends its
   end-screen summary (`gameSummary` plus `score`) across as `rivalSummary`;
   each host keeps the rival's in `ui.versus.rivalSummary` and passes it to its
   guests in `versus`, and the end screen compares the teams (`drawTeams` in
@@ -218,7 +222,10 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
   `share` makes the pack from that side's own wave (no bosses, no elites)
   with the game's `rnd`, never `wrnd`, so the challenge's waves stay the same.
   A pack never overshoots its budget: it only picks monsters the budget still
-  pays for and cuts a group to fit, so every pack is worth the same. The log
+  pays for and cuts a group to fit, so every pack is worth the same.
+  `receivePack` caps a message at one pack. A race's last wave isn't won
+  while a threat is still on its way, and `s.rivalDone` (main.js: the
+  rival's game has stopped) refuses sends that would be lost. The log
   counts `sent`, `blocked` and `landed` in packs, `got` in monsters.
   A race's pick screen has no map row (the referee chose it in the lobby). Pack entries and their monsters carry
   `sent` (purple ring, `SEND.coins` of the coins, no meter).
