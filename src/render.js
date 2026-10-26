@@ -2290,9 +2290,11 @@ function teamRows(S, R, r, myScore) {
     ['Flower damage', garden(S), garden(R), 1],
     ['Cat damage (baton, bombs)', catDmg(S), catDmg(R), 1],
     ['Flowers planted', planted(S), planted(R), 0],
+    // each team's attack: what it sent, what of the other's it blocked, and what of its own landed
     ['Packs sent', vs(S, 'sent'), vs(R, 'sent'), 1],
-    ['Packs blocked', vs(S, 'blocked'), vs(R, 'blocked'), 1],
-    ['Monsters sent at them', vs(R, 'got'), vs(S, 'got'), 1], // what each team's packs brought the other
+    ['Rival packs blocked', vs(S, 'blocked'), vs(R, 'blocked'), 1],
+    ['Packs that got through', vs(R, 'landed'), vs(S, 'landed'), 1],
+    ['Monsters those brought', vs(R, 'got'), vs(S, 'got'), 1],
     ['Star flower', star(S), star(R), 0],
   ];
 }
@@ -2351,7 +2353,7 @@ function drawEndScreen(c, s, ui, time) {
   dim(c, 'rgba(12,18,26,0.88)');
   // the two panels are as tall as their contents (a solo game has one cat, few flowers), centred
   const rowH = 46, many = S.cats.length > 2, blockH = many ? 86 : 150; // 3-4 cats get shorter blocks
-  const left = race ? 62 + 12 * 26 : 70 + S.flowers.length * rowH + (S.best ? 34 : 0); // a race compares the teams instead of listing flowers
+  const left = race ? 62 + 13 * 26 : 70 + S.flowers.length * rowH + (S.best ? 34 : 0); // a race compares the teams instead of listing flowers
   const h = clamp(Math.max(left, 52 + S.cats.length * (blockH + 8)), 250, 430);
   const top = Math.round((BASE_H - h) / 2) + 6;
   label(c, title, BASE_W / 2, top - 92, 46, col, 'center', 700, OUT);

@@ -614,15 +614,22 @@ function buildQueue(s, n, { share = 0 } = {}) {
     return u.weight * (age <= 1 ? TUNE.newEnemyBoost ?? 1 : Math.max(TUNE.oldEnemyMin ?? 1, 1 - (TUNE.oldEnemyFade ?? 0) * (age - 1)));
   };
   const total = avail.reduce((a, u) => a + weightOf(u), 0);
+  // A pack from versus rivals is worth exactly its budget: it picks only
+  // monsters the budget still pays for, and cuts a group down to fit. A wave
+  // may overshoot a little (its RNG stays as it was, for the challenge codes).
+  const each = (u) => u.cost / u.group;
   while (budget > 0) {
-    let r = R(s) * total, pick = avail[0];
-    for (const u of avail) { r -= weightOf(u); if (r <= 0) { pick = u; break; } }
+    const pool = share ? avail.filter((u) => each(u) <= budget + 1e-9) : avail;
+    if (!pool.length) break;
+    let r = R(s) * (share ? pool.reduce((a, u) => a + weightOf(u), 0) : total), pick = pool[0];
+    for (const u of pool) { r -= weightOf(u); if (r <= 0) { pick = u; break; } }
     const path = Math.floor(R(s) * s.m.paths.length); // a group sticks together on one road
     const [lo, hi] = TUNE.spawnGap || [0.4, 1.2];
     // packs (swarms, wasps) get bigger every wave after they first appear, up to packMaxGrowth
     // times their size, and pay for every member: bigger packs come less often, not for free
     const growth = Math.min(TUNE.packMaxGrowth ?? Infinity, 1 + (TUNE.packGrowthPerWave ?? 0) * (n - pick.fromWave));
-    const group = pick.group > 1 ? Math.round(pick.group * growth) : 1;
+    let group = pick.group > 1 ? Math.round(pick.group * growth) : 1;
+    if (share) group = Math.min(group, Math.floor(budget / each(pick) + 1e-9));
     for (let i = 0; i < group; i++) q.push({ type: pick.enemy, path, wait: group > 1 ? 0.18 : lo + R(s) * (hi - lo) });
     budget -= pick.cost * (group / pick.group);
   }
@@ -787,7 +794,7 @@ function sendPack(s, p) {
   text(s, p.x, p.y - T * 0.8, all ? 'Blocked!' : blocked > 0 ? 'Blocked, and sent the rest!' : 'Sent to the rivals!', all ? '#8dff9a' : '#d9a8ff');
   ev(s, blocked > 0 ? 'shieldBreak' : 'throw');
   if (blocked > 0) log.logBlock(s, p, blocked / SEND.pack);
-  if (share > 1e-9) log.logSend(s, p);
+  if (share > 1e-9) log.logSend(s, p, share / SEND.pack);
 }
 
 // A pack from the rivals: it is on its way, landing in SEND.warning seconds.
@@ -812,9 +819,9 @@ function landPack(s, share) {
   const pack = buildQueue(s, Math.max(1, lv), { share });
   if (s.phase === 'wave') { s.queue.unshift(...pack); s.spawnWait = Math.min(s.spawnWait, 0.6); }
   else s.incoming.push(...pack);
-  text(s, s.m.base.x, s.m.base.y - T * 1.2, s.phase === 'wave' ? `+${pack.length} from the rivals!` : `+${pack.length} rival monsters next wave`, '#d9a8ff');
+  if (pack.length) text(s, s.m.base.x, s.m.base.y - T * 1.2, s.phase === 'wave' ? `+${pack.length} from the rivals!` : `+${pack.length} rival monsters next wave`, '#d9a8ff');
   ev(s, 'elite');
-  log.logGot(s, pack.length);
+  log.logGot(s, pack.length, share / SEND.pack);
   return pack.length;
 }
 

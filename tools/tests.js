@@ -908,6 +908,21 @@ test('Sending monsters', 'a rival pack waits as a warning, then lands', () => {
   ok(!sim.receivePack(game(), S.pack), 'nothing outside a race');
 });
 
+test('Sending monsters', 'every pack is worth its budget: groups are cut to fit, so none overshoots', () => {
+  const S = BALANCE.send, worth = [];
+  for (let seed = 1; seed <= 12; seed++) {
+    const s = raceGame(seed), before = new Set([...s.queue, ...s.incoming]);
+    landNow(s);
+    const each = new Map(s.m.waves.map((u) => [u.enemy, u.cost / u.group]));
+    worth.push([...s.queue, ...s.incoming].filter((e) => !before.has(e) && e.sent).reduce((a, e) => a + each.get(e.type), 0));
+  }
+  const s = raceGame(), cheapest = Math.min(...s.m.waves.map((u) => u.cost / u.group));
+  ok(worth.every((w) => w > 0), 'every pack brings monsters');
+  ok(Math.max(...worth) - Math.min(...worth) < cheapest + 1e-9, `packs worth the same, give or take one monster (${worth.map((w) => w.toFixed(2)).join(' ')})`);
+  landNow(s, S.pack / 1000);
+  ok(![...s.queue, ...s.incoming, ...s.enemies].some((e) => e.sent), 'a sliver too small for any monster brings none');
+});
+
 test('Sending monsters', 'sending while a rival pack is on its way blocks it first', () => {
   const S = BALANCE.send, s = raceGame();
   sim.receivePack(s, S.pack); sim.receivePack(s, S.pack);
@@ -1051,7 +1066,7 @@ test('Games', 'the end screen summary adds up', () => {
   for (const f of S.flowers) eq(f.dmg, Math.round(r.game.totals.damage[f.type] || 0), `${f.type} damage`);
   const fromFlowers = r.game.flowers.reduce((a, f) => a + f.dmg, 0);
   near(S.cats.reduce((a, c) => a + c.garden, 0), fromFlowers, 2, 'flower damage split between the cats');
-  ok(S.versus && ['sent', 'blocked', 'got'].every((k) => Number.isFinite(S.versus[k])), 'the race numbers, for comparing teams');
+  ok(S.versus && ['sent', 'blocked', 'got', 'landed'].every((k) => Number.isFinite(S.versus[k])), 'the race numbers, for comparing teams');
   eq(S.cottage, Math.max(0, Math.ceil(r.lives)), 'cottage left as the HUD shows it (rounded up)');
   ok(JSON.parse(JSON.stringify(S)).cats.length === 2, 'it travels as JSON to the rival team');
 });

@@ -166,8 +166,8 @@ early is a way to catch them before they've planted. **The first cottage to fall
 there for both teams. If both teams win every wave, the one with more cottage
 left wins, then the higher score. Boss chests never offer the cottage repair
 in a race. The end screen puts the two teams side by side (waves, cottage,
-score, monsters bonked, coins, flower and cat damage, packs sent and blocked,
-star flower), the better number in green, next to your own team's cats.
+score, monsters bonked, coins, flower and cat damage, packs sent, rival packs
+blocked, packs that got through and the monsters those brought, star flower), the better number in green, next to your own team's cats.
 
 **Sending monsters.** Bonking your wave fills the send meter. **X** spends
 part of it on a pack of monsters for the rivals. A pack doesn't land at once:
@@ -180,8 +180,9 @@ push.
 **Send them monsters.** Bonking your wave fills your team's purple send
 meter (a whole wave fills it once over, a boss adds half). When it's past the
 first tick, any cat presses **X** to send a pack to the rivals: 15% of the
-wave they're playing, made of its kinds of monsters (never bosses). It arrives
-at once, or with their next wave if they're in a break. Sent monsters have a
+wave they're playing, made of its kinds of monsters (never bosses). Every pack
+is worth the same: a swarm is cut down to what the pack pays for. One that
+lands in a break comes with their next wave. Sent monsters have a
 purple ring and drop half the coins, and killing them doesn't fill the
 meter, so packs can't bounce back and forth. Numbers: `balance.json → send`. Pausing pauses both
 teams. A race can't be retried or saved; **Enter** on the end screen asks for
