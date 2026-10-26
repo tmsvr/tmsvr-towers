@@ -19,6 +19,8 @@
 //  - flowers: every flower ever planted, with its tile, who planted it when,
 //    each level reached [t, lvl, by], how it ended, and its own damage and kills
 //    (in total and per wave), so placement can be judged flower by flower.
+//  - result.waveKills: kills of the waves' own monsters (no hive bugs, split-offs or
+//    rivals' packs), what the score counts; result.kills counts every kill.
 //  - result.cottageLeft: the cottage's health at the end rounded up, as the HUD showed it
 //    (result.cottage is the exact value to 0.1).
 //  - result.retries: every wave the players tried again, in order. A retry
@@ -134,7 +136,7 @@ export function finishLog(s, how) {
   if (!s.stats) return null;
   if (cur(s) && cur(s).waveStartT != null) logWaveEnd(s, how);
   const st = s.stats;
-  st.result = { how, wave: s.wave, won: !!s.won, cottage: r1(s.lives), cottageLeft: Math.max(0, Math.ceil(s.lives)), kills: s.kills, seconds: Math.round(s.t), retries: s.retries || [] };
+  st.result = { how, wave: s.wave, won: !!s.won, cottage: r1(s.lives), cottageLeft: Math.max(0, Math.ceil(s.lives)), kills: s.kills, waveKills: s.waveKills ?? s.kills, seconds: Math.round(s.t), retries: s.retries || [] };
   const totals = { damage: {}, kills: {}, cottageDamage: {}, cottageDamageByRoad: {}, coins: s.players.map(() => ({ earned: 0, plant: 0, upgrade: 0, heal: 0, refund: 0 })), bloom: { damage: {}, triggers: {} },
     elites: { spawned: {}, killed: 0 }, items: { dropped: {}, picked: {}, used: {}, expired: {} },
     shields: { raised: 0, broken: 0, bombHits: 0 }, perks: [], versus: { sent: 0, got: 0, blocked: 0 } };
@@ -318,7 +320,7 @@ export function gameSummary(log) {
     };
   });
   return {
-    won: r.won, wave: r.wave, seconds: r.seconds, kills: r.kills, cottage: r.cottageLeft ?? Math.ceil(r.cottage), maxCottage: log.cottageHealth, // rounded up, as the HUD and the score show it
+    won: r.won, wave: r.wave, seconds: r.seconds, kills: r.kills, waveKills: r.waveKills ?? r.kills, cottage: r.cottageLeft ?? Math.ceil(r.cottage), maxCottage: log.cottageHealth, // rounded up, as the HUD and the score show it
     flowers: Object.values(flowers).sort((a, b) => b.dmg - a.dmg),
     best: best && best.dmg > 0 ? { type: best.type, lvl: topLevel(best), dmg: best.dmg, kills: best.kills } : null,
     cats,

@@ -10,7 +10,7 @@ import { CATS } from './data.js';
 export function raceStatus(s) {
   return {
     wave: s.wave, last: lastWave(s), phase: s.phase, cleared: wavesCleared(s),
-    lives: Math.max(0, Math.ceil(s.lives)), maxLives: s.maxLives, kills: s.kills, score: scoreOf(s),
+    lives: Math.max(0, Math.ceil(s.lives)), maxLives: s.maxLives, kills: s.kills, waveKills: s.waveKills ?? s.kills, score: scoreOf(s),
     over: !!s.over, won: !!s.won, fell: !!s.over && !s.raceWon, players: s.players.length, cats: s.players.map((p) => p.cat), picked: s.phase !== 'pick', meter: s.meter || 0,
     // our packs still on their way to them, so they can watch them land
     waiting: s.waiting ? s.wave + 1 : 0, // ready for that wave, waiting for the rivals

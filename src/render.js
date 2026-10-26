@@ -2285,7 +2285,7 @@ function teamRows(S, R, r, myScore) {
     ['Reached wave', S.wave, fin(R?.wave) ?? fin(r?.wave), 1],
     ['Cottage left', S.cottage, fin(R?.cottage) ?? fin(r?.lives), 1],
     ['Score', myScore, fin(R?.score) ?? fin(r?.score), 1],
-    ['Monsters bonked', S.kills, fin(R?.kills) ?? fin(r?.kills), 1],
+    ['Wave monsters bonked', S.waveKills ?? S.kills, fin(R?.waveKills) ?? fin(r?.waveKills), 1], // not hive bugs or split-offs: what the score counts
     ['Coins earned', coins(S), coins(R), 1],
     ['Flower damage', garden(S), garden(R), 1],
     ['Cat damage (baton, bombs)', catDmg(S), catDmg(R), 1],

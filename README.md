@@ -123,7 +123,9 @@ them into a chat.
   the meantime (solo, local or hosted online) uses it. The map and mode are
   locked on the pick screen; cats and flowers are yours to choose.
 - **Score** = 1,000 per wave cleared + 20 per point of cottage health left + 5
-  per monster bonked, ×1.5 on Hard (`balance.json → score`). Only compare
+  per monster of the waves bonked (not the bugs a hive lets out or the blobs a
+  splitter breaks into: a hive left alive longer makes more; not monsters sent
+  by versus rivals), ×1.5 on Hard (`balance.json → score`). Only compare
   scores of the same mode, map and number of players. The end screen shows
   your best in this browser (per code for challenges, otherwise per map, mode
   and number of players).

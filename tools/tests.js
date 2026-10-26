@@ -735,11 +735,16 @@ test('Challenges', 'the daily challenge is the same all day and changes the next
 
 test('Challenges', 'the score adds up waves, cottage and kills; Hard counts more; the result names the code', () => {
   const S = BALANCE.score, s = game({ cats: ['bomber', 'gardener'] });
-  s.wave = 4; s.phase = 'wave'; s.over = true; s.lives = 37.2; s.kills = 120;
+  s.wave = 4; s.phase = 'wave'; s.over = true; s.lives = 37.2; s.kills = 150; s.waveKills = 120;
   eq(sim.wavesCleared(s), 3, 'waves cleared when wave 4 was lost');
   eq(sim.scoreOf(s), 3 * S.perWave + 38 * S.perCottage + 120 * S.perKill, 'score');
   s.hard = true;
   eq(sim.scoreOf(s), Math.round((3 * S.perWave + 38 * S.perCottage + 120 * S.perKill) * S.hard), 'hard score');
+  const g = game(); g.queue = [];
+  const kill = (type, from, sent) => { sim.spawnEnemy(g, type, from, 0, null); const e = g.enemies.at(-1); e.sent = sent; sim.damage(g, e, 1e9, true); };
+  kill('hive', null, false); const hive = g.enemies.at(-1);
+  kill('swarm', hive, false); kill('grunt', null, true);
+  eq(g.kills, 3, 'every kill counted'); eq(g.waveKills, 1, 'the score counts only the wave\'s own monster');
   const text = shareText(s);
   ok(text.includes(codeOf(s)) && text.includes(sim.scoreOf(s).toLocaleString('en-US')) && text.includes('2 players'), text);
 });

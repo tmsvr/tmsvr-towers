@@ -9,7 +9,7 @@ import { ENEMIES, FLOWER_ORDER, CAT_ORDER, ELITE_TRAITS, ITEM_KINDS, PERKS } fro
 // so small numbers take one byte and a position in tenths of a pixel three.
 // Bump whenever a message changes shape, so mismatched copies refuse to play
 // together instead of misreading each other (checked when a guest joins).
-export const PROTOCOL = 20;
+export const PROTOCOL = 21;
 
 const utf8 = new TextEncoder(), fromUtf8 = new TextDecoder();
 
@@ -121,7 +121,7 @@ const CHEST = struct([['offers', listOf(listOf(text))], ['cursor', listOf(int)],
 
 const GAME = struct([
   ['lives', r1], ['wave', int], ['phase', oneOf(PHASES)], ['timer', r1], ['queue', count], ['over', bool], ['won', bool],
-  ['kills', int], ['map', int], ['baseHitT', r2], ['maxLives', int], ['endless', bool], ['chest', maybe(CHEST)], ['perks', counts(PERKS)], ['hard', bool],
+  ['kills', int], ['waveKills', int], ['map', int], ['baseHitT', r2], ['maxLives', int], ['endless', bool], ['chest', maybe(CHEST)], ['perks', counts(PERKS)], ['hard', bool],
   ['sprint', bool], ['locked', bool], ['seed', int], ['versus', bool], ['hold', bool], ['meter', r2], ['threats', listOf(THREAT)], ['waiting', bool], ['rivalBreak', bool],
 ]);
 

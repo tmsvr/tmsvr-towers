@@ -71,7 +71,7 @@ export function createState(nPlayers = 1, seed = 1337, { sharedScreen = false, l
     m,
     t: 0, nextId: 1, rng: seed, seed, wrng: waveSeed(seed), wave: 0, phase: 'pick', timer: 0, queue: [], spawnWait: 0,
     lives: DIFFICULTY.cottageHealth, maxLives: DIFFICULTY.cottageHealth, baseHitT: 0, lastAlarm: -99, players: [], flowers: [], enemies: [], drops: [], bombs: [], projs: [], clouds: [],
-    fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, sharedScreen, map: m.index, hard: !!hard, sprint: !!sprint, locked: !!locked, versus: !!versus, hold: false, waiting: false, goWave: 0, rivalBreak: true,
+    fx: [], events: [], grid: new Map(), over: false, won: false, kills: 0, waveKills: 0, sharedScreen, map: m.index, hard: !!hard, sprint: !!sprint, locked: !!locked, versus: !!versus, hold: false, waiting: false, goWave: 0, rivalBreak: true,
     meter: 0, outbox: [], incoming: [], threats: [], // versus: the team's send meter, packs to send, packs landed in a break, packs on their way ({share, t})
     items: [], // power-ups dropped by elites, waiting to be picked up
     perks: {}, chest: null, chestDue: false, // boss chests: the team's perks, the open chest, one is owed
@@ -394,6 +394,9 @@ function bombShield(s, e, b) {
 function killEnemy(s, e) {
   e.dead = true;
   s.kills++;
+  // the score counts only the waves' own monsters: not hive bugs or split-offs
+  // (a hive left alive longer makes more) and not packs from the rivals
+  if (!e.child && !e.sent) s.waveKills = (s.waveKills || 0) + 1;
   puff(s, e.x, e.y, '#ffffff', 10, 110);
   ev(s, e.def.boss ? 'bossDie' : 'die');
   if (e.def.boss) ev(s, 'shake', { amt: 10 });
@@ -820,7 +823,7 @@ function landPack(s, share) {
 // cottage left and monsters bonked, more on Hard.
 export const wavesCleared = (s) => (s.won || s.phase !== 'wave' ? s.wave : s.wave - 1);
 export function scoreOf(s) {
-  const raw = wavesCleared(s) * SCORE.perWave + Math.max(0, Math.ceil(s.lives)) * SCORE.perCottage + s.kills * SCORE.perKill;
+  const raw = wavesCleared(s) * SCORE.perWave + Math.max(0, Math.ceil(s.lives)) * SCORE.perCottage + (s.waveKills ?? s.kills) * SCORE.perKill; // saves from before waveKills: all kills
   return Math.round(raw * (s.hard ? SCORE.hard : 1));
 }
 
