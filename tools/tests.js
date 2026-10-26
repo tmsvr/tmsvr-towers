@@ -1047,6 +1047,7 @@ test('Games', 'the end screen summary adds up', () => {
   const fromFlowers = r.game.flowers.reduce((a, f) => a + f.dmg, 0);
   near(S.cats.reduce((a, c) => a + c.garden, 0), fromFlowers, 2, 'flower damage split between the cats');
   ok(S.versus && ['sent', 'blocked', 'got'].every((k) => Number.isFinite(S.versus[k])), 'the race numbers, for comparing teams');
+  eq(S.cottage, Math.max(0, Math.ceil(r.lives)), 'cottage left as the HUD shows it (rounded up)');
   ok(JSON.parse(JSON.stringify(S)).cats.length === 2, 'it travels as JSON to the rival team');
 });
 
