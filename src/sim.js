@@ -203,7 +203,7 @@ export function spawnEnemy(s, type, from, path = 0, elite) {
   // One curve for every wave, endless included: each wave is hpGrowth tougher than
   // the last, so there is no jump anywhere and a full garden meets a clear wall.
   const grow = Math.pow(1 + TUNE.hpGrowth, w);
-  const hpScale = (TUNE.enemyHp ?? 1) * grow * (solo ? (d.boss ? TUNE.soloBossHp : 1) : TUNE.coopEnemyHp * more(s, 'enemyHp')) * finale * endlessBoss * (s.hard ? HARD.enemyHp : 1);
+  const hpScale = (TUNE.enemyHp ?? 1) * grow * (solo ? (d.boss ? TUNE.soloBossHp : 1) : TUNE.coopEnemyHp * more(s, 'enemyHp')) * finale * endlessBoss * (s.hard ? HARD.enemyHp : 1) * (s.sprint ? SPRINT.enemyHp ?? 1 : 1);
   const j = () => (rnd(s) - 0.5) * 18 * U;
   const id = s.nextId++;
   const road = s.m.paths[from ? from.path : path];
@@ -520,7 +520,7 @@ function updateEnemies(s, dt) {
       }
     }
     e.wob += dt * 8 * e.slow;
-    let sp = e.def.speed * e.slow * (e.speedMul || 1) * (e.dashing ? e.def.dash.speedMultiplier : 1) * (e.under ? e.def.burrow.speedMultiplier : 1);
+    let sp = e.def.speed * e.slow * (e.speedMul || 1) * (s.sprint ? SPRINT.enemySpeed ?? 1 : 1) * (e.dashing ? e.def.dash.speedMultiplier : 1) * (e.under ? e.def.burrow.speedMultiplier : 1);
     // stag beetles run faster the more they are hurt, so chip damage along the road backfires
     if (e.def.enrage) sp *= 1 + (e.def.enrage.maxSpeedMultiplier - 1) * (1 - Math.max(0, e.hp) / e.maxhp);
     const road = s.m.paths[e.path], wps = road.waypoints;

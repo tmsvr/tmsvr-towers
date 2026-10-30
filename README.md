@@ -111,7 +111,8 @@ them into a chat.
 
 - **Sprint** is the quick mode, about 8 minutes: 6 waves that play like normal
   waves 2, 4, 5, 7, 9 and 10, with bosses in waves 3 and 6, more coins at the
-  start, more coins per monster and 12 s breaks.
+  start, more coins per monster and 12 s breaks. Its monsters are tougher and
+  quicker than in those normal waves (20% more health, 10% faster).
 - **Every game has a challenge code** (top right of the pick screen, and on the
   end screen), like `9KW-CVE`. It stands for the map, the mode and the waves'
   random numbers. Anyone who plays the same code meets exactly the same monsters,

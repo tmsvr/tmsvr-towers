@@ -654,13 +654,13 @@ function nextQueue(s) {
   return s.queue.map((e) => `${e.type}/${e.path}/${e.elite ? e.elite.join('+') : ''}`).join(' ');
 }
 
-test('Sprint', 'a Sprint plays sprint.waves: each wave as tough and as big as the normal wave it names', () => {
+test('Sprint', 'a Sprint plays sprint.waves: each wave as big as the normal wave it names, its monsters sprint.enemyHp times as tough', () => {
   const SP = BALANCE.sprint;
   eq(sim.lastWave({ sprint: true }), SP.waves.length, 'number of waves');
   SP.waves.forEach((lv, i) => eq(sim.levelOf({ sprint: true }, i + 1), lv, `sprint wave ${i + 1}`));
   eq(sim.levelOf({ sprint: true }, SP.waves.length + 1), TOTAL_WAVES + 1, 'endless carries on from the breather');
   const hpIn = (sprint, wave) => { const s = game({ seed: 3 }); s.sprint = sprint; s.wave = wave; sim.spawnEnemy(s, 'grunt', null, 0); return s.enemies.at(-1).maxhp; };
-  near(hpIn(true, 3), hpIn(false, SP.waves[2]), 1e-9, 'grunt health in sprint wave 3');
+  near(hpIn(true, 3), hpIn(false, SP.waves[2]) * (SP.enemyHp ?? 1), 1e-9, 'grunt health in sprint wave 3 (times sprint.enemyHp)');
   const sizeOf = (sprint, wave) => { const s = game({ seed: 3 }); s.sprint = sprint; s.wave = wave - 1; return nextQueue(s).split(' ').length; };
   eq(sizeOf(true, 2), sizeOf(false, SP.waves[1]), 'monsters in sprint wave 2');
 });

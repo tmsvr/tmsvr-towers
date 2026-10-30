@@ -128,6 +128,9 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
   rule that grows with the waves (health, size, coin fade, elites, bosses, the
   breather) goes by it, and `lastWave(s)` is the wave that wins. Use these,
   not `s.wave` or `TOTAL_WAVES`, in new rules that scale with the waves.
+  Sprint monsters also get `sprint.enemyHp` times the health and
+  `sprint.enemySpeed` times the speed (on top of Hard), so a Sprint wave is
+  tougher than the normal wave it names.
 - **Challenges and scores.** `s.seed`, `s.map`, `s.hard` and `s.sprint` make
   the challenge code (`codeOf` in `challenge.js`). A challenge (K or D on the
   menu, `ui.challenge` in `main.js`) is applied to each new game with
