@@ -87,7 +87,7 @@ them.
   - **T** starts a new game (the pick screen, with your last map, cats and flowers already chosen)
   - **M** goes back to the menu (Esc too, after the game)
   - **C** on the victory screen keeps going in endless mode
-- **O** on the main menu loads a saved game (solo, local co-op or online) and carries on from the moment it was saved, paused. Online, the host saves and loads; a loaded online game starts once all its players are back (or when the host presses Enter).
+- **O** on the main menu loads a saved game (solo, local co-op or online) and carries on from the moment it was saved, paused. Online, the host saves and loads; a loaded online game starts once all its players are back (or when the host presses Enter). The host can also press **O** in the host lobby, after friends have joined.
 - Beat all 10 waves and press C on the victory screen to keep going in **endless mode**: wave after wave, each tougher than the last. Every wave's monsters are 20% tougher than the last, endless ones too, so sooner or later even a garden full of level-5 flowers meets a wave it can't hold. Wave 11, right after the big boss, is a smaller one to catch your breath; after that the monsters come in about the same numbers, and every 5 waves brings one more boss (wave 15 has two, wave 20 three, wave 25 four…). From wave 21 the waves in between bring bosses too (one each until wave 25, then two…).
 - The game fills the browser window: a wider or taller window shows more of the map (things stay the same size), so there are no black bars.
 - I (in the menu or while picking) opens the flower guide: every flower's stats at each level, worked out from `balance.json`.

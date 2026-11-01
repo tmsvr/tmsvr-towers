@@ -234,7 +234,7 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
   `sent` (purple ring, `SEND.coins` of the coins, no meter).
 - **Saves online** are made and loaded by the host. A loaded online save
   either resumes at once (the others still connected) or opens a room and
-  resumes when all its players have joined, or when the host presses Enter (`pendingSave`).
+  resumes when all its players have joined, or when the host presses Enter (`pendingSave`). O also works in the host lobby (`saveForLobby`). The file picker is put in the page while it is open (`openSaveFile`): Safari ignores a file chosen in a detached one.
 
 ## Common changes
 

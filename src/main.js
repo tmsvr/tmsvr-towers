@@ -184,6 +184,7 @@ addEventListener('keydown', (e) => {
     return;
   }
   if (mode === 'hostWait' && code === 'Enter') { startOnlineGame(); return; }
+  if (mode === 'hostWait' && code === 'KeyO') { openSaveFile(); return; }
   if (code === 'KeyP') togglePause();
   if (!stopped || ui.disconnected) return;
   const ask = (t) => net.send({ t }); // online the host decides
@@ -346,18 +347,42 @@ function saveToFile() {
 
 function openSaveFile() {
   if (ui.online === 'guest') { flashNote('The host can load a saved game'); return; }
+  // In the host lobby the note goes under the room code: the lobby covers the canvas
+  const tell = (txt) => (mode === 'hostWait' ? updateHostLobby(txt) : flashNote(txt));
+  // The picker sits in the page while it is open: Safari never reports a file
+  // chosen in a detached one, and a detached one can be thrown away mid-pick.
+  document.getElementById('savefile')?.remove();
   const input = document.createElement('input');
   input.type = 'file';
+  input.id = 'savefile';
   input.accept = '.json,application/json';
+  input.style.display = 'none';
+  document.body.append(input);
+  input.addEventListener('cancel', () => input.remove());
   input.onchange = async () => {
     const file = input.files[0];
+    input.remove();
     if (!file) return;
     let save;
-    try { save = loadGame(JSON.parse(await file.text())); } catch (e) { flashNote(`Couldn't load that file: ${e.message}`); return; }
-    if (mode === 'menu') startSaved(save);
+    try { save = loadGame(JSON.parse(await file.text())); } catch (e) { tell(`Couldn't load that file: ${e.message}`); return; }
+    try {
+      if (mode === 'menu') startSaved(save);
+      else if (mode === 'hostWait') saveForLobby(save);
+    } catch (e) { console.error(e); tell(`Couldn't start the saved game: ${e.message}`); }
   };
   input.click();
 }
+
+// O in the host lobby: the save carries on once its players are in (or on Enter).
+function saveForLobby({ state: s, mode: how }) {
+  if (how !== 'online') { updateHostLobby('That save is from a solo or local game: load it from the main menu'); return; }
+  pendingSave = s;
+  const el = document.getElementById('resume');
+  if (el) el.innerHTML = resumeText();
+  updateHostLobby('Saved game loaded');
+  if (guests.size >= s.players.length - 1) startOnlineGame(); // everyone from the save is here already
+}
+const resumeText = () => (pendingSave ? `Your saved game (${esc(pendingSave.m.name)}, wave ${pendingSave.wave}, ${pendingSave.players.length} cats) carries on once everyone is in.` : '');
 
 function startSaved({ state: s, mode: how, sameVersion }) {
   if (how === 'online' && ui.online === 'host') { // the others are still here: straight back in (a missing cat can rejoin)
@@ -503,10 +528,9 @@ function startHost() {
     const share = isLocalhost
       ? '<p class="hint">Your friends need their own copy of the game (or put it online, e.g. GitHub Pages), then press <b>4</b> and enter the code.</p>'
       : `<p><button id="copy" class="small">Copy invite link</button></p><p class="hint">…or they open the game, press <b>4</b> and enter the code.</p>`;
-    const resume = pendingSave ? `<p>Your saved game (${esc(pendingSave.m.name)}, wave ${pendingSave.wave}, ${pendingSave.players.length} cats) carries on once everyone is in.</p>` : '';
-    showLobby(`<h2>Host an online game</h2><p>Room code</p><div class="code">${code}</div>${resume}${share}
+    showLobby(`<h2>Host an online game</h2><p>Room code</p><div class="code">${code}</div><p id="resume">${resumeText()}</p>${share}
       <p id="who"></p><p><button id="start" type="button">Start the game</button></p>
-      <p class="hint" id="hosthint"></p><p class="hint">Esc to cancel</p>`);
+      <p class="hint" id="hosthint"></p><p class="hint">O loads a saved online game · Esc to cancel</p>`);
     copyButton('copy', link);
     document.getElementById('start').onclick = () => startOnlineGame();
     updateHostLobby();
