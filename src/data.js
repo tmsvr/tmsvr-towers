@@ -204,6 +204,7 @@ function computeStats(type, lvl) {
     slowSeconds: b.slow ? (b.slowSeconds ?? 1.3) * (1 + (pl.slowDuration ?? 0) * l) : undefined,
     stacks: b.stacks ? Math.floor(b.stacks + pl.poisonStacks * l) : undefined, // whole stacks only
     cloudR: b.cloudR ? b.cloudR * (1 + pl.cloudSize * l) : undefined,
+    flyerDamage: b.flyerDamage ? b.flyerDamage + (b.flyerDamagePerLevel ?? 0) * l : undefined, // Daisy's edge on flyers grows with its level
   };
 }
 

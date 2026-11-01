@@ -1219,6 +1219,17 @@ test('Monsters', 'Daisy seeds hit flyers harder', () => {
   });
 });
 
+test('Monsters', 'Daisy shoots flyers first, and its bonus on them grows with its level', () => {
+  ok(flowerStats('daisy', MAX_LEVEL).flyerDamage > flowerStats('daisy', 1).flyerDamage, 'more against flyers at max level');
+  const { s, road } = bloomFlower('daisy');
+  const grunt = monsterOn(s, 'grunt', road), flyer = monsterOn(s, 'flyer', road);
+  grunt.hp = grunt.maxhp = flyer.hp = flyer.maxhp = 1e5;
+  grunt.left = 1; flyer.left = 1e4; // the grunt is much nearer the cottage
+  s.projs = [];
+  pin(s, [[grunt, ...at(road)], [flyer, ...at(road)]], 1 / 60);
+  eq(s.projs[0]?.target, flyer, 'first seed goes to the flyer');
+});
+
 test('Bloom', 'Sunflower beams hit bosses harder', () => {
   withoutBloom(() => {
     const { s, f, road } = bloomFlower('sunflower');

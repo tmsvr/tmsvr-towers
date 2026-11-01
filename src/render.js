@@ -2417,6 +2417,7 @@ function guideRows(t) {
   rows.push(['Range', st.map((x) => (x.range >= GLOBAL_RANGE ? 'whole map' : `${fmt(x.range / T)} tiles`))]);
   if (F.kind === 'cloud') rows.push(['Max poison/s', st.map((x) => fmt(x.dmg * x.stacks))]);
   else if (!st[0].slow) rows.push(['Damage/s', st.map((x) => fmt(x.dmg / x.rate))]);
+  if (F.flyerDamage > 1) rows.push(['Damage/s to flyers', st.map((x) => fmt((x.dmg * x.flyerDamage) / x.rate))]);
   return rows;
 }
 
@@ -2458,7 +2459,11 @@ function drawGuide(c, time, sel) {
   if (F.kind === 'cloud') tags.push(['Ignores armour', '#9ad14b']);
   if (F.kind === 'chomp') tags.push(['Swallows small critters whole', '#e0569b'], [`Bites off ${Math.round((F.maxHpBite || 0) * 100)}% of max health (${+((F.bossMaxHpBite || 0) * 100).toFixed(1)}% on bosses)`, '#e0569b']);
   if (F.kind === 'beam') tags.push(['Aims at the tough monster nearest the cottage', '#ffd23f']);
-  if (F.flyerDamage > 1) tags.push([`+${Math.round((F.flyerDamage - 1) * 100)}% damage to flyers`, '#8fe3ff']);
+  if (F.flyerDamage > 1) {
+    const top = flowerStats(t, MAX_LEVEL).flyerDamage;
+    tags.push([`+${Math.round((F.flyerDamage - 1) * 100)}% damage to flyers` + (top > F.flyerDamage ? ` (+${Math.round((top - 1) * 100)}% at max)` : ''), '#8fe3ff']);
+  }
+  if (F.target === 'flyers') tags.push(['Shoots flyers first', '#8fe3ff']);
   if (F.bossDamage > 1) tags.push([`+${Math.round((F.bossDamage - 1) * 100)}% damage to bosses`, '#ffd23f']);
   if (F.target === 'big') tags.push(['Bites the toughest monster in reach', '#e0569b']);
   if (F.kind === 'bolt') tags.push(['Hits several in a line', '#ff7a2f']);

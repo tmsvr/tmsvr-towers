@@ -1224,7 +1224,9 @@ function updateFlowers(s, dt) {
         inRange.push(e);
         // 'big' bites the toughest monster in reach, the one furthest along if several are as tough
         // ('strong' is picked below, once every monster in reach is known)
+        // 'flyers' (Daisy) shoots flying monsters first, which most flowers can't touch
         const better = st.target === 'big' ? !best || e.maxhp > best.maxhp || (e.maxhp === best.maxhp && e.left < best.left)
+          : st.target === 'flyers' && best && !!e.def.flying !== !!best.def.flying ? !!e.def.flying
           : !best || e.left < best.left;
         if (better) best = e;
       }
