@@ -2427,7 +2427,7 @@ const pct = (v) => `${Math.round(v * 100)}%`;
 function bloomText(type) {
   const b = BLOOM[type] || {};
   switch (type) {
-    case 'daisy': return `every ${nth(b.every)} seed splits, ${b.pieces} more seeds fly on`;
+    case 'daisy': return `every ${nth(b.every)} seed explodes, hitting flyers too`;
     case 'sunflower': return `the beam also takes ${pct(b.maxHp)} of the target's max health`;
     case 'firelily': return `monsters it hits burn for ${b.seconds}s`;
     case 'stink': return `monsters in its clouds take ${pct(b.vulnerable)} more damage from everything`;

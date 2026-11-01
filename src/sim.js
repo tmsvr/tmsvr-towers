@@ -626,9 +626,9 @@ function buildQueue(s, n, { share = 0 } = {}) {
     const path = Math.floor(R(s) * s.m.paths.length); // a group sticks together on one road
     const [lo, hi] = TUNE.spawnGap || [0.4, 1.2];
     // packs (swarms, wasps) get bigger every wave after they first appear, up to packMaxGrowth
-    // times their size, and pay for every member: bigger packs come less often, not for free
+    // times their size (or their own maxGroup), and pay for every member: bigger packs come less often, not for free
     const growth = Math.min(TUNE.packMaxGrowth ?? Infinity, 1 + (TUNE.packGrowthPerWave ?? 0) * (n - pick.fromWave));
-    let group = pick.group > 1 ? Math.round(pick.group * growth) : 1;
+    let group = pick.group > 1 ? Math.min(pick.maxGroup ?? Infinity, Math.round(pick.group * growth)) : 1;
     if (share) group = Math.min(group, Math.floor(budget / each(pick) + 1e-9));
     for (let i = 0; i < group; i++) q.push({ type: pick.enemy, path, wait: group > 1 ? 0.18 : lo + R(s) * (hi - lo) });
     budget -= pick.cost * (group / pick.group);
@@ -1248,7 +1248,7 @@ function updateFlowers(s, dt) {
     f.headIdx = (f.headIdx + 1) % Math.min(f.lvl, 5);
     const hx = f.x, hy = f.y - T * 0.35;
     if (st.kind === 'single') {
-      s.projs.push({ id: s.nextId++, kind: 'single', x: hx, y: hy, target: best, speed: 460 * U, dmg: st.dmg, flyer: st.flyerDamage, color: st.color, src: f.type, fid: f.id, split: burst ? { ...bl } : null });
+      s.projs.push({ id: s.nextId++, kind: 'single', x: hx, y: hy, target: best, speed: 460 * U, dmg: st.dmg, flyer: st.flyerDamage, color: st.color, src: f.type, fid: f.id, blast: burst ? { ...bl } : null });
     } else if (st.kind === 'beam') {
       damage(s, best, st.dmg * (best.def.boss ? st.bossDamage ?? 1 : 1), false, false, f.type, f.id); // the boss killer
       if (bl?.maxHp && !best.dead) { damage(s, best, best.maxhp * bl.maxHp, true, true, f.type, f.id, true); log.logBloom(s, f.type); }
@@ -1311,7 +1311,7 @@ function updateProjs(s, dt) {
         damage(s, p.target, p.dmg * (p.target.def.flying ? p.flyer ?? 1 : 1), false, false, p.src, p.fid, !!p.bloom); // Daisy's extra against flyers
         p.done = true;
         puff(s, p.target.x, p.target.y, p.color, 3, 60);
-        if (p.split) splitSeed(s, p);
+        if (p.blast) blastSeed(s, p);
       }
       else { p.x += (dx / d) * mv; p.y += (dy / d) * mv; }
     } else if (p.kind === 'bolt') {
@@ -1351,11 +1351,18 @@ function updateProjs(s, dt) {
 
 // Daisy's Bloom: a seed bursts into more seeds that fly on to the monsters
 // nearest the one it hit.
-function splitSeed(s, p) {
-  const t = p.target, b = p.split;
-  const near = s.enemies.filter((e) => e !== t && hittable(e) && dist(e, t) <= b.reach * T).sort((a, c) => dist(a, t) - dist(c, t)).slice(0, b.pieces);
-  for (const e of near) s.projs.push({ id: s.nextId++, kind: 'single', x: t.x, y: t.y, target: e, speed: 460 * U, dmg: p.dmg * b.damage, flyer: p.flyer, color: p.color, src: p.src, fid: p.fid, bloom: true });
-  if (near.length) log.logBloom(s, p.src);
+// Daisy's Bloom seed explodes where it lands, flyers and all: wasps come in
+// tight packs and pile up on the cottage, so a splash is what reaches them.
+function blastSeed(s, p) {
+  const t = p.target, b = p.blast, r = b.radius * T;
+  s.fx.push({ kind: 'ring', x: t.x, y: t.y, r, col: '#ffd34d', life: 0.35 });
+  let hit = false;
+  for (const e of s.enemies) {
+    if (e === t || !hittable(e) || dist(e, t) > r + e.def.r) continue;
+    damage(s, e, p.dmg * b.damage * (e.def.flying ? p.flyer ?? 1 : 1), false, false, p.src, p.fid, true);
+    hit = true;
+  }
+  if (hit) log.logBloom(s, p.src);
 }
 
 // Poison clouds add a stack to every ground enemy inside, twice a second.

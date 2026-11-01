@@ -495,6 +495,23 @@ test('Waves', 'packs grow up to packMaxGrowth times their size', () => {
   ok(biggest <= 2 * Math.round(5 * D.packMaxGrowth), `a run of ${biggest} swarm bugs`);
 });
 
+test('Waves', 'a pack never grows past its own maxGroup (wasps stay at 6)', () => {
+  const wasp = BALANCE.waves.find((u) => u.enemy === 'wasp');
+  eq(wasp.maxGroup, 6, 'wasp maxGroup');
+  // a late wave of nothing but wasps: every pack is a full one of maxGroup, never packMaxGrowth's 9
+  const sizes = new Set();
+  for (let seed = 1; seed <= 4; seed++) {
+    const s = wonGame();
+    s.rng = seed;
+    sim.continueEndless(s);
+    s.m = { ...s.m, waves: [wasp] };
+    s.wave = 39; s.phase = 'prep'; s.queue = []; s.enemies = [];
+    tick(s, { ready: true });
+    sizes.add(s.queue.filter((e) => e.type === 'wasp').length % wasp.maxGroup);
+  }
+  eq([...sizes].join(' '), '0', 'wasps beyond whole packs of 6');
+});
+
 test('Waves', 'packs pay for every member, so bigger packs use up the wave as fast as smaller ones', () => {
   const D = BALANCE.difficulty, old = D.packGrowthPerWave;
   // the wave budget the monsters of wave 9 use up (a pack member costs cost / group), over a few seeds
@@ -1120,14 +1137,24 @@ test('Bloom', 'every flower has a Bloom ability, and the upgrade that reaches it
   eq(upgradeCost('thorn', 1), below, 'other upgrades');
 });
 
-test('Bloom', 'Daisy: every few seeds splits on to nearby monsters', () => {
+test('Bloom', 'Daisy: every few seeds explodes, hitting flyers and ground monsters close by', () => {
   const { s, road } = bloomFlower('daisy');
-  const [x, y] = at(road);
-  const list = [0, 1, 2].map(() => monsterOn(s, 'grunt', road));
-  for (const e of list) e.hp = e.maxhp = 1e6;
-  pin(s, list.map((e, i) => [e, x + i * 12, y]), 3);
-  ok(bloomLog(s).triggers.daisy > 0, 'no seed split');
-  ok(bloomLog(s).damage.daisy > 0, 'split seeds did no damage');
+  const [x, y] = at(road), b = BLOOM.daisy;
+  // the Daisy aims at the wasp (flyers first); the explosion reaches the grunt next to it, not the far one
+  const [target, near, far] = ['wasp', 'grunt', 'grunt'].map((t) => monsterOn(s, t, road));
+  // a second wasp a little further from the cottage, so the Daisy never aims at it: only the blast reaches it
+  const flyer = monsterOn(s, 'wasp', road), base = s.m.base, away = Math.atan2(y - base.y, x - base.x);
+  for (const e of [target, near, far, flyer]) e.hp = e.maxhp = 1e6;
+  const spots = [[target, x, y], [flyer, x + Math.cos(away) * 8, y + Math.sin(away) * 8], [near, x, y + 0.4 * b.radius * T], [far, x, y + (b.radius + 1) * T]];
+  pin(s, spots, 3);
+  ok(bloomLog(s).triggers.daisy > 0, 'no seed exploded');
+  ok(bloomLog(s).damage.daisy > 0, 'explosions did no damage');
+  ok(near.hp < near.maxhp, 'the grunt next to the target was not hit');
+  eq(far.hp, far.maxhp, 'grunt out of the blast');
+  ok(flyer.hp < flyer.maxhp, 'the wasp next to the target was not hit');
+  // blast damage only: a share of the seeds, with Daisy's extra against flyers
+  const st = flowerStats('daisy', BLOOM.level), blasts = bloomLog(s).triggers.daisy;
+  eq(Math.round(flyer.maxhp - flyer.hp), Math.round(blasts * st.dmg * b.damage * st.flyerDamage), 'the wasp took the blasts with the flyer bonus');
 });
 
 test('Bloom', 'Sunflower: the beam also takes a share of max health', () => {

@@ -38,7 +38,7 @@ upgrade path a goal, without helping "spam level-1 flowers".
 
 | Flower | Level 5 ability | Starting numbers |
 |---|---|---|
-| Daisy | Every 4th seed splits into 3 when it hits | 2 extra seeds at 50% damage |
+| Daisy | Every 3rd seed explodes where it hits, flyers included | 60% damage to everything within 0.8 tiles |
 | Sunflower | The beam also takes a share of the target's max health (bosses too) | 3% of max health |
 | Fire Lily | Every monster a fireball hits is set on fire | 2 s, 25% of the hit's damage per second |
 | Stinkbloom | Monsters in its cloud take extra damage from everything | +15% |

@@ -46,7 +46,7 @@ them.
 - Standing on a flower, hold E to upgrade it and R to heal it. Q switches E to
   dig-up mode, which removes the flower and refunds part of what was spent on it.
 - At level 5 every flower **blooms**: it sparkles and gains a special ability
-  (Daisy seeds split, Fire Lily sets monsters alight, Frostbloom freezes…).
+  (Daisy seeds explode, Fire Lily sets monsters alight, Frostbloom freezes…).
   The flower guide (I) says what each one does.
 - From wave 4 some big monsters arrive as **elites**: they glow, are much
   tougher and have a trait (armoured, swift, regenerating, frost-proof or

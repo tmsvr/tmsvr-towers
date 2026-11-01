@@ -28,7 +28,7 @@
     "player.bombGap": "Seconds before a cat can throw again after a bomb, so a cat with two bombs doesn't throw both by accident.",
     "player.sprint": "Holding sprint multiplies speed by sprintSpeed for up to sprintSeconds; stamina refills fully in sprintRecoverSeconds after a sprintRecoverDelay pause. Running dry means waiting until it is a third full.",
     "cats": "Character classes. Every number is a multiplier on the player section (1 = normal). growSpeed is how fast a cat pours into flowers (upgrading and healing); upgradeCost is how many coins it pays per coin of progress (0.7 = 30% cheaper). Two players can't pick the same cat.",
-    "waves": "Which enemies can appear: fromWave = first wave it shows up (or [lo, hi]: a random wave in that range, rolled once per game), weight = how often it is picked, cost = how much of the wave budget one group uses, group = how many spawn together.",
+    "waves": "Which enemies can appear: fromWave = first wave it shows up (or [lo, hi]: a random wave in that range, rolled once per game), weight = how often it is picked, cost = how much of the wave budget one group uses, group = how many spawn together, maxGroup = the most a pack of it ever grows to (on top of packMaxGrowth: wasps stay at 6, since only a few flowers can hit them).",
     "waveSets": "Other lists like waves, for maps that name one with waveSet in maps.json; maps without one use waves. rush (Hourglass, Four Junctions, Lattice, Five Fords): fast monsters and ones Frostbloom can't hold, a few flyers at an unknown wave, small wasp packs late. wild (Twin Whirls, Bramblewood): leapers and diggers that get past ground flowers, beetles that punish chip damage, flyers rare and late.",
     "enemies.unslowable": "Frostbloom can't slow it.",
     "enemies.slowResist": "Share of a Frostbloom's slow it shrugs off (0.5 = half as slowed: a slow to 25% speed becomes 62.5%).",
@@ -38,7 +38,7 @@
     "enemies.quake": "Each time it comes up from underground, flowers within radius tiles lose damage health (times wearMultiplierByLevel for their level; max level is immune).",
     "enemies.withers": "Flowers within radius tiles lose perSecond health a second (times wearMultiplierByLevel; max level is immune).",
     "enemies.enrage": "Speed grows as it loses health, up to maxSpeedMultiplier when nearly dead.",
-    "bloom": "Bloom abilities (IDEAS R1): flowers at bloom.level get one special ability each. enabled = false switches them all off (and the price bump). upgradePrice multiplies the cost of the upgrade that reaches bloom.level. daisy: every Nth seed splits into `pieces` more seeds at `damage` share, aimed at monsters within `reach` tiles. sunflower: the beam also takes maxHp of the target's max health. firelily: every monster hit burns for `seconds`, taking `share` of the hit's damage per second (ignores armour). stink: monsters in its clouds take `vulnerable` more damage from everything, for `seconds` after leaving. frost: every Nth pulse freezes non-boss monsters for `freeze` seconds. thorn: every Nth pulse reaches `range` times as far and knocks small monsters back `knock` tiles per second. snap: swallows any non-boss monster below `below` of its health.",
+    "bloom": "Bloom abilities (IDEAS R1): flowers at bloom.level get one special ability each. enabled = false switches them all off (and the price bump). upgradePrice multiplies the cost of the upgrade that reaches bloom.level. daisy: every Nth seed explodes where it hits, giving every other monster within `radius` tiles (flying ones too) `damage` share of the seed's damage, with Daisy's extra against flyers, so tight wasp packs take it together. sunflower: the beam also takes maxHp of the target's max health. firelily: every monster hit burns for `seconds`, taking `share` of the hit's damage per second (ignores armour). stink: monsters in its clouds take `vulnerable` more damage from everything, for `seconds` after leaving. frost: every Nth pulse freezes non-boss monsters for `freeze` seconds. thorn: every Nth pulse reaches `range` times as far and knocks small monsters back `knock` tiles per second. snap: swallows any non-boss monster below `below` of its health.",
     "elites": "Elite monsters (IDEAS R2). enabled = false switches them off. Only `types` can be elite, from wave `fromWave`: the chance is `chance` + `chancePerWave` per wave after that, at most `maxChance`; in endless mode (where the monsters are already much tougher) it starts again at `endlessChance` in wave 11 and grows `endlessChancePerWave` a wave up to `endlessMaxChance`. Elites have `hp` times the health and one trait (picked by weight): armoured adds `armor`; swift multiplies speed by `speed`; regenerating heals `perSecond` of its max health a second while not poisoned or burning; frostproof can't be slowed or frozen; splitting breaks into `count` copies with `hp` of a normal one's health. Each elite carries one power-up (by weight), dropped when it dies and gone after `itemSeconds` if nobody picks it up. fertiliser: the flower you stand on gains a level for free. water: flowers within `radius` tiles heal to full and stop wearing for the rest of the wave. sun: the flower you stand on fires `fireRate` times as fast for `seconds`. snow: every non-boss monster freezes for `seconds`.",
     "bossShield": "Boss shields (IDEAS R3). enabled = false switches them off. A boss raises a shield when its health falls to each share in `at` (`atBig` for the last wave's boss and endless bosses). While it is up the boss takes `block` less damage from everything but bombs. Each bomb that hits it takes one segment off (`catHits` gives some cats more per bomb); it has `hitsCoop` segments in co-op, `hitsSolo` alone. Broken, the boss is stunned and takes `exposedDamage` more damage for `exposedSeconds`.",
     "difficulty.morePlayers": "Online games can have 3 or 4 cats. For each number of cats: waveSize and enemyHp multiply the co-op wave size and monster health (coopWaveSize, coopEnemyHp), and shieldHits more bomb hits break a boss shield. Tuned with the autopilot so 3 and 4 cats end about like 2 (the third cat helps more than the fourth).",
@@ -241,7 +241,7 @@
     "enabled": true,
     "level": 5,
     "upgradePrice": 1.25,
-    "daisy": { "every": 4, "pieces": 2, "damage": 0.5, "reach": 1.5 },
+    "daisy": { "every": 3, "damage": 0.6, "radius": 0.8 },
     "sunflower": { "maxHp": 0.03 },
     "firelily": { "seconds": 2, "share": 0.25 },
     "stink": { "vulnerable": 0.15, "seconds": 1 },
@@ -321,7 +321,7 @@
     { "enemy": "mole",     "fromWave": 6, "weight": 3, "cost": 2,   "group": 1 },
     { "enemy": "healer",   "fromWave": 7, "weight": 2, "cost": 3,   "group": 1 },
     { "enemy": "hive",     "fromWave": 7, "weight": 2, "cost": 5,   "group": 1 },
-    { "enemy": "wasp",     "fromWave": 8, "weight": 0.6, "cost": 6, "group": 3 }
+    { "enemy": "wasp",     "fromWave": 8, "weight": 0.6, "cost": 6, "group": 3, "maxGroup": 6 }
   ],
 
   "waveSets": {
@@ -341,7 +341,7 @@
       { "enemy": "healer",   "fromWave": 7,      "weight": 2, "cost": 3,   "group": 1 },
       { "enemy": "mole",     "fromWave": [7, 8], "weight": 2, "cost": 2,   "group": 1 },
       { "enemy": "hive",     "fromWave": 8,      "weight": 1, "cost": 5,   "group": 1 },
-      { "enemy": "wasp",     "fromWave": [8, 9], "weight": 0.6, "cost": 4,   "group": 2 }
+      { "enemy": "wasp",     "fromWave": [8, 9], "weight": 0.6, "cost": 4,   "group": 2, "maxGroup": 6 }
     ],
     "wild": [
       { "enemy": "grunt",    "fromWave": 1,      "weight": 5, "cost": 1,   "group": 1 },
