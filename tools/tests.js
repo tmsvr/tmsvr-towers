@@ -399,6 +399,37 @@ test('Monsters', 'a hurt stag beetle runs faster', () => {
   near(weak / full, want, 0.05, 'speed ratio at 10% health');
 });
 
+test('Maps', 'monsters in a tunnel can\'t be hit; flyers over the hill can', () => {
+  const m = MAPS.findIndex((x) => x.tunnel.size > 0);
+  ok(m >= 0, 'no map has a tunnel');
+  const s = game({ map: m }), k = [...s.m.tunnel][0], at = [k % s.m.W, Math.floor(k / s.m.W)];
+  const grunt = monsterOn(s, 'grunt', at), flyer = monsterOn(s, 'flyer', at);
+  grunt.seg = flyer.seg = 1;
+  tick(s);
+  ok(grunt.hid && !sim.hittable(grunt), 'the grunt in the tunnel can be hit');
+  ok(!flyer.hid && sim.hittable(flyer), 'the flyer over the hill can\'t be hit');
+  ok(!sim.canBuildAt(s, ...at), 'flowers can be planted on the hill');
+});
+
+test('Maps', 'a road that opens later sends nothing before its wave, and monsters after', () => {
+  const m = MAPS.findIndex((x) => x.paths.some((p) => p.opens > 1));
+  ok(m >= 0, 'no map opens a road later');
+  const late = MAPS[m].paths.map((p, i) => [p.opens, i]).filter(([o]) => o > 1);
+  for (const [opens, road] of late) {
+    let before = 0, after = 0;
+    for (let seed = 1; seed <= 6; seed++) for (const n of [opens - 1, opens]) {
+      const s = game({ map: m, seed });
+      s.phase = 'prep'; s.timer = 0; s.wave = n - 1;
+      tick(s);
+      eq(s.wave, n, 'wave started');
+      const used = s.queue.filter((e) => e.path === road).length;
+      if (n < opens) before += used; else after += used;
+    }
+    eq(before, 0, `monsters on road ${road} before wave ${opens}`);
+    ok(after > 0, `road ${road} sent nothing in wave ${opens}`);
+  }
+});
+
 test('Monsters', 'a [lo, hi] arrival wave lands inside its range and varies between games', () => {
   const m = MAPS.findIndex((x) => x.waves !== BALANCE.waves && x.waves.some((u) => Array.isArray(u.fromWave)));
   ok(m >= 0, 'no map uses a ranged arrival');

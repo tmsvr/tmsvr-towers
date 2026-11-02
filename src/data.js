@@ -39,7 +39,7 @@ function prepareMap(def, index) {
   const w = def.width, h = def.height;
   const center = ([x, y]) => ({ x: (x + 0.5) * T, y: (y + 0.5) * T });
   const pathTiles = new Set();
-  const paths = def.paths.map((pts) => {
+  const paths = def.paths.map((pts, i) => {
     let length = 0;
     for (let i = 0; i < pts.length - 1; i++) {
       const [x0, y0] = pts[i], [x1, y1] = pts[i + 1];
@@ -50,16 +50,22 @@ function prepareMap(def, index) {
     // enemies appear one tile outside the map edge, walking in
     const dx = Math.sign(pts[1][0] - pts[0][0]), dy = Math.sign(pts[1][1] - pts[0][1]);
     const spawn = center([pts[0][0] - dx, pts[0][1] - dy]);
-    return { points: pts, waypoints: pts.map(center), spawn, dir: Math.atan2(dy, dx), length: length + T };
+    // opens: the wave this road first sends monsters (roads that open late are fenced off until then)
+    return { points: pts, waypoints: pts.map(center), spawn, dir: Math.atan2(dy, dx), length: length + T, opens: def.opens?.[i] ?? 1 };
   });
   const blocked = new Set();
   const obstacles = [];
   const footbridges = new Set(); // cat-only bridges over water
+  const tunnel = new Set(); // road tiles under a hill: monsters there can't be seen or hit
   for (const o of def.obstacles || []) {
     if (o.type === 'bridge') {
       for (let y = o.y; y < o.y + o.h; y++) for (let x = o.x; x < o.x + o.w; x++) { footbridges.add(y * w + x); blocked.add(y * w + x); }
     } else if (o.type === 'pond') {
       for (let y = o.y; y < o.y + o.h; y++) for (let x = o.x; x < o.x + o.w; x++) blocked.add(y * w + x);
+      obstacles.push({ ...o });
+    } else if (o.type === 'hill') {
+      // a grassy hill the roads tunnel under: cats walk over it but can't plant on it
+      for (let y = o.y; y < o.y + o.h; y++) for (let x = o.x; x < o.x + o.w; x++) { blocked.add(y * w + x); if (pathTiles.has(y * w + x)) tunnel.add(y * w + x); }
       obstacles.push({ ...o });
     } else {
       blocked.add(o.y * w + o.x);
@@ -107,6 +113,7 @@ function prepareMap(def, index) {
   const solids = new Map();
   const addSolid = (k, s) => { if (!solids.has(k)) solids.set(k, []); solids.get(k).push(s); };
   for (const o of obstacles) {
+    if (o.type === 'hill') continue; // cats walk right over hills
     let s;
     if (o.type === 'pond' && [...Array(o.w * o.h).keys()].some((i) => deckTiles.has((o.y + Math.floor(i / o.w)) * w + o.x + (i % o.w)))) {
       for (let y = o.y; y < o.y + o.h; y++) for (let x = o.x; x < o.x + o.w; x++) {
@@ -125,12 +132,22 @@ function prepareMap(def, index) {
   }
   return {
     index, id: def.id, name: def.name, desc: def.desc, W: w, H: h, waves: waveSet(def), waveSize: def.waveSize ?? 1, startCoins: def.startCoins ?? 1, entrances: entrances(def), coinDrops: (def.coinDrops ?? 1) * (entrances(def) / 2) ** (BAL.economy.entranceCoins ?? 0), worldW: w * T, worldH: h * T,
-    paths, base: center(def.base), baseTile: def.base, start: center(def.start), pathTiles, blocked, yard, obstacles, solids, decks,
+    paths, base: center(def.base), baseTile: def.base, start: center(def.start), pathTiles, blocked, yard, obstacles, solids, decks, tunnel,
   };
 }
 
 // Every map, ready to play. A game keeps the one it is on as s.m.
 export const MAPS = MAP_DEFS.map(prepareMap);
+// A ground monster in a tunnel (flyers go over the hill).
+export const inTunnel = (m, e) => !e.def.flying && m.tunnel.has(Math.floor(e.y / T) * m.W + Math.floor(e.x / T));
+// The roads that send monsters in wave level n.
+export const openRoads = (m, n) => m.paths.map((_, i) => i).filter((i) => m.paths[i].opens <= n);
+// What monsters drop in wave level n: a road still fenced off needs no flowers yet, so its entrance doesn't pay.
+export const coinDropsAt = (m, n) => {
+  if (!m.paths.some((p) => p.opens > n)) return m.coinDrops;
+  const open = new Set(openRoads(m, n).map((i) => m.paths[i].points[0].join())).size;
+  return m.coinDrops * (open / m.entrances) ** (BAL.economy.entranceCoins ?? 0);
+};
 
 // ---- enemies (pixels, pixels/second) ----
 // The warning shown the first time each monster type turns up: [title, hint].

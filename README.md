@@ -43,6 +43,10 @@ them.
   switches between **Normal**, **Hard** (more and much tougher monsters,
   and fewer coins: for players whose gardens hold Normal with lots to spare),
   **Sprint** (6 quick waves, see Competing below) and **Sprint · Hard**.
+- Some maps have twists: on **Molehill** the roads run through tunnels under
+  grassy hills, where nothing can see or hit the monsters (cats can walk over
+  the hills but not plant on them); on **Overgrown** two roads are fenced off
+  at first, with a sign saying in which wave each one opens.
 - Standing on a flower, hold E to upgrade it and R to heal it. Q switches E to
   dig-up mode, which removes the flower and refunds part of what was spent on it.
 - At level 5 every flower **blooms**: it sparkles and gains a special ability
@@ -201,7 +205,7 @@ a rematch (new waves, same map and mode), **M** leaves.
 | File | What's in it |
 |---|---|
 | `balance.json` | Every flower, enemy, level, economy and difficulty number, in tiles and seconds. The `_help` section explains each field. |
-| `maps.json` | Map layouts: roads, base, obstacles, plus per-map `waveSize` and `startCoins`. |
+| `maps.json` | Map layouts: roads, base, obstacles (hills hide the roads under them), roads that open later, plus per-map `waveSize` and `startCoins`. |
 | `tools/gallery.html` | Every flower at every level and every cat, drawn with the game's own code (http://localhost:8765/tools/gallery.html). |
 | `tools/maps.html` | Every map drawn whole, to check a layout after editing `maps.json` (http://localhost:8765/tools/maps.html). |
 | `tools/balance-test.html` | Open http://localhost:8765/tools/balance-test.html to run an autopilot through whole games with the current numbers. |

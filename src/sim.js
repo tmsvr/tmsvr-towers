@@ -7,7 +7,7 @@ import {
   T, U, VIEW_W, MAP_H, TOTAL_WAVES, MAPS, ENEMIES, INTROS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, GROW_TIME, FLOWER_HP, WEAR_PER_SEC, WEAR_MULT, HEAL_RATE, HEAL_COST,
   POISON_TIME, START_COINS, LOADOUT_SIZE, loadoutSize, DIFFICULTY, ECONOMY, flowerStats, upgradeCost, plantCost, GLOBAL_RANGE, PLAYER, CATS, CAT_ORDER, bloomOf, ELITES, SHIELD, CHEST, PERKS,
-  SPRINT, SCORE, SEND, VERSUS,
+  SPRINT, SCORE, SEND, VERSUS, inTunnel, openRoads, coinDropsAt,
 } from './data.js';
 import { prune, clamp, nextSeed, randomFrom } from './util.js';
 import * as log from './stats.js';
@@ -340,7 +340,7 @@ function useItem(s, p) {
 }
 
 // Whether flowers, bombs and batons can touch this enemy right now.
-export const hittable = (e) => !e.dead && !e.under;
+export const hittable = (e) => !e.dead && !e.under && !e.hid; // hid: in a tunnel
 // Out of reach of ground-only flowers and poison clouds: flyers, and
 // grasshoppers in the middle of a leap.
 export const airborne = (e) => e.def.flying || (e.dashing && e.def.dash.leap);
@@ -422,7 +422,7 @@ function killEnemy(s, e) {
   // Drops shrink a little each wave, so bigger waves don't pay out ever more;
   // fractions round up by chance, so even 1-coin monsters drop less on average.
   const fade = Math.max(ECONOMY.coinFadeMin ?? 0, 1 - (ECONOMY.coinFadePerWave ?? 0) * Math.max(0, levelOf(s) - 1));
-  const raw = e.def.coin * ECONOMY.coinDropMultiplier * s.m.coinDrops * fade * (s.hard ? HARD.coins : 1) * (s.sprint ? SPRINT.coinDrops : 1) * (e.sent ? SEND.coins : 1);
+  const raw = e.def.coin * ECONOMY.coinDropMultiplier * coinDropsAt(s.m, levelOf(s)) * fade * (s.hard ? HARD.coins : 1) * (s.sprint ? SPRINT.coinDrops : 1) * (e.sent ? SEND.coins : 1);
   const v = Math.floor(raw + rnd(s));
   if (v <= 0) return;
   // Large drops split into a few pickups so they scatter nicely.
@@ -539,6 +539,7 @@ function updateEnemies(s, dt) {
     // how far is left to the cottage (flowers aim at whoever is closest to getting in)
     e.left = final ? Math.hypot(base.x - e.x, base.y - e.y) : road.length - e.dist;
     if (!final && d - mv < 1) e.seg++;
+    e.hid = inTunnel(s.m, e);
   }
 }
 
@@ -602,6 +603,7 @@ function buildQueue(s, n, { share = 0 } = {}) {
   let budget = (endless ? size(TOTAL_WAVES) * (1 + (TUNE.endlessWaveSizePerWave ?? 0) * (n - TOTAL_WAVES)) : size(n))
     * (s.players.length > 1 ? TUNE.coopWaveSize * more(s, 'waveSize') : TUNE.soloWaveSize) * s.m.waveSize * (s.hard ? HARD.waveSize : 1);
   const avail = s.m.waves.map((u, i) => ({ ...u, fromWave: from[i] })).filter((u) => u.fromWave <= n);
+  const roads = openRoads(s.m, n); // some maps open roads later in the game
   const bossWave = !share && n % TUNE.bossEvery === 0;
   if (bossWave) budget *= TUNE.bossWaveBudget;
   if (share) budget *= share;
@@ -623,7 +625,7 @@ function buildQueue(s, n, { share = 0 } = {}) {
     if (!pool.length) break;
     let r = R(s) * (share ? pool.reduce((a, u) => a + weightOf(u), 0) : total), pick = pool[0];
     for (const u of pool) { r -= weightOf(u); if (r <= 0) { pick = u; break; } }
-    const path = Math.floor(R(s) * s.m.paths.length); // a group sticks together on one road
+    const path = roads[Math.floor(R(s) * roads.length)]; // a group sticks together on one road
     const [lo, hi] = TUNE.spawnGap || [0.4, 1.2];
     // packs (swarms, wasps) get bigger every wave after they first appear, up to packMaxGrowth
     // times their size (or their own maxGroup), and pay for every member: bigger packs come less often, not for free
@@ -640,7 +642,7 @@ function buildQueue(s, n, { share = 0 } = {}) {
   const bosses = (bossWave ? 1 : 0) + Math.max(0, cycles - (bossWave ? 0 : TUNE.bossFreeCycles ?? 0)) * (TUNE.endlessBossesPerCycle ?? 0);
   for (let i = 0; i < bosses; i++) {
     const at = bossWave && i === bosses - 1 ? q.length : Math.floor((q.length * (i + 1)) / (bosses + 1));
-    q.splice(at, 0, { type: pickBoss(s), path: Math.floor(wrnd(s) * s.m.paths.length), wait: 3 });
+    q.splice(at, 0, { type: pickBoss(s), path: roads[Math.floor(wrnd(s) * roads.length)], wait: 3 });
   }
   const k = Math.max(TUNE.spawnGapMinScale ?? 0.5, 1 - n * (TUNE.spawnSpeedupPerWave ?? 0.03));
   for (const e of q) { e.wait *= k; e.elite = rollElite(s, e.type, n, wrnd); }
@@ -649,6 +651,9 @@ function buildQueue(s, n, { share = 0 } = {}) {
   for (let i = 0; i < rush; i++) q[i].wait = Math.min(q[i].wait, 0.12);
   return q;
 }
+
+// Does a road that was fenced off open in wave w? (Sprint skips levels, so it goes by the step.)
+const roadOpens = (s, w) => s.m.paths.some((p) => p.opens > 1 && p.opens > levelOf(s, w - 1) && p.opens <= levelOf(s, w));
 
 function startWave(s) {
   s.wave++;
@@ -660,7 +665,8 @@ function startWave(s) {
   log.logWaveStart(s);
   staggerMapWide(s);
   const boss = s.queue.filter((e) => ENEMIES[e.type].boss).length;
-  banner(s, boss > 1 ? `Wave ${s.wave} — ${boss} BOSSES!` : boss ? `Wave ${s.wave} — BOSS!` : levelOf(s) === TOTAL_WAVES + 1 ? `Wave ${s.wave} — catch your breath` : `Wave ${s.wave}`);
+  const opens = roadOpens(s, s.wave);
+  banner(s, boss > 1 ? `Wave ${s.wave} — ${boss} BOSSES!${opens ? ' New road!' : ''}` : boss ? `Wave ${s.wave} — BOSS!${opens ? ' New road!' : ''}` : opens ? `Wave ${s.wave} — a new road opens!` : levelOf(s) === TOTAL_WAVES + 1 ? `Wave ${s.wave} — catch your breath` : `Wave ${s.wave}`);
   ev(s, boss ? 'boss' : 'wave');
 }
 
@@ -710,7 +716,7 @@ function updateWaves(s, dt, ready) {
     const bonus = Math.round((ECONOMY.waveBonusBase + levelOf(s) * ECONOMY.waveBonusPerWave) * (s.players.length > 1 ? ECONOMY.coopBonusShare : 1));
     for (const p of s.players) p.coins += bonus;
     log.logWaveEnd(s, 'cleared');
-    banner(s, bonus > 0 ? `Wave cleared!  +${bonus} each` : 'Wave cleared!');
+    banner(s, (bonus > 0 ? `Wave cleared!  +${bonus} each` : 'Wave cleared!') + (roadOpens(s, s.wave + 1) ? '  ·  a new road opens next wave' : ''));
     ev(s, 'clear');
     if (s.chestDue) openChest(s);
     saveCheckpoint(s);

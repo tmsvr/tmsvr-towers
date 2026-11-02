@@ -4,7 +4,8 @@
     "paths": "Each path is a list of corner points, from where enemies enter (on the map edge) to the base. Segments must be straight horizontal or vertical lines. Enemies are spread across all paths.",
     "base": "The cottage enemies are trying to reach; every path must end here.",
     "start": "Where the cats start.",
-    "obstacles": "Hand-placed things you can't plant on: pond (x, y, w, h), tree (x, y), rock (x, y), bridge (x, y, w, h: a footbridge over a pond that cats can cross). Roads may cross ponds; they get a bridge automatically.",
+    "obstacles": "Hand-placed things you can't plant on: pond (x, y, w, h), tree (x, y), rock (x, y), bridge (x, y, w, h: a footbridge over a pond that cats can cross), hill (x, y, w, h: roads under it run through a tunnel, where monsters can't be seen or hit; cats walk over it). Roads may cross ponds; they get a bridge automatically.",
+    "opens": "Optional: for each road, the wave it first sends monsters (1 = from the start). A later road is fenced off and grown over until then, with a sign saying when it opens. Until then its entrance doesn't count towards the coins for more entrances.",
     "waveSize": "Multiplies how many enemies come per wave on this map (maps with short roads or several entrances can use less than 1). Boss health is multiplied by its square root.",
     "startCoins": "Multiplies the starting coins on this map (maps with several entrances need more flowers early).",
     "coinDrops": "Optional: multiplies the coins monsters drop on this map (default 1), on top of balance.json economy.entranceCoins, which already pays more on maps with more entrances.",
@@ -384,71 +385,56 @@
       "scatter": { "trees": 26, "rocks": 12, "seed": 71 }
     },
     {
-      "id": "sixways",
-      "name": "Six Ways",
-      "desc": "Hard: six roads",
+      "id": "molehill",
+      "name": "Molehill",
+      "desc": "Hard: roads cross under a hill",
       "width": 31,
-      "height": 25,
-      "base": [15, 12],
-      "start": [11, 14],
-      "waveSize": 0.72,
-      "startCoins": 2.9,
-      "waveSet": "rush",
+      "height": 23,
+      "base": [15, 18],
+      "start": [15, 15],
+      "waveSize": 0.9,
+      "startCoins": 2.5,
       "paths": [
-        [[0, 4], [6, 4], [6, 12], [15, 12]],
-        [[0, 20], [6, 20], [6, 12], [15, 12]],
-        [[30, 4], [24, 4], [24, 12], [15, 12]],
-        [[30, 20], [24, 20], [24, 12], [15, 12]],
-        [[11, 0], [11, 6], [15, 6], [15, 12]],
-        [[19, 24], [19, 18], [15, 18], [15, 12]]
+        [[0, 8], [23, 8], [23, 18], [15, 18]],
+        [[30, 10], [7, 10], [7, 18], [15, 18]],
+        [[15, 0], [15, 18]]
       ],
       "obstacles": [
-        { "type": "pond", "x": 13, "y": 10, "w": 5, "h": 1 },
-        { "type": "pond", "x": 13, "y": 14, "w": 5, "h": 1 },
-        { "type": "pond", "x": 13, "y": 11, "w": 1, "h": 3 },
-        { "type": "pond", "x": 17, "y": 11, "w": 1, "h": 3 },
-        { "type": "pond", "x": 9, "y": 8, "w": 3, "h": 2 },
-        { "type": "pond", "x": 18, "y": 14, "w": 3, "h": 2 },
-        { "type": "pond", "x": 1, "y": 10, "w": 3, "h": 4 },
-        { "type": "pond", "x": 27, "y": 10, "w": 3, "h": 4 },
-        { "type": "pond", "x": 20, "y": 1, "w": 4, "h": 2 },
-        { "type": "pond", "x": 7, "y": 22, "w": 4, "h": 2 }
+        { "type": "hill", "x": 11, "y": 5, "w": 9, "h": 7 },
+        { "type": "hill", "x": 6, "y": 12, "w": 3, "h": 4 },
+        { "type": "hill", "x": 22, "y": 12, "w": 3, "h": 4 },
+        { "type": "pond", "x": 2, "y": 13, "w": 3, "h": 3 },
+        { "type": "pond", "x": 26, "y": 2, "w": 3, "h": 3 },
+        { "type": "pond", "x": 25, "y": 14, "w": 3, "h": 4 },
+        { "type": "pond", "x": 9, "y": 1, "w": 3, "h": 2 }
       ],
-      "scatter": { "trees": 28, "rocks": 10, "seed": 83 }
+      "scatter": { "trees": 26, "rocks": 10, "seed": 83 }
     },
     {
-      "id": "marsh",
-      "name": "Marsh",
-      "desc": "Hard: little dry land",
+      "id": "overgrown",
+      "name": "Overgrown",
+      "desc": "Hard: roads open later",
       "width": 33,
-      "height": 25,
-      "base": [16, 20],
-      "start": [16, 17],
-      "waveSize": 1.1,
-      "startCoins": 1.9,
-      "waveSet": "wild",
+      "height": 23,
+      "base": [16, 11],
+      "start": [16, 8],
+      "waveSize": 1.6,
+      "startCoins": 1.5,
       "paths": [
-        [[0, 2], [10, 2], [10, 8], [4, 8], [4, 14], [12, 14], [12, 20], [16, 20]],
-        [[32, 2], [22, 2], [22, 8], [28, 8], [28, 14], [20, 14], [20, 20], [16, 20]],
-        [[16, 0], [16, 20]]
+        [[0, 11], [5, 11], [5, 4], [12, 4], [12, 11], [16, 11]],
+        [[32, 11], [27, 11], [27, 18], [20, 18], [20, 11], [16, 11]],
+        [[16, 22], [16, 11]]
       ],
+      "opens": [1, 4, 7],
       "obstacles": [
-        { "type": "pond", "x": 14, "y": 18, "w": 5, "h": 1 },
-        { "type": "pond", "x": 14, "y": 22, "w": 5, "h": 1 },
-        { "type": "pond", "x": 14, "y": 19, "w": 1, "h": 3 },
-        { "type": "pond", "x": 18, "y": 19, "w": 1, "h": 3 },
-        { "type": "pond", "x": 13, "y": 3, "w": 2, "h": 9 },
-        { "type": "pond", "x": 18, "y": 3, "w": 2, "h": 9 },
-        { "type": "pond", "x": 5, "y": 10, "w": 6, "h": 3 },
-        { "type": "pond", "x": 22, "y": 10, "w": 6, "h": 3 },
-        { "type": "pond", "x": 5, "y": 17, "w": 5, "h": 4 },
-        { "type": "pond", "x": 23, "y": 17, "w": 5, "h": 4 },
-        { "type": "pond", "x": 11, "y": 4, "w": 1, "h": 3 },
-        { "type": "pond", "x": 21, "y": 4, "w": 1, "h": 3 },
-        { "type": "pond", "x": 26, "y": 22, "w": 4, "h": 2 },
-        { "type": "pond", "x": 3, "y": 22, "w": 4, "h": 2 }
+        { "type": "pond", "x": 7, "y": 6, "w": 4, "h": 4 },
+        { "type": "pond", "x": 22, "y": 13, "w": 4, "h": 4 },
+        { "type": "pond", "x": 17, "y": 14, "w": 2, "h": 7 },
+        { "type": "pond", "x": 1, "y": 16, "w": 3, "h": 3 },
+        { "type": "pond", "x": 28, "y": 2, "w": 3, "h": 3 },
+        { "type": "pond", "x": 20, "y": 2, "w": 3, "h": 2 }
       ],
-      "scatter": { "trees": 34, "rocks": 12, "seed": 29 }
+      "scatter": { "trees": 30, "rocks": 12, "seed": 29 }
     }
   ]
 }

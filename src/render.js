@@ -11,9 +11,9 @@
 import {
   T, U, VIEW_W as BASE_W, MAP_H as BASE_MAP_H, HUD_H, TOTAL_WAVES, MAPS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, loadoutSize, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, GLOBAL_RANGE, ENEMIES, INTROS,
-  BLOOM, bloomOf, ELITES, CHEST, ECONOMY, SEND,
+  BLOOM, bloomOf, ELITES, CHEST, ECONOMY, SEND, inTunnel,
 } from './data.js';
-import { tileOf, canBuildAt, uprootRefund, catStats, plantPrice, upgradeLeft, healLeft, lastWave, modeName, scoreOf, wavesCleared } from './sim.js';
+import { levelOf, tileOf, canBuildAt, uprootRefund, catStats, plantPrice, upgradeLeft, healLeft, lastWave, modeName, scoreOf, wavesCleared } from './sim.js';
 import { codeOf, encodeCode } from './challenge.js';
 import { raceLine, rivalName } from './versus.js';
 import { isMuted } from './audio.js';
@@ -204,6 +204,52 @@ function drawPond(c, o, r) {
   }
 }
 
+// The tiles of a road in walking order (corners come twice).
+function* roadTiles(p) {
+  const pts = p.points;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [x0, y0] = pts[i], [x1, y1] = pts[i + 1], dx = Math.sign(x1 - x0), dy = Math.sign(y1 - y0);
+    for (let x = x0, y = y0; ; x += dx, y += dy) { yield [x, y, dx, dy]; if (x === x1 && y === y1) break; }
+  }
+}
+
+// A grassy hill a road tunnels under.
+function drawHill(c, o, r) {
+  const x = o.x * T, y = o.y * T, w = o.w * T, h = o.h * T;
+  rrect(c, x + 3, y + 10, w - 6, h - 6, T * 0.6, 'rgba(0,0,0,0.16)');
+  const g = c.createLinearGradient(0, y, 0, y + h);
+  g.addColorStop(0, '#9ad66a'); g.addColorStop(1, '#5c9c3c');
+  rrect(c, x + 3, y + 3, w - 6, h - 6, T * 0.6, g, '#3e7a30', 2.5);
+  rrect(c, x + 14, y + 10, w - 28, Math.max(T * 0.4, h * 0.35), T * 0.4, 'rgba(255,255,255,0.12)');
+  c.strokeStyle = '#4f8f34'; c.lineWidth = 2; c.lineCap = 'round';
+  for (let i = 0; i < o.w * o.h * 3; i++) {
+    const tx = x + 14 + r() * (w - 28), ty = y + 14 + r() * (h - 28);
+    c.beginPath(); c.moveTo(tx, ty); c.lineTo(tx - 4, ty - 7); c.moveTo(tx, ty); c.lineTo(tx, ty - 9); c.moveTo(tx, ty); c.lineTo(tx + 4, ty - 7); c.stroke();
+  }
+  for (let i = 0; i < o.w * o.h * 0.5; i++) {
+    const fx = x + 16 + r() * (w - 32), fy = y + 16 + r() * (h - 32);
+    for (let k = 0; k < 3; k++) circle(c, fx + (r() - 0.5) * 12, fy + (r() - 0.5) * 8, 2.2, r() < 0.5 ? '#ffffff' : '#ffe066');
+  }
+}
+
+// A stone arch wherever a road goes into a hill or comes out of one.
+function drawTunnelMouths(c, m) {
+  for (const p of m.paths) {
+    let prev = null;
+    for (const [x, y, dx, dy] of roadTiles(p)) {
+      const inside = m.tunnel.has(y * m.W + x);
+      if (prev && prev.inside !== inside) {
+        const [ix, iy] = inside ? [x, y] : [prev.x, prev.y], ox = inside ? -dx : dx, oy = inside ? -dy : dy;
+        c.save(); c.translate((ix + 0.5 + ox * 0.5) * T, (iy + 0.5 + oy * 0.5) * T); c.rotate(Math.atan2(oy, ox));
+        ellipse(c, -5, 0, T * 0.32, T * 0.56, '#7c7884', OUT, 3);
+        ellipse(c, -2, 0, T * 0.2, T * 0.4, '#1b1424');
+        c.restore();
+      }
+      prev = { x, y, inside };
+    }
+  }
+}
+
 // A wooden bridge deck over one water tile: planks across the way it is
 // crossed, with a rail and posts on both sides.
 function drawDeck(c, d) {
@@ -347,6 +393,8 @@ function paintBg(c, m) {
     }
   }
   for (const d of m.decks) drawDeck(c, d);
+  for (const o of m.obstacles) if (o.type === 'hill') drawHill(c, o, r);
+  drawTunnelMouths(c, m);
   for (const o of m.obstacles) if (o.type === 'rock') drawRock(c, o);
   // a monster cave where each road enters the map
   for (const path of m.paths) {
@@ -1731,7 +1779,7 @@ function drawMinimap(c, s, ui) {
     c.fillStyle = f.lvl === 0 ? '#3e8a2e' : FLOWERS[f.type].color;
     c.fillRect(mx(f.x) - r, my(f.y) - r, r * 2, r * 2);
   }
-  for (const e of s.enemies) circle(c, mx(e.x), my(e.y), e.def.boss ? 4.5 : e.def.r > 14 * U ? 3 : 2, e.def.boss ? '#ff3030' : '#e0405a');
+  for (const e of s.enemies) if (!inTunnel(m, e)) circle(c, mx(e.x), my(e.y), e.def.boss ? 4.5 : e.def.r > 14 * U ? 3 : 2, e.def.boss ? '#ff3030' : '#e0405a');
   circle(c, mx(base.x), my(base.y), s.baseHitT > 0 ? 6 + Math.sin(performance.now() / 80) * 2 : 4, s.baseHitT > 0 ? '#ff4040' : '#ffffff', OUT, 1.5);
   for (const p of s.players) circle(c, mx(p.x), my(p.y), 4.5, PLAYER.scarves[p.id], '#ffffff', 1.5);
   c.strokeStyle = 'rgba(255,255,255,0.9)'; c.lineWidth = 1.5;
@@ -2009,20 +2057,50 @@ function wrapText(c, txt, maxW, size, weight = 500) {
 }
 
 // A tiny overview of a map for the map picker.
+// A road that opens later in the game: grown over up to where it meets an
+// open road, with a fence across its mouth and the wave it opens in.
+function drawClosedRoads(c, s, m) {
+  const lv = Math.max(1, levelOf(s)); // before wave 1 too, the first roads are open
+  if (!m.paths.some((p) => p.opens > lv)) return;
+  const open = new Set();
+  for (const p of m.paths) if (p.opens <= lv) for (const [x, y] of roadTiles(p)) open.add(y * m.W + x);
+  for (const p of m.paths) {
+    if (p.opens <= lv) continue;
+    const pts = [{ x: p.spawn.x - Math.cos(p.dir) * T * 0.5, y: p.spawn.y - Math.sin(p.dir) * T * 0.5 }];
+    for (const [x, y] of roadTiles(p)) {
+      if (open.has(y * m.W + x)) break;
+      pts.push({ x: (x + 0.5) * T, y: (y + 0.5) * T });
+    }
+    strokePoly(c, pts, T * 0.9, 'rgba(127,189,82,0.78)');
+    // the fence
+    const fx = p.waypoints[0].x - Math.cos(p.dir) * T * 0.2, fy = p.waypoints[0].y - Math.sin(p.dir) * T * 0.2;
+    c.save(); c.translate(fx, fy); c.rotate(p.dir + Math.PI / 2);
+    for (const k of [-0.45, 0, 0.45]) rrect(c, k * T - 4, -9, 8, 18, 3, '#9c6b3c', OUT, 2);
+    for (const yy of [-5, 3]) rrect(c, -T * 0.55, yy - 2.5, T * 1.1, 5, 2, '#c08850', OUT, 1.5);
+    c.restore();
+    let n = s.wave + 1;
+    while (levelOf(s, n) < p.opens) n++;
+    const k = T * (0.5 + Math.abs(Math.cos(p.dir)) * 1.1); // a little way in, so the edge doesn't cut it
+    label(c, `Opens wave ${n}`, p.waypoints[0].x + Math.cos(p.dir) * k, p.waypoints[0].y + Math.sin(p.dir) * k + 5, 13, '#ffe9a8', 'center', 700);
+  }
+}
+
 function drawMapThumb(c, m, x, y, w, h) {
   const sc = Math.min(w / m.worldW, h / m.worldH);
   const ox = x + (w - m.worldW * sc) / 2, oy = y + (h - m.worldH * sc) / 2;
   rrect(c, ox, oy, m.worldW * sc, m.worldH * sc, 4, '#7fbd52');
   for (const o of m.obstacles) {
     if (o.type === 'pond') rrect(c, ox + o.x * T * sc, oy + o.y * T * sc, o.w * T * sc, o.h * T * sc, 3, '#4fa3d9');
+    else if (o.type === 'hill') continue; // over the roads, below
     else circle(c, ox + (o.x + 0.5) * T * sc, oy + (o.y + 0.5) * T * sc, T * sc * 0.4, o.type === 'tree' ? '#3f8f3a' : '#9a9aa2');
   }
   for (const p of m.paths) {
     c.beginPath();
     p.waypoints.forEach((wp, i) => (i ? c.lineTo : c.moveTo).call(c, ox + wp.x * sc, oy + wp.y * sc));
     c.lineWidth = Math.max(2, T * sc * 0.8); c.strokeStyle = '#e0bf86'; c.lineJoin = 'round'; c.stroke();
-    circle(c, ox + p.waypoints[0].x * sc, oy + p.waypoints[0].y * sc, 4, '#8a5cff', OUT, 1);
   }
+  for (const o of m.obstacles) if (o.type === 'hill') rrect(c, ox + o.x * T * sc, oy + o.y * T * sc, o.w * T * sc, o.h * T * sc, 3, '#4f8f34');
+  for (const p of m.paths) circle(c, ox + p.waypoints[0].x * sc, oy + p.waypoints[0].y * sc, 4, p.opens > 1 ? '#c08850' : '#8a5cff', OUT, 1); // brown: opens later
   circle(c, ox + m.base.x * sc, oy + m.base.y * sc, 5, '#d6504a', '#fff', 1.5);
 }
 
@@ -2611,6 +2689,7 @@ export function render(c, s, ui) {
   drawBg(c, m, ui.dpr, camX, camY);
   c.translate(-camX, -camY);
   for (const path of m.paths) {
+    if (s && path.opens > Math.max(1, levelOf(s))) continue; // fenced off for now
     const ex = path.waypoints[0].x - Math.cos(path.dir) * T * 0.55, ey = path.waypoints[0].y - Math.sin(path.dir) * T * 0.55;
     for (let i = 0; i < 3; i++) {
       const a = time * 2 + i * 2.1;
@@ -2631,6 +2710,7 @@ export function render(c, s, ui) {
   // only draw what's on (or near) the screen
   const M = T * 1.5;
   const vis = (o) => o.x > camX - M && o.x < camX + VIEW_W + M && o.y > camY - M && o.y < camY + MAP_H + M;
+  drawClosedRoads(c, s, m);
   for (const p of s.players) drawBuildGhost(c, p, s, time);
   drawCottage(c, m.base.x, m.base.y, s.lives, s.maxLives, s.baseHitT, time);
   for (const cl of s.clouds) if (vis(cl)) drawCloud(c, cl, time);
@@ -2639,7 +2719,7 @@ export function render(c, s, ui) {
   // things standing on the ground, drawn back to front
   actors.length = 0;
   for (const f of s.flowers) if (vis(f)) addActor(f.y + T * 0.2, FLOWER, f);
-  for (const e of s.enemies) if (!e.def.flying && vis(e)) addActor(e.y, ENEMY, e);
+  for (const e of s.enemies) if (!e.def.flying && vis(e) && !inTunnel(m, e)) addActor(e.y, ENEMY, e);
   for (const p of s.players) addActor(p.y, CAT, p);
   for (const o of m.obstacles) {
     if (o.type === 'tree' && vis({ x: (o.x + 0.5) * T, y: (o.y + 0.5) * T })) addActor((o.y + 0.75) * T, TREE, o);

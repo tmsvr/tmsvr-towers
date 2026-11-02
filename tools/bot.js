@@ -119,7 +119,7 @@ export function runBot({ players = 2, seed = 1, loadouts, cats, map = 0, hard = 
   // right next to the road, covering about 7 road tiles).
   const coverage = (x, y) => {
     let n = 0;
-    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (dx * dx + dy * dy <= 5.3 && m.pathTiles.has((y + dy) * m.W + x + dx)) n++;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (dx * dx + dy * dy <= 5.3 && m.pathTiles.has((y + dy) * m.W + x + dx) && !m.tunnel.has((y + dy) * m.W + x + dx)) n++; // nothing to shoot in a tunnel
     return n;
   };
   const spots = [];
@@ -139,9 +139,13 @@ export function runBot({ players = 2, seed = 1, loadouts, cats, map = 0, hard = 
     const per = roadTiles.map(() => 0);
     for (const f of s.flowers) for (const r of roadsNear(f.tx, f.ty)) per[r]++;
     const most = Math.max(...per);
+    // roads that open later get flowers one wave ahead, like players do
+    const soon = (r) => m.paths[r].opens <= sim.levelOf(s, s.wave + 1);
     for (const o of spots) {
       if (taken.has(o.y * m.W + o.x) || !sim.canBuildAt(s, o.x, o.y)) continue;
-      const behind = o.near.length ? Math.max(...o.near.map((r) => most - per[r])) : 0;
+      const near = o.near.filter(soon);
+      if (o.near.length && !near.length) continue;
+      const behind = near.length ? Math.max(...near.map((r) => most - per[r])) : 0;
       const v = o.n + H.spotRoads * behind - H.spotCottage * o.home - H.spotWalk * (Math.abs(o.x + 0.5 - px) + Math.abs(o.y + 0.5 - py));
       if (v > bs) { bs = v; best = o; }
     }

@@ -45,7 +45,7 @@ Claude Code users: `.claude/launch.json` defines this server as `towers`
 | `index.html` | The page: canvas, lobby DOM for online play, CSS, PeerJS script tag |
 | `fonts/` | The Fredoka font (Latin letters, every weight in one file), its CSS and license |
 | `balance.json` | Every gameplay number, in tiles and seconds. `_help` explains the fields |
-| `maps.json` | Maps: roads (waypoints), cottage, start, obstacles, `waveSize`, `startCoins`, `waveSet`, scatter. `_help` explains the fields |
+| `maps.json` | Maps: roads (waypoints), cottage, start, obstacles (ponds, hills with tunnels…), roads that open later (`opens`), `waveSize`, `startCoins`, `waveSet`, scatter. `_help` explains the fields |
 | `src/data.js` | Loads both JSON files (top-level `await fetch`), converts to pixel units, derives flower stats per level, prepares maps (decks, bridges, colliders), computes `DATA_HASH` |
 | `src/sim.js` | **The game rules.** Pure state + `step(state, inputs, dt)`. No DOM, no drawing |
 | `src/stats.js` | Game log hooks the sim calls (damage, coins, waves…). Counting only, never affects play. `gameSummary` makes the end screen's numbers (the host sends them to the guest as a `summary` message) |
@@ -241,7 +241,7 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
 | I want to… | Do this |
 |---|---|
 | Rebalance (damage, costs, HP, waves, economy) | Edit `balance.json`. The flower guide (I key) and pick cards update themselves |
-| Change a map, or add one | Edit/add an entry in `maps.json`, then look at it whole in `/tools/maps.html`. Roads are lists of corner points; each segment must be horizontal or vertical; every road ends at `base`. Check reachability (a scatter seed can wall off a tile; change `scatter.seed`) |
+| Change a map, or add one | Edit/add an entry in `maps.json`, then look at it whole in `/tools/maps.html`. Roads are lists of corner points; each segment must be horizontal or vertical; every road ends at `base`. Check reachability (a scatter seed can wall off a tile; change `scatter.seed`). A `hill` obstacle puts the roads under it in a tunnel (`m.tunnel`, `inTunnel`: monsters there are `hid`, so not `hittable`); `opens` makes a road start sending monsters in a later wave (`openRoads` in `buildQueue`, fenced off by `drawClosedRoads` until then, and its entrance doesn't pay until it opens: `coinDropsAt`) |
 | Tune Sprint or the score | `balance.json → sprint` (which waves it plays, breaks, coins) and `→ score`. Check Sprint with `runBot({ sprint: true })` |
 | Tune 3-4 cat games | `balance.json → difficulty.morePlayers`. Check with `runBot({ players: 3 })` and `players: 4` against `players: 2` |
 | Make a map easier or harder | `waveSize` (monster count; boss HP scales with its square root) and `startCoins` in `maps.json` |
