@@ -45,7 +45,7 @@ them.
   **Sprint** (6 quick waves, see Competing below) and **Sprint · Hard**.
 - Some maps have twists: on **Molehill** the roads run through tunnels under
   grassy hills, where nothing can see or hit the monsters (cats can walk over
-  the hills but not plant on them); on **Overgrown** two roads are fenced off
+  the hills but not plant on them); on **Overgrown** four of its five roads are fenced off
   at first, with a sign saying in which wave each one opens.
 - Standing on a flower, hold E to upgrade it and R to heal it. Q switches E to
   dig-up mode, which removes the flower and refunds part of what was spent on it.
