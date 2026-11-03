@@ -15,6 +15,7 @@ import { encodeCode, decodeCode, codeOf, dailyChallenge, shareText } from '../sr
 import { raceStatus, raceResult } from '../src/versus.js';
 import { createHostLink } from '../src/host.js';
 import { saveGame, loadGame } from '../src/save.js';
+import { openRoom, joinGame } from '../src/net.js';
 
 const DT = 1 / 60;
 const tests = [];
@@ -1696,6 +1697,80 @@ test('Online', 'guest inputs survive the trip', () => {
 });
 
 // ---- drawing ----------------------------------------------------------------------
+// A stand-in for window.Peer that does what PeerJS does when the link to the
+// signalling server drops: an error, then 'disconnected'; connections stay up.
+async function withFakePeer(fn) {
+  const made = [], real = window.Peer;
+  window.Peer = class {
+    constructor(id) {
+      Object.assign(this, { id, handlers: {}, disconnected: false, destroyed: false, reconnects: 0 });
+      made.push(this);
+    }
+    on(ev, f) { this.handlers[ev] = f; }
+    emit(ev, ...args) { this.handlers[ev]?.(...args); }
+    connect() { const c = { handlers: {}, on(ev, f) { this.handlers[ev] = f; }, peerConnection: { createDataChannel: () => ({}) } }; this.conn = c; return c; }
+    reconnect() { this.reconnects++; this.disconnected = false; }
+    destroy() { this.destroyed = true; }
+    drop(type = 'network') { this.emit('error', { type }); this.disconnected = true; this.emit('disconnected'); }
+  };
+  const peer = async (n = 1) => { for (let i = 0; i < 400 && made.length < n; i++) await new Promise((res) => setTimeout(res, 10)); ok(made.length >= n, 'no Peer was made'); return made[n - 1]; };
+  try { await fn(peer, made); } finally { window.Peer = real; }
+}
+const handlers = (seen) => ({
+  onOpen: (code) => seen.push(`open ${code}`), onError: (msg) => seen.push(`error ${msg}`),
+  onLink() {}, onData() {}, onClose: () => seen.push('close'),
+});
+
+test('Online', 'a host losing the signalling server mid-game hears nothing of it, and gets back', async () => {
+  await withFakePeer(async (peer) => {
+    const seen = [], room = openRoom(handlers(seen)), p = await peer();
+    p.emit('open');
+    eq(seen.length, 1, 'the room opens once');
+    p.drop();
+    p.drop('socket-error');
+    p.drop('unavailable-id'); // someone took the code meanwhile: the game must not be torn down
+    ok(!p.destroyed, 'the peer, and so the game, stays up');
+    p.emit('open'); // this is what used to bring the lobby back up over the game
+    eq(seen.length, 1, 'no second open, no error');
+    p.disconnected = true;
+    p.handlers.disconnected();
+    await new Promise((res) => setTimeout(res, 3100));
+    ok(p.reconnects >= 1, 'it reconnects');
+    room.close();
+  });
+});
+
+test('Online', 'a host that never got a room still hears why, and a code clash picks another', async () => {
+  await withFakePeer(async (peer) => {
+    const seen = [], room = openRoom(handlers(seen)), p = await peer();
+    p.emit('error', { type: 'network' });
+    eq(seen.length, 1, 'the error is reported');
+    ok(seen[0].startsWith('error'), `an error, got ${seen[0]}`);
+    p.emit('error', { type: 'unavailable-id' });
+    ok(p.destroyed, 'the taken code is given up');
+    const q = await peer(2);
+    q.emit('open');
+    eq(seen[1], `open ${q.id.slice(-4)}`, 'the new code');
+    room.close();
+  });
+});
+
+test('Online', 'a guest losing the signalling server mid-game hears nothing of it; before joining it does', async () => {
+  await withFakePeer(async (peer) => {
+    const seen = [], link = joinGame('ABCD', handlers(seen)), p = await peer();
+    p.emit('open');
+    p.conn.handlers.open();
+    eq(seen[0], 'open undefined', 'joined');
+    p.drop();
+    eq(seen.length, 1, 'no error over the game');
+    link.close();
+    const early = [], link2 = joinGame('ABCD', handlers(early)), q = await peer(2);
+    q.emit('error', { type: 'peer-unavailable' });
+    ok(early[0]?.startsWith('error'), 'before joining the error is reported');
+    link2.close();
+  });
+});
+
 test('Drawing', 'pick screen, a game in progress and the end screen draw without errors', () => {
   const cv = document.createElement('canvas'); cv.width = 1008; cv.height = 656;
   const c = cv.getContext('2d');

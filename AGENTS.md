@@ -68,7 +68,7 @@ Claude Code users: `.claude/launch.json` defines this server as `towers`
 | `tools/gallery.html` | Every flower at every level, every cat (standing and swinging) and every monster, drawn with the real render code. `?zoom=5` for close-ups |
 | `tools/screens.html` | Every screen (menu, guide, pick, game, chest, pause, end screens, overlays) drawn with the real render code on realistic games, including a long endless run with huge numbers, so text that doesn't fit shows at a glance. `?only=pause` filters by name |
 | `tools/tests.html`, `tools/tests.js` | The test suite: prices, maps, monsters, endless mode, whole autopilot games, saved games, online encoding, drawing. Runs in the browser |
-| `tools/fakepeer.js` | A stand-in for PeerJS over `BroadcastChannel`: open the game with `?fakenet` in several tabs of one browser to test online play without the internet (`&tick` too if background tabs freeze) |
+| `tools/fakepeer.js` | A stand-in for PeerJS over `BroadcastChannel`: open the game with `?fakenet` in several tabs of one browser to test online play without the internet (`&tick` too if background tabs freeze). `fakeDrop()` in the console loses that tab's link to the signalling server, as happens for real mid-game |
 | `tools/maps.html` | Every map from `maps.json` drawn whole with the real render code (roads, ponds, bridges, scatter, cottage, entrances) |
 | `turn/` | Cloudflare Worker that makes TURN relay credentials, and how to deploy it (`turn/README.md`) |
 | `serve.py` | No-cache local server |

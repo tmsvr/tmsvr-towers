@@ -51,7 +51,10 @@ class FakePeer extends Emitter {
     c.timer = setTimeout(() => { if (!c.open) { conns.delete(c.id); this.emit('error', { type: 'peer-unavailable' }); } }, 3000);
     return c;
   }
-  reconnect() {}
+  // What PeerJS does when its link to the signalling server drops: an error,
+  // then 'disconnected'. Connections stay up, and reconnecting fires 'open' again.
+  drop() { this.emit('error', { type: 'network' }); this.disconnected = true; this.emit('disconnected', this.id); }
+  reconnect() { this.disconnected = false; setTimeout(() => this.emit('open', this.id), 30); }
   destroy() {
     this.destroyed = true;
     peers.delete(this.id);
@@ -82,6 +85,8 @@ bus.onmessage = ({ data: m }) => {
 addEventListener('pagehide', () => { for (const c of [...conns.values()]) c.close(); });
 
 window.Peer = FakePeer;
+// From the console: lose this tab's signalling link mid-game.
+window.fakeDrop = () => { for (const p of peers.values()) p.drop(); };
 
 // ?fakenet&tick: some embedded or automated browsers stop drawing background
 // tabs without telling the page it is hidden, so their games freeze. Saying

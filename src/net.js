@@ -25,6 +25,7 @@ const BACKLOG = { fast: 16 * 1024, reliable: 64 * 1024 };
 // Empty: PeerJS's own servers only.
 const ICE_URL = 'https://petal-turn.timester12.workers.dev';
 const ICE_WAIT = 3000; // ms; without an answer by then, connect with PeerJS's servers
+const RECONNECT_WAIT = 3000; // ms between tries to get back to the signalling server
 
 const randomCode = () => Array.from({ length: 4 }, () => LETTERS[Math.floor(Math.random() * LETTERS.length)]).join('');
 
@@ -120,12 +121,12 @@ const OFFLINE = { send() {}, sendFast() {}, close() {}, kick() {}, connected: fa
 // a link with its own two lanes. Teammates join the room; a versus race also
 // links two rooms (connect). Who a link is (teammate or rival) is up to the
 // game: the first thing either side says is a hello naming its role.
-//   onOpen(code)        the room has its code
+//   onOpen(code)        the room has its code (once: reconnecting to the signalling server isn't news)
 //   onLink(link)        a connection opened (link.out: we connected to them)
 //   onData(link, msg)   a message (fast-lane ones as an ArrayBuffer)
 //   onClose(link)       a link closed or failed
 export function openRoom({ onOpen, onLink, onData, onClose, onError }) {
-  let peer = null, closed = false, code = '';
+  let peer = null, closed = false, code = '', opened = false;
   if (!requirePeer(onError)) return { ...OFFLINE, connect() {}, links: [] };
   const links = new Set();
 
@@ -150,15 +151,17 @@ export function openRoom({ onOpen, onLink, onData, onClose, onError }) {
     if (closed) return;
     code = randomCode();
     peer = new window.Peer(PREFIX + code, opts);
-    peer.on('open', () => onOpen(code));
+    peer.on('open', () => { if (!opened) { opened = true; onOpen(code); } });
     peer.on('connection', (c) => adopt(c, false));
     peer.on('error', (err) => {
-      if (err.type === 'unavailable-id') { peer.destroy(); open(); return; } // code clash: pick another
       if (err.type === 'peer-unavailable') { onError(errorText(err), true); return; } // a room we tried to link to isn't there
+      // Once open, trouble here is only the signalling link: the game's connections are fine and reconnecting is under way.
+      if (opened) { console.warn('Signalling server trouble; the game carries on', err.type); return; }
+      if (err.type === 'unavailable-id') { peer.destroy(); open(); return; } // code clash: pick another
       if (!closed) onError(errorText(err));
     });
     // The signalling link can drop while the game connection is fine; reconnect so rejoining still works.
-    peer.on('disconnected', () => { if (!closed && !peer.destroyed) peer.reconnect(); });
+    peer.on('disconnected', () => setTimeout(() => { if (!closed && peer.disconnected && !peer.destroyed) peer.reconnect(); }, RECONNECT_WAIT));
   });
   open();
 
@@ -172,7 +175,7 @@ export function openRoom({ onOpen, onLink, onData, onClose, onError }) {
 }
 
 export function joinGame(code, { onOpen, onData, onClose, onError }) {
-  let closed = false, peer = null;
+  let closed = false, peer = null, joined = false;
   const link = lanes();
   if (!requirePeer(onError)) return OFFLINE;
   peerOptions().then((opts) => {
@@ -180,10 +183,11 @@ export function joinGame(code, { onOpen, onData, onClose, onError }) {
     peer = new window.Peer(opts);
     peer.on('open', () => {
       const conn = peer.connect(PREFIX + code.toUpperCase(), { reliable: true });
-      conn.on('open', () => { link.attach(conn, onData); onOpen(); });
+      conn.on('open', () => { joined = true; link.attach(conn, onData); onOpen(); });
       wire(conn, { onData, onClose: () => { link.detach(conn); if (!closed) onClose(); } });
     });
-    peer.on('error', (err) => { if (!closed) onError(errorText(err)); });
+    // Once joined, trouble here is only the signalling link: losing the host shows up as onClose.
+    peer.on('error', (err) => { if (!closed && !joined) onError(errorText(err)); });
   });
   return {
     send: (msg) => link.send(msg),
