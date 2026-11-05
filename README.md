@@ -41,7 +41,8 @@ them.
   pick the same cat: Brick (slow, big hits), Zip (fast, light hits), Fern
   (grows and heals faster) or Boom (faster, bigger bombs). On the map row, E
   switches between **Normal**, **Hard** (more and much tougher monsters,
-  and fewer coins: for players whose gardens hold Normal with lots to spare),
+  fewer coins, but 10 more seconds before the first wave: for players whose
+  gardens hold Normal with lots to spare),
   **Sprint** (6 quick waves, see Competing below) and **Sprint · Hard**.
 - Some maps have twists: on **Molehill** the roads run through tunnels under
   grassy hills, where nothing can see or hit the monsters (cats can walk over

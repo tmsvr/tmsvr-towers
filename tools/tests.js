@@ -621,6 +621,24 @@ test('Waves', 'hard mode: monsters drop hard.coins as many coins', () => {
   near(hard / normal, BALANCE.difficulty.hard.coins, 0.08, `${hard} coins instead of ${normal}`);
 });
 
+test('Waves', 'hard mode: the first wave comes hard.firstWaveExtra seconds later, in every mode', () => {
+  const extra = BALANCE.difficulty.hard.firstWaveExtra;
+  ok(extra > 0, 'hard has extra time');
+  const timer = (mode) => { const s = sim.createState(1, 1, mode); return s.timer; };
+  eq(timer({ hard: false }), BALANCE.difficulty.firstWaveDelay, 'normal');
+  eq(timer({ hard: true }), BALANCE.difficulty.firstWaveDelay + extra, 'hard');
+  eq(timer({ hard: false, sprint: true }), BALANCE.sprint.firstWaveDelay, 'sprint');
+  eq(timer({ hard: true, sprint: true }), BALANCE.sprint.firstWaveDelay + extra, 'sprint, hard');
+  const s = sim.createState(1, 1, {});
+  sim.setMode(s, { hard: true, sprint: false });
+  eq(s.timer, BALANCE.difficulty.firstWaveDelay + extra, 'switching to hard on the pick screen');
+  sim.setMode(s, { hard: false, sprint: false });
+  eq(s.timer, BALANCE.difficulty.firstWaveDelay, 'and back');
+  const race = (hard) => { const r = sim.createState(1, 1, { hard, versus: true }); r.hold = true; sim.releaseHold(r); return r.timer; };
+  eq(race(false), BALANCE.versus.firstWaveDelay, 'race');
+  eq(race(true), BALANCE.versus.firstWaveDelay + extra, 'hard race');
+});
+
 test('Waves', 'the plant key on the map row switches hard mode, and everyone confirms again', () => {
   const s = sim.createState(2, 1, { map: 0 });
   s.players.forEach((p) => { p.pick.chosen = ['thorn', 'frost', 'daisy']; });

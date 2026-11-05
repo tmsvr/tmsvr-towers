@@ -29,7 +29,7 @@ const EDGE = 14;
 // Difficulty knobs from balance.json (exported so balance can be swept from the console).
 export const TUNE = DIFFICULTY;
 // Hard mode multiplies monster health, how many come and the coins they drop (chosen on the pick screen).
-const HARD = { enemyHp: 1, waveSize: 1, coins: 1, ...DIFFICULTY.hard };
+const HARD = { enemyHp: 1, waveSize: 1, coins: 1, firstWaveExtra: 0, ...DIFFICULTY.hard };
 // 3 or 4 cats (online) meet more and tougher monsters (balance.json → difficulty.morePlayers).
 // Read when used, so it can be swept from the console like the rest of TUNE.
 const more = (s, k, none = 1) => DIFFICULTY.morePlayers?.[s.players.length]?.[k] ?? none;
@@ -52,7 +52,8 @@ export function levelOf(s, n = s.wave) {
   return n <= SPRINT.waves.length ? SPRINT.waves[n - 1] : TOTAL_WAVES + n - SPRINT.waves.length; // endless goes on from wave 11
 }
 const breakTime = (s) => (s.sprint ? SPRINT.timeBetweenWaves : TUNE.timeBetweenWaves);
-const firstWaveDelay = (s) => (s.sprint ? SPRINT.firstWaveDelay : DIFFICULTY.firstWaveDelay);
+const hardFirstWaveExtra = (s) => (s.hard ? HARD.firstWaveExtra : 0);
+const firstWaveDelay = (s) => (s.sprint ? SPRINT.firstWaveDelay : DIFFICULTY.firstWaveDelay) + hardFirstWaveExtra(s);
 
 // The four ways to play a map, in the order the plant key on the map row goes through them.
 export const MODES = [{ hard: false, sprint: false }, { hard: true, sprint: false }, { hard: false, sprint: true }, { hard: true, sprint: true }];
@@ -766,7 +767,7 @@ export function endRace(s) {
 export function releaseHold(s) {
   if (!s.hold) return;
   s.hold = false;
-  s.timer = VERSUS.firstWaveDelay ?? s.timer; // a little longer to plant: both teams start from nothing
+  s.timer = VERSUS.firstWaveDelay != null ? VERSUS.firstWaveDelay + hardFirstWaveExtra(s) : s.timer; // a little longer to plant: both teams start from nothing
   banner(s, 'Go! The same waves for both teams. Plant fast!');
   ev(s, 'boss');
 }
