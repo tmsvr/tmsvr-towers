@@ -131,7 +131,7 @@
   "versus": { "firstWaveDelay": 45 },
 
   "sprint": {
-    "waves": [2, 4, 5, 7, 9, 10],
+    "waves": [2, 4, 5, 6, 9, 10],
     "firstWaveDelay": 25,
     "timeBetweenWaves": 12,
     "startCoins": 2.5,
