@@ -47,7 +47,9 @@ them.
 - Some maps have twists: on **Molehill** the roads run through tunnels under
   grassy hills, where nothing can see or hit the monsters (cats can walk over
   the hills but not plant on them); on **Overgrown** four of its five roads are fenced off
-  at first, with a sign saying in which wave each one opens.
+  at first, with a sign saying in which wave each one opens. **Warren** and
+  **Rabbit Holes** mix both: tunnelled back roads open later in the game and
+  pop out only a few tiles from the cottage.
 - Standing on a flower, hold E to upgrade it and R to heal it. Q switches E to
   dig-up mode, which removes the flower and refunds part of what was spent on it.
 - At level 5 every flower **blooms**: it sparkles and gains a special ability
