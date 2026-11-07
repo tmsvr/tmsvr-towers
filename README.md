@@ -117,7 +117,7 @@ There is no server, so scores live in your browser and get shared by pasting
 them into a chat.
 
 - **Sprint** is the quick mode, about 8 minutes: 6 waves that play like normal
-  waves 2, 4, 5, 6, 9 and 10, with bosses in waves 3 and 6, more coins at the
+  waves 2, 4, 5, 6, 8 and 10, with bosses in waves 3 and 6, more coins at the
   start, more coins per monster and 12 s breaks. Its monsters are tougher and
   quicker than in those normal waves (20% more health, 10% faster).
 - **Every game has a challenge code** (top right of the pick screen, and on the

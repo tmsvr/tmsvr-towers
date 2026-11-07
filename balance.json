@@ -102,7 +102,7 @@
     "waveBudgetPerWave": 26,
     "waveBudgetPerWaveSquared": 2.4,
     "bossEvery": 5,
-    "bossWaveBudget": 0.6,
+    "bossWaveBudget": 0.8,
     "spawnGap": [0.25, 0.75],
     "spawnSpeedupPerWave": 0.06,
     "spawnGapMinScale": 0.35,
@@ -131,7 +131,7 @@
   "versus": { "firstWaveDelay": 45 },
 
   "sprint": {
-    "waves": [2, 4, 5, 6, 9, 10],
+    "waves": [2, 4, 5, 6, 8, 10],
     "firstWaveDelay": 25,
     "timeBetweenWaves": 12,
     "startCoins": 2.5,
