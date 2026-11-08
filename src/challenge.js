@@ -6,7 +6,6 @@
 // 30 bits, five to a letter: seed (SEED_BITS), map (5), hard (1), sprint (1),
 // and a 2-bit check so a mistyped code is refused rather than played.
 import { MAPS } from './data.js';
-import { modeName, lastWave, wavesCleared, scoreOf } from './sim.js';
 
 const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 32, no I/O/0/1
 export const SEED_BITS = 21;
@@ -50,17 +49,4 @@ export function dailyChallenge(date = new Date()) {
   for (const ch of day) h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193);
   h >>>= 0;
   return { seed: h % 2 ** SEED_BITS, map: Math.floor(h / 2 ** SEED_BITS) % MAPS.length, hard: false, sprint: true, day };
-}
-
-// A few lines to paste into a chat, Wordle style: what was played, how it went.
-export function shareText(s, { players = s.players.length, daily = null } = {}) {
-  const hp = Math.max(0, Math.ceil(s.lives)), bar = Math.round((hp / s.maxLives) * 10);
-  const result = s.won ? `won all ${lastWave(s)} waves` : s.endless ? `endless wave ${s.wave}` : `fell in wave ${s.wave}/${lastWave(s)}`;
-  const who = players > 1 ? ` · ${players} players` : ' · solo';
-  return [
-    `🌼 Petal Patrol${daily ? ` · daily ${daily}` : ''} · ${modeName(s)} · ${s.m.name}${who}`,
-    `Code ${codeOf(s)} · ${result} · ${wavesCleared(s)} cleared`,
-    `🏠 ${'🟩'.repeat(bar)}${'⬛'.repeat(10 - bar)} ${hp}/${s.maxLives} · ${s.kills} bonked${s.retries?.length ? ` · ${s.retries.length} retr${s.retries.length > 1 ? 'ies' : 'y'}` : ''}`,
-    `Score ${scoreOf(s).toLocaleString('en-US')}`,
-  ].join('\n');
 }

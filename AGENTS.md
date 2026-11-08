@@ -59,7 +59,7 @@ Claude Code users: `.claude/launch.json` defines this server as `towers`
 | `src/host.js` / `src/guest.js` | Each side of an online game (host-authoritative) |
 | `src/snapshot.js` | Host builds snapshots; guest interpolates between them |
 | `src/predict.js` | Guest-side prediction of its own cat, reconciled with the host |
-| `src/challenge.js` | Challenge codes (seed + map + mode in six letters), the daily challenge, and the result text players copy with X |
+| `src/challenge.js` | Challenge codes (seed + map + mode in six letters) and the daily challenge |
 | `src/save.js` | Saved games (S on the pause screen, O on the menu): the whole state as JSON, keeping shared references (`$id`/`$ref`) and naming shared data (monster types, maps) |
 | `src/util.js` | Seeded RNG, `clamp`, small helpers |
 | `src/version.js` | `BUILD`, the build number shown in the bottom-right corner of the menu and pause screen (the commit count) |

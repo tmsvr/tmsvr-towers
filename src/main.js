@@ -5,7 +5,7 @@
 //   host      – this browser runs the game for up to 4 cats; the guests' inputs arrive over the network (host.js)
 //   guest     – this browser only sends inputs and draws snapshots from the host (guest.js)
 import { createState, step, continueEndless, retryWave, canRetry, setChallenge, scoreOf, modeName, MODES, releaseHold, releaseWave, rushWave, endRace, receivePack } from './sim.js';
-import { randomSeed, encodeCode, decodeCode, codeOf, dailyChallenge, shareText } from './challenge.js';
+import { randomSeed, encodeCode, decodeCode, codeOf, dailyChallenge } from './challenge.js';
 import { finishLog, currentLog, gameSummary } from './stats.js';
 import { render, setView, VIEW_W, MAP_H, BASE_W, BASE_H } from './render.js';
 import { initAudio, play, toggleMute, setMusicMood } from './audio.js';
@@ -168,7 +168,6 @@ addEventListener('keydown', (e) => {
   if (code === 'KeyM' && inGame && (stopped || ui.disconnected)) { backToMenu(); return; }
   const racing = !!ui.versus?.race;
   if (code === 'KeyS' && ui.paused && inGame) { if (racing) flashNote("A race can't be saved"); else saveToFile(); return; }
-  if (code === 'KeyX' && inGame && state && (state.over || state.won) && state.phase !== 'pick') { copyResult(); return; }
   if (mode === 'menu') {
     // still connected after a game: 3 or Enter plays again together, any other mode leaves
     if (ui.online && (code === 'Digit3' || code === 'Numpad3' || code === 'Enter')) { playAgainOnline(); return; }
@@ -269,11 +268,6 @@ function showCodeEntry() {
   };
 }
 function closeCodeEntry() { mode = 'menu'; hideLobby(); canvas.focus(); }
-
-function copyResult() {
-  const text = shareText(state, { daily: ui.challenge?.day && encodeCode(ui.challenge) === codeOf(state) ? ui.challenge.day : null });
-  navigator.clipboard.writeText(text).then(() => flashNote('Result copied: paste it in the chat'), () => flashNote("Couldn't copy (the browser said no)"));
-}
 
 // Personal bests, kept in this browser: per challenge code when one is being
 // played, otherwise per map, mode and number of players.

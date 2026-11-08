@@ -11,7 +11,7 @@ import { encodeSnapshot, encodeInputs, decodeFast } from '../src/schema.js';
 import { gameSummary } from '../src/stats.js';
 import { render, num, clock, setView, BASE_W, BASE_H, VIEW_W, MAP_H } from '../src/render.js';
 import { runBot } from './bot.js';
-import { encodeCode, decodeCode, codeOf, dailyChallenge, shareText } from '../src/challenge.js';
+import { encodeCode, decodeCode, codeOf, dailyChallenge } from '../src/challenge.js';
 import { raceStatus, raceResult } from '../src/versus.js';
 import { createHostLink } from '../src/host.js';
 import { saveGame, loadGame } from '../src/save.js';
@@ -824,7 +824,7 @@ test('Challenges', 'the daily challenge is the same all day and changes the next
   ok(a.sprint, 'a Sprint');
 });
 
-test('Challenges', 'the score adds up waves, cottage and kills; Hard counts more; the result names the code', () => {
+test('Challenges', 'the score adds up waves, cottage and kills; Hard counts more', () => {
   const S = BALANCE.score, s = game({ cats: ['bomber', 'gardener'] });
   s.wave = 4; s.phase = 'wave'; s.over = true; s.lives = 37.2; s.kills = 150; s.waveKills = 120;
   eq(sim.wavesCleared(s), 3, 'waves cleared when wave 4 was lost');
@@ -836,8 +836,6 @@ test('Challenges', 'the score adds up waves, cottage and kills; Hard counts more
   kill('hive', null, false); const hive = g.enemies.at(-1);
   kill('swarm', hive, false); kill('grunt', null, true);
   eq(g.kills, 3, 'every kill counted'); eq(g.waveKills, 1, 'the score counts only the wave\'s own monster');
-  const text = shareText(s);
-  ok(text.includes(codeOf(s)) && text.includes(sim.scoreOf(s).toLocaleString('en-US')) && text.includes('2 players'), text);
 });
 
 test('Challenges', 'mode, seed and lock survive a snapshot', () => {

@@ -140,16 +140,6 @@ them into a chat.
   scores of the same mode, map and number of players. The end screen shows
   your best in this browser (per code for challenges, otherwise per map, mode
   and number of players).
-- **X** on the victory or defeat screen copies the result for the chat:
-
-  ```
-  🌼 Petal Patrol · daily 2026-10-16 · Sprint · Molehill · 2 players
-  Code 9KW-CVE · won all 6 waves · 6 cleared
-  🏠 🟩🟩🟩🟩🟩🟩🟩⬛⬛⬛ 141/200 · 812 bonked
-  Score 12,880
-  ```
-
-  Retrying a wave (R) is allowed, but the result says how many retries you used.
 
 ### Versus races
 

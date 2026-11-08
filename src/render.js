@@ -2349,9 +2349,8 @@ const monsterName = (t) => (INTROS[t]?.[0] || t[0].toUpperCase() + t.slice(1) + 
 const retryWaveNo = (s) => (s.over || s.phase === 'wave' ? s.wave : s.wave + 1);
 function stopKeys(s, extra = '') {
   const retry = s.won || s.phase === 'pick' ? '' : `R: retry wave ${Math.max(1, retryWaveNo(s))}  ·  `;
-  const share = s.over || s.won ? 'X: copy result for a chat  ·  ' : '';
   if (race) return `${s.over || s.won ? 'Enter: rematch  ·  ' : ''}M: menu (leaves the race)${extra}`;
-  return `${s.won ? 'C: keep going (endless)  ·  ' : ''}${retry}${share}T: new game  ·  M: menu${extra}`;
+  return `${s.won ? 'C: keep going (endless)  ·  ' : ''}${retry}T: new game  ·  M: menu${extra}`;
 }
 // The score line on the end screens, with this browser's best for the same game.
 function scoreLine(s, ui) {
