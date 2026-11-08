@@ -46,12 +46,12 @@ them.
   **Sprint** (6 quick waves, see Competing below) and **Sprint · Hard**.
 - Some maps have twists: on **Molehill** the roads run through tunnels under
   grassy hills, where nothing can see or hit the monsters (cats can walk over
-  the hills but not plant on them); on **Overgrown** four of its five roads are fenced off
-  at first, with a sign saying in which wave each one opens. **Warren** and
-  **Rabbit Holes** mix both: tunnelled back roads open later in the game and
-  pop out only a few tiles from the cottage. On **Badger Sett** one road
-  forks three ways under a long hill, so you can't see which way each monster
-  went; on **Landslide** a landslide closes the long winding road in wave 7 and
+  the hills but not plant on them). On **Warren** and **Rabbit Holes** some
+  roads are fenced off at first, with a sign saying in which wave each one
+  opens, and those tunnelled back roads pop out only a few tiles from the
+  cottage. On **Badger Sett** the main road dives straight into a hill and
+  forks three ways underneath, so you can't see which way each monster went;
+  on **Landslide** a landslide closes the long winding road in wave 7 and
   the monsters take a short cut through the hill instead (a sign warns you).
 - Standing on a flower, hold E to upgrade it and R to heal it. Q switches E to
   dig-up mode, which removes the flower and refunds part of what was spent on it.
@@ -143,7 +143,7 @@ them into a chat.
 - **X** on the victory or defeat screen copies the result for the chat:
 
   ```
-  🌼 Petal Patrol · daily 2026-10-16 · Sprint · Whirlpool · 2 players
+  🌼 Petal Patrol · daily 2026-10-16 · Sprint · Molehill · 2 players
   Code 9KW-CVE · won all 6 waves · 6 cleared
   🏠 🟩🟩🟩🟩🟩🟩🟩⬛⬛⬛ 141/200 · 812 bonked
   Score 12,880
