@@ -59,7 +59,7 @@ Claude Code users: `.claude/launch.json` defines this server as `towers`
 | `src/host.js` / `src/guest.js` | Each side of an online game (host-authoritative) |
 | `src/snapshot.js` | Host builds snapshots; guest interpolates between them |
 | `src/predict.js` | Guest-side prediction of its own cat, reconciled with the host |
-| `src/challenge.js` | Challenge codes (seed + map + mode in six letters) and the daily challenge |
+| `src/challenge.js` | Challenge codes (seed + map + mode in six letters) |
 | `src/save.js` | Saved games (S on the pause screen, O on the menu): the whole state as JSON, keeping shared references (`$id`/`$ref`) and naming shared data (monster types, maps) |
 | `src/util.js` | Seeded RNG, `clamp`, small helpers |
 | `src/version.js` | `BUILD`, the build number shown in the bottom-right corner of the menu and pause screen (the commit count) |
@@ -132,8 +132,9 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
   `sprint.enemySpeed` times the speed (on top of Hard), so a Sprint wave is
   tougher than the normal wave it names.
 - **Challenges and scores.** `s.seed`, `s.map`, `s.hard` and `s.sprint` make
-  the challenge code (`codeOf` in `challenge.js`). A challenge (K or D on the
-  menu, `ui.challenge` in `main.js`) is applied to each new game with
+  the challenge code (`codeOf` in `challenge.js`; X on the end screen copies
+  it, `copyCode`). A challenge (K on the menu, host only when online,
+  `ui.challenge` in `main.js`) is applied to each new game with
   `setChallenge`, which also sets `s.locked` so the pick screen can't change
   the map or mode. `scoreOf(s)` in `sim.js` is the score; personal bests are
   kept in `localStorage` (`recordBest` in `main.js`).
@@ -146,10 +147,10 @@ keyboard ──► main.js ──inputs──► sim.step(state, inputs, 1/60) �
   particular waves or monsters.
 - **Stop screens.** Pause, defeat and victory share their keys (`keydown` in
   `main.js`, `stopKeys` in `render.js`): R retries the wave (`retryWave`
-  rewinds to the checkpoint the sim saves at the start of every break), T
-  starts a new game at the pick screen, M goes to the menu, C after a win
-  goes endless. Online the guest asks the host (`retry`, `restart`,
-  `continue`).
+  rewinds to the checkpoint the sim saves at the start of every break), M
+  goes to the menu (the next game starts there, with the last choices kept by
+  `rememberChoices`), C after a win goes endless. Online the guest asks the
+  host (`retry`, `continue`).
 - **Saved games.** S on the pause screen downloads the whole state
   (`save.js`); O on the menu loads it, paused. A loaded game is just a state,
   so it carries on exactly as it would have (the tests check this).

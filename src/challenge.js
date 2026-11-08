@@ -40,13 +40,3 @@ export function decodeCode(text) {
 }
 
 export const codeOf = (s) => encodeCode({ seed: s.seed ?? 0, map: s.map, hard: s.hard, sprint: s.sprint });
-
-// Today's challenge, the same for everyone on the same date: a Sprint on a map
-// that changes every day.
-export function dailyChallenge(date = new Date()) {
-  const day = date.toISOString().slice(0, 10);
-  let h = 0x811c9dc5;
-  for (const ch of day) h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193);
-  h >>>= 0;
-  return { seed: h % 2 ** SEED_BITS, map: Math.floor(h / 2 ** SEED_BITS) % MAPS.length, hard: false, sprint: true, day };
-}

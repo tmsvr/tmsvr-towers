@@ -94,8 +94,8 @@ them.
 - P or Esc pauses (either player, online too); S on the pause screen saves the game as a file.
 - The pause, defeat and victory screens share the same keys:
   - **R** retries the wave from the break before it (same garden, same coins), in any wave
-  - **T** starts a new game (the pick screen, with your last map, cats and flowers already chosen)
-  - **M** goes back to the menu (Esc too, after the game)
+  - **M** goes back to the menu (Esc too, after the game); start the next game from there, with your last map, cats and flowers already chosen. Online you all go back together, and 3 or Enter starts the next game
+  - **X** on the defeat or victory screen copies the game's challenge code, so friends can play the same game
   - **C** on the victory screen keeps going in endless mode
 - **O** on the main menu loads a saved game (solo, local co-op or online) and carries on from the moment it was saved, paused. Online, the host saves and loads; a loaded online game starts once all its players are back (or when the host presses Enter). The host can also press **O** in the host lobby, after friends have joined.
 - Beat all 10 waves and press C on the victory screen to keep going in **endless mode**: wave after wave, each tougher than the last. Every wave's monsters are 20% tougher than the last, endless ones too, so sooner or later even a garden full of level-5 flowers meets a wave it can't hold. Wave 11, right after the big boss, is a smaller one to catch your breath; after that the monsters come in about the same numbers, and every 5 waves brings one more boss (wave 15 has two, wave 20 three, wave 25 four…). From wave 21 the waves in between bring bosses too (one each until wave 25, then two…).
@@ -128,11 +128,10 @@ them into a chat.
   random numbers. Anyone who plays the same code meets exactly the same monsters,
   in the same order on the same roads, elites included, whatever they plant. So
   a code makes a fair contest: everyone plays it, then you compare scores.
-- **K** on the menu: type in a code. **D**: today's **daily challenge** (a
-  Sprint on a map that changes every day, the same for everyone). The menu
-  shows the challenge until you press K to clear it, and every game started in
-  the meantime (solo, local or hosted online) uses it. The map and mode are
-  locked on the pick screen; cats and flowers are yours to choose.
+- **K** on the menu: type in a code. The menu shows the challenge until you
+  press K to clear it, and every game started in the meantime (solo, local or
+  hosted online) uses it. Online only the host sets the challenge. The map and
+  mode are locked on the pick screen; cats and flowers are yours to choose.
 - **Score** = 1,000 per wave cleared + 20 per point of cottage health left + 5
   per monster of the waves bonked (not the bugs a hive lets out or the blobs a
   splitter breaks into: a hive left alive longer makes more; not monsters sent

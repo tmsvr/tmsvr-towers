@@ -10,8 +10,8 @@
 // with each entity carrying the fields schema.js sends for it.
 import {
   T, U, VIEW_W as BASE_W, MAP_H as BASE_MAP_H, HUD_H, TOTAL_WAVES, MAPS,
-  FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, loadoutSize, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, GLOBAL_RANGE, ENEMIES, INTROS,
-  BLOOM, bloomOf, ELITES, CHEST, ECONOMY, SEND, inTunnel, roadOpen,
+  FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, loadoutSize, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, GLOBAL_RANGE, ENEMIES, INTROS,
+  BLOOM, bloomOf, ELITES, CHEST, SEND, inTunnel, roadOpen,
 } from './data.js';
 import { levelOf, tileOf, canBuildAt, uprootRefund, catStats, plantPrice, upgradeLeft, healLeft, lastWave, modeName, scoreOf, wavesCleared } from './sim.js';
 import { codeOf, encodeCode } from './challenge.js';
@@ -2345,12 +2345,12 @@ function drawOverlay(c, title, sub, col) {
 // is there, just the title and keys.
 const monsterName = (t) => (INTROS[t]?.[0] || t[0].toUpperCase() + t.slice(1) + 's').replace(/!$/, ''); // intro titles are already plural
 // The keys on every screen that stops the game, the same everywhere (main.js
-// handles them): R retries the wave, T starts a new game, M goes to the menu.
+// handles them): R retries the wave, M goes to the menu (new games start there).
 const retryWaveNo = (s) => (s.over || s.phase === 'wave' ? s.wave : s.wave + 1);
 function stopKeys(s, extra = '') {
   const retry = s.won || s.phase === 'pick' ? '' : `R: retry wave ${Math.max(1, retryWaveNo(s))}  ·  `;
   if (race) return `${s.over || s.won ? 'Enter: rematch  ·  ' : ''}M: menu (leaves the race)${extra}`;
-  return `${s.won ? 'C: keep going (endless)  ·  ' : ''}${retry}T: new game  ·  M: menu${extra}`;
+  return `${s.won ? 'C: keep going (endless)  ·  ' : ''}${retry}M: menu${extra}`;
 }
 // The score line on the end screens, with this browser's best for the same game.
 function scoreLine(s, ui) {
@@ -2462,7 +2462,7 @@ function drawEndScreen(c, s, ui, time) {
   label(c, title, BASE_W / 2, top - 92, 46, col, 'center', 700, OUT);
   const where = won ? `All ${lastWave(s)} waves` : S.wave > lastWave(s) ? `Endless wave ${S.wave}` : `Wave ${S.wave}/${lastWave(s)}`;
   label(c, fitText(c, `${where}  ·  ${clock(S.seconds)}  ·  ${num(S.kills)} monsters bonked  ·  cottage ${S.cottage}/${S.maxCottage}`, BASE_W - 40, 18), BASE_W / 2, top - 50, 18, '#e8f1f7', 'center', 500, null);
-  const code = race ? '' : `  ·  replay code ${codeOf(s)} (K on the menu)`;
+  const code = race ? '' : `  ·  replay code ${codeOf(s)} (X: copy)`;
   label(c, fitText(c, `${scoreLine(s, ui)}  ·  ${modeName(s)}${code}`, BASE_W - 40, 17, 700), BASE_W / 2, top - 22, 17, '#ffe27a', 'center', 700, null);
 
   // flowers: damage per type, biggest first (in a race: the two teams side by side)
@@ -2660,15 +2660,14 @@ function drawMenu(c, time, ui) {
   if (ch) {
     const m = MAPS[ch.map];
     c.globalAlpha = 0.8 + Math.sin(time * 4) * 0.2;
-    label(c, fitText(c, `${ch.day ? `Daily challenge ${ch.day}` : 'Challenge'} ${encodeCode(ch)} · ${m?.name} · ${modeName(ch)} — start any game  ·  K: clear`, 700, 16, 700), cx, 458, 16, '#8dff9a', 'center', 700, null);
+    label(c, fitText(c, `Challenge ${encodeCode(ch)} · ${m?.name} · ${modeName(ch)} — start any game  ·  K: clear`, 700, 16, 700), cx, 458, 16, '#8dff9a', 'center', 700, null);
     c.globalAlpha = 1;
-  } else {
-    const ks = [['D', 'Daily challenge'], ['K', 'Play a challenge code']];
+  } else if (ui.online !== 'guest') { // online the host chooses
+    const ks = [['K', 'Play a challenge code']];
     let x = cx - chipsWidth(c, ks, 15, 22) / 2;
     for (const [key, txt] of ks) x += keyChip(c, x, 458, key, txt, 15) + 22;
   }
-  label(c, `Each cat picks ${LOADOUT_SIZE} of the ${FLOWER_ORDER.length} flowers · Dig a flower up for ${Math.round(ECONOMY.uprootRefund * 100)}% of its coins back.`, cx, 488, 14, '#cfe0ea', 'center', 500, null);
-  label(c, `Defend the cottage for ${TOTAL_WAVES} waves (or a ${lastWave({ sprint: true })}-wave Sprint), then keep going in endless mode.`, cx, 512, 13, '#8fa5b3', 'center', 500, null);
+  label(c, `Defend the cottage for ${TOTAL_WAVES} waves (or a ${lastWave({ sprint: true })}-wave Sprint), then keep going in endless mode.`, cx, 500, 13, '#8fa5b3', 'center', 500, null);
 }
 
 // Which version this is, small in the bottom-right corner (menu and pause screen).

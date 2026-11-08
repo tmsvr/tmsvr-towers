@@ -11,7 +11,7 @@ import { encodeSnapshot, encodeInputs, decodeFast } from '../src/schema.js';
 import { gameSummary } from '../src/stats.js';
 import { render, num, clock, setView, BASE_W, BASE_H, VIEW_W, MAP_H } from '../src/render.js';
 import { runBot } from './bot.js';
-import { encodeCode, decodeCode, codeOf, dailyChallenge } from '../src/challenge.js';
+import { encodeCode, decodeCode, codeOf } from '../src/challenge.js';
 import { raceStatus, raceResult } from '../src/versus.js';
 import { createHostLink } from '../src/host.js';
 import { saveGame, loadGame } from '../src/save.js';
@@ -815,13 +815,6 @@ test('Challenges', 'a challenge sets the map, mode and seed, and they can no lon
   s.players[0].pick.row = 0;
   sim.step(s, [{ mx: 1 }, {}], DT); sim.step(s, [{}, {}], DT); sim.step(s, [{ buildTap: true }, {}], DT);
   eq(s.map, 3, 'map'); ok(s.hard && s.sprint, 'mode');
-});
-
-test('Challenges', 'the daily challenge is the same all day and changes the next', () => {
-  const a = dailyChallenge(new Date('2026-10-16T08:00:00Z')), b = dailyChallenge(new Date('2026-10-16T20:00:00Z')), c = dailyChallenge(new Date('2026-10-17T08:00:00Z'));
-  eq(encodeCode(a), encodeCode(b), 'same day');
-  ok(encodeCode(a) !== encodeCode(c), 'next day');
-  ok(a.sprint, 'a Sprint');
 });
 
 test('Challenges', 'the score adds up waves, cottage and kills; Hard counts more', () => {
