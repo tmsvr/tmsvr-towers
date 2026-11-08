@@ -2531,7 +2531,7 @@ function bloomText(type) {
     case 'daisy': return `every ${nth(b.every)} seed explodes, hitting flyers too`;
     case 'sunflower': return `the beam also takes ${pct(b.maxHp)} of the target's max health`;
     case 'firelily': return `monsters it hits burn for ${b.seconds}s`;
-    case 'stink': return `monsters in its clouds take ${pct(b.vulnerable)} more damage from everything`;
+    case 'stink': return `monsters in its clouds take ${pct(b.vulnerable)} more damage from everything, until ${b.seconds}s after they leave`;
     case 'frost': return `every ${nth(b.every)} pulse freezes monsters for ${b.freeze}s (not bosses)`;
     case 'thorn': return `every ${nth(b.every)} pulse reaches ${b.range}× as far and shoves small monsters away`;
     case 'snap': return `swallows any monster below ${pct(b.below)} health (not bosses)`;

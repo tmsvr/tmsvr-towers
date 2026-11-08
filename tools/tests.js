@@ -1260,6 +1260,16 @@ test('Bloom', 'Stinkbloom: monsters in its clouds take extra damage', () => {
   const hp = grunt.hp;
   sim.damage(s, grunt, 100, true);
   near(hp - grunt.hp, 100 * (1 + BLOOM.stink.vulnerable), 0.01, 'a 100 hit');
+  // out of the cloud it stays weak for BLOOM.stink.seconds, then a hit is plain again
+  s.flowers.length = s.projs.length = s.clouds.length = 0; // no more clouds
+  const left = grunt.vulnT;
+  ok(left > BLOOM.stink.seconds - 0.1 && left <= BLOOM.stink.seconds + 1e-9, `weak for ${left}s`);
+  pin(s, [[grunt, ...at(road)]], left - 0.1);
+  ok(grunt.vulnT > 0, 'the weak spot faded too soon');
+  pin(s, [[grunt, ...at(road)]], 0.2);
+  const hp2 = grunt.hp;
+  sim.damage(s, grunt, 100, true);
+  near(hp2 - grunt.hp, 100, 0.01, 'a 100 hit once it faded');
 });
 
 test('Bloom', 'Frostbloom: every few pulses freezes monsters, but not bosses', () => {

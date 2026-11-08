@@ -244,7 +244,7 @@
     "daisy": { "every": 3, "damage": 0.6, "radius": 0.8 },
     "sunflower": { "maxHp": 0.03 },
     "firelily": { "seconds": 2, "share": 0.25 },
-    "stink": { "vulnerable": 0.15, "seconds": 1 },
+    "stink": { "vulnerable": 0.15, "seconds": 3 },
     "frost": { "every": 3, "freeze": 0.6 },
     "thorn": { "every": 4, "range": 2, "knock": 4 },
     "snap": { "below": 0.15 }
