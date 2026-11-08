@@ -5,7 +5,7 @@
 import * as sim from '../src/sim.js';
 import {
   T, MAPS, FLOWERS, FLOWER_ORDER, MAX_LEVEL, FLOWER_HP, ENEMIES, CATS, CAT_ORDER, BALANCE, TOTAL_WAVES,
-  plantCost, upgradeCost, flowerStats, WEAR_MULT, BLOOM, bloomOf, ELITES, SHIELD, CHEST, LOADOUT_SIZE, PLAYER,
+  plantCost, upgradeCost, flowerStats, WEAR_MULT, BLOOM, bloomOf, ELITES, SHIELD, CHEST, LOADOUT_SIZE, PLAYER, coinDropsAt,
 } from '../src/data.js';
 import { encodeSnapshot, encodeInputs, decodeFast } from '../src/schema.js';
 import { gameSummary } from '../src/stats.js';
@@ -429,6 +429,30 @@ test('Maps', 'a road that opens later sends nothing before its wave, and monster
     eq(before, 0, `monsters on road ${road} before wave ${opens}`);
     ok(after > 0, `road ${road} sent nothing in wave ${opens}`);
   }
+});
+
+test('Maps', 'a road that closes sends monsters before its wave and nothing after, and its entrance stops paying', () => {
+  const m = MAPS.findIndex((x) => x.paths.some((p) => p.closes < Infinity));
+  ok(m >= 0, 'no map closes a road');
+  for (const [closes, road] of MAPS[m].paths.map((p, i) => [p.closes, i]).filter(([c]) => c < Infinity)) {
+    let before = 0, after = 0;
+    for (let seed = 1; seed <= 6; seed++) for (const n of [closes - 1, closes, closes + 3]) {
+      const s = game({ map: m, seed });
+      s.phase = 'prep'; s.timer = 0; s.wave = n - 1;
+      tick(s);
+      eq(s.wave, n, 'wave started');
+      const used = s.queue.filter((e) => e.path === road).length;
+      if (n < closes) before += used; else after += used;
+    }
+    ok(before > 0, `road ${road} sent nothing before wave ${closes}`);
+    eq(after, 0, `monsters on road ${road} from wave ${closes}`);
+  }
+  // an entrance that only closed roads use doesn't pay; one an open road still uses does
+  const fake = { coinDrops: 1, entrances: 2, paths: [{ points: [[0, 0]], opens: 1, closes: 3 }, { points: [[5, 0]], opens: 1, closes: Infinity }] };
+  eq(coinDropsAt(fake, 2), 1, 'both entrances pay while both roads are open');
+  ok(coinDropsAt(fake, 3) < 1, 'the closed road\'s entrance stops paying');
+  fake.paths.push({ points: [[0, 0]], opens: 3, closes: Infinity });
+  eq(coinDropsAt(fake, 3), 1, 'a road that opens on the same entrance keeps it paying');
 });
 
 test('Monsters', 'a [lo, hi] arrival wave lands inside its range and varies between games', () => {

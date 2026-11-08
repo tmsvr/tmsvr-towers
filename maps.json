@@ -6,6 +6,7 @@
     "start": "Where the cats start.",
     "obstacles": "Hand-placed things you can't plant on: pond (x, y, w, h), tree (x, y), rock (x, y), bridge (x, y, w, h: a footbridge over a pond that cats can cross), hill (x, y, w, h: roads under it run through a tunnel, where monsters can't be seen or hit; cats walk over it). Roads may cross ponds; they get a bridge automatically.",
     "opens": "Optional: for each road, the wave it first sends monsters (1 = from the start). A later road is fenced off and grown over until then, with a sign saying when it opens. Until then its entrance doesn't count towards the coins for more entrances.",
+    "closes": "Optional: for each road, the wave it stops sending monsters (a landslide blocks it; leave it out, or use null, for roads that never close). Until then a sign says when; after it the road is fenced off and grown over like a road that hasn't opened. Pair it with a road that opens in the same wave to move the monsters somewhere else.",
     "waveSize": "Multiplies how many enemies come per wave on this map (maps with short roads or several entrances can use less than 1). Boss health is multiplied by its square root.",
     "startCoins": "Multiplies the starting coins on this map (maps with several entrances need more flowers early).",
     "coinDrops": "Optional: multiplies the coins monsters drop on this map (default 1), on top of balance.json economy.entranceCoins, which already pays more on maps with more entrances.",
@@ -497,6 +498,62 @@
         { "type": "pond", "x": 20, "y": 1, "w": 3, "h": 2 }
       ],
       "scatter": { "trees": 28, "rocks": 10, "seed": 109 }
+    },
+    {
+      "id": "sett",
+      "name": "Badger Sett",
+      "desc": "Hard: one road forks underground",
+      "width": 33,
+      "height": 25,
+      "base": [16, 18],
+      "start": [14, 15],
+      "waveSize": 1,
+      "startCoins": 2,
+      "paths": [
+        [[0, 3], [12, 3], [12, 7], [24, 7], [24, 18], [16, 18]],
+        [[0, 3], [12, 3], [12, 7], [24, 7], [24, 11], [8, 11], [8, 18], [16, 18]],
+        [[0, 3], [12, 3], [12, 7], [24, 7], [24, 11], [16, 11], [16, 18]],
+        [[0, 21], [12, 21], [12, 18], [16, 18]]
+      ],
+      "opens": [1, 1, 7, 4],
+      "obstacles": [
+        { "type": "hill", "x": 6, "y": 10, "w": 21, "h": 4 },
+        { "type": "pond", "x": 27, "y": 1, "w": 3, "h": 3 },
+        { "type": "pond", "x": 4, "y": 6, "w": 3, "h": 3 },
+        { "type": "pond", "x": 2, "y": 14, "w": 3, "h": 3 },
+        { "type": "pond", "x": 27, "y": 17, "w": 4, "h": 4 },
+        { "type": "pond", "x": 19, "y": 21, "w": 3, "h": 2 },
+        { "type": "pond", "x": 15, "y": 1, "w": 5, "h": 2 }
+      ],
+      "scatter": { "trees": 28, "rocks": 10, "seed": 113 }
+    },
+    {
+      "id": "landslide",
+      "name": "Landslide",
+      "desc": "Hard: the road moves in wave 7",
+      "width": 33,
+      "height": 23,
+      "base": [8, 11],
+      "start": [10, 14],
+      "waveSize": 1,
+      "startCoins": 2,
+      "paths": [
+        [[32, 4], [30, 4], [30, 18], [16, 18], [16, 6], [12, 6], [12, 11], [8, 11]],
+        [[32, 4], [28, 4], [28, 11], [8, 11]],
+        [[0, 19], [12, 19], [12, 15], [8, 15], [8, 11]],
+        [[10, 0], [10, 3], [4, 3], [4, 11], [8, 11]]
+      ],
+      "opens": [1, 7, 1, 4],
+      "closes": [7, null, null, null],
+      "obstacles": [
+        { "type": "hill", "x": 17, "y": 8, "w": 13, "h": 6 },
+        { "type": "pond", "x": 20, "y": 2, "w": 4, "h": 3 },
+        { "type": "pond", "x": 13, "y": 13, "w": 3, "h": 3 },
+        { "type": "pond", "x": 22, "y": 15, "w": 4, "h": 2 },
+        { "type": "pond", "x": 4, "y": 20, "w": 3, "h": 2 },
+        { "type": "pond", "x": 0, "y": 6, "w": 3, "h": 3 }
+      ],
+      "scatter": { "trees": 26, "rocks": 10, "seed": 127 }
     }
   ]
 }

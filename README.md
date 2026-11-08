@@ -49,7 +49,10 @@ them.
   the hills but not plant on them); on **Overgrown** four of its five roads are fenced off
   at first, with a sign saying in which wave each one opens. **Warren** and
   **Rabbit Holes** mix both: tunnelled back roads open later in the game and
-  pop out only a few tiles from the cottage.
+  pop out only a few tiles from the cottage. On **Badger Sett** one road
+  forks three ways under a long hill, so you can't see which way each monster
+  went; on **Landslide** a landslide closes the long winding road in wave 7 and
+  the monsters take a short cut through the hill instead (a sign warns you).
 - Standing on a flower, hold E to upgrade it and R to heal it. Q switches E to
   dig-up mode, which removes the flower and refunds part of what was spent on it.
 - At level 5 every flower **blooms**: it sparkles and gains a special ability

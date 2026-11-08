@@ -50,8 +50,9 @@ function prepareMap(def, index) {
     // enemies appear one tile outside the map edge, walking in
     const dx = Math.sign(pts[1][0] - pts[0][0]), dy = Math.sign(pts[1][1] - pts[0][1]);
     const spawn = center([pts[0][0] - dx, pts[0][1] - dy]);
-    // opens: the wave this road first sends monsters (roads that open late are fenced off until then)
-    return { points: pts, waypoints: pts.map(center), spawn, dir: Math.atan2(dy, dx), length: length + T, opens: def.opens?.[i] ?? 1 };
+    // opens: the wave this road first sends monsters (roads that open late are fenced off until then);
+    // closes: the wave it stops (a landslide blocks it), if it ever does
+    return { points: pts, waypoints: pts.map(center), spawn, dir: Math.atan2(dy, dx), length: length + T, opens: def.opens?.[i] ?? 1, closes: def.closes?.[i] ?? Infinity };
   });
   const blocked = new Set();
   const obstacles = [];
@@ -140,13 +141,13 @@ function prepareMap(def, index) {
 export const MAPS = MAP_DEFS.map(prepareMap);
 // A ground monster in a tunnel (flyers go over the hill).
 export const inTunnel = (m, e) => !e.def.flying && m.tunnel.has(Math.floor(e.y / T) * m.W + Math.floor(e.x / T));
-// The roads that send monsters in wave level n.
-export const openRoads = (m, n) => m.paths.map((_, i) => i).filter((i) => m.paths[i].opens <= n);
-// What monsters drop in wave level n: a road still fenced off needs no flowers yet, so its entrance doesn't pay.
+// Does road p send monsters in wave level n? The roads that do.
+export const roadOpen = (p, n) => p.opens <= n && n < p.closes;
+export const openRoads = (m, n) => m.paths.map((_, i) => i).filter((i) => roadOpen(m.paths[i], n));
+// What monsters drop in wave level n: a road fenced off (not open yet, or closed) needs no flowers, so its entrance doesn't pay.
 export const coinDropsAt = (m, n) => {
-  if (!m.paths.some((p) => p.opens > n)) return m.coinDrops;
   const open = new Set(openRoads(m, n).map((i) => m.paths[i].points[0].join())).size;
-  return m.coinDrops * (open / m.entrances) ** (BAL.economy.entranceCoins ?? 0);
+  return open === m.entrances ? m.coinDrops : m.coinDrops * (open / m.entrances) ** (BAL.economy.entranceCoins ?? 0);
 };
 
 // ---- enemies (pixels, pixels/second) ----

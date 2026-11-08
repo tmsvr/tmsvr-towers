@@ -16,7 +16,7 @@
 // slightly pessimistic estimate rather than a hard lower bound.
 import * as sim from '../src/sim.js';
 import { finishLog } from '../src/stats.js';
-import { T, FLOWER_ORDER, FLOWERS, LOADOUT_SIZE, MAX_LEVEL, FLOWER_HP, PLAYER, CATS, ELITES, CHEST, flowerStats } from '../src/data.js';
+import { T, FLOWER_ORDER, FLOWERS, LOADOUT_SIZE, MAX_LEVEL, FLOWER_HP, PLAYER, CATS, ELITES, CHEST, flowerStats, roadOpen } from '../src/data.js';
 
 // The habits measured in the logs; runBot({ habits }) can override any of them.
 export const HABITS = {
@@ -139,8 +139,8 @@ export function runBot({ players = 2, seed = 1, loadouts, cats, map = 0, hard = 
     const per = roadTiles.map(() => 0);
     for (const f of s.flowers) for (const r of roadsNear(f.tx, f.ty)) per[r]++;
     const most = Math.max(...per);
-    // roads that open later get flowers one wave ahead, like players do
-    const soon = (r) => m.paths[r].opens <= sim.levelOf(s, s.wave + 1);
+    // roads that open later get flowers one wave ahead, like players do (and closed ones none)
+    const soon = (r) => roadOpen(m.paths[r], sim.levelOf(s, s.wave + 1));
     for (const o of spots) {
       if (taken.has(o.y * m.W + o.x) || !sim.canBuildAt(s, o.x, o.y)) continue;
       const near = o.near.filter(soon);

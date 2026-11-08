@@ -11,7 +11,7 @@
 import {
   T, U, VIEW_W as BASE_W, MAP_H as BASE_MAP_H, HUD_H, TOTAL_WAVES, MAPS,
   FLOWER_ORDER, FLOWERS, MAX_LEVEL, FLOWER_HP, LOADOUT_SIZE, loadoutSize, flowerStats, upgradeCost, plantCost, PLAYER, CATS, CAT_ORDER, GLOBAL_RANGE, ENEMIES, INTROS,
-  BLOOM, bloomOf, ELITES, CHEST, ECONOMY, SEND, inTunnel,
+  BLOOM, bloomOf, ELITES, CHEST, ECONOMY, SEND, inTunnel, roadOpen,
 } from './data.js';
 import { levelOf, tileOf, canBuildAt, uprootRefund, catStats, plantPrice, upgradeLeft, healLeft, lastWave, modeName, scoreOf, wavesCleared } from './sim.js';
 import { codeOf, encodeCode } from './challenge.js';
@@ -2056,35 +2056,59 @@ function wrapText(c, txt, maxW, size, weight = 500) {
   return lines;
 }
 
-// A tiny overview of a map for the map picker.
-// A road that opens later in the game: grown over up to where it meets an
-// open road, with a fence across its mouth and the wave it opens in.
+// A road that is fenced off: one that opens later, or one a landslide closed.
+// It is grown over wherever no open road runs, with a fence where it leaves
+// them (or comes out of a tunnel) and a sign. A road that will close says so where it leaves the roads
+// that stay open.
 function drawClosedRoads(c, s, m) {
   const lv = Math.max(1, levelOf(s)); // before wave 1 too, the first roads are open
-  if (!m.paths.some((p) => p.opens > lv)) return;
-  const open = new Set();
-  for (const p of m.paths) if (p.opens <= lv) for (const [x, y] of roadTiles(p)) open.add(y * m.W + x);
+  if (m.paths.every((p) => p.opens <= 1 && p.closes === Infinity)) return;
+  const tilesOpenAt = (n) => {
+    const open = new Set();
+    for (const p of m.paths) if (roadOpen(p, n)) for (const [x, y] of roadTiles(p)) open.add(y * m.W + x);
+    return open;
+  };
+  const open = tilesOpenAt(lv);
+  const waveOf = (level) => { let n = s.wave + 1; while (levelOf(s, n) < level) n++; return n; };
+  // the first tile of p off the given roads, and the way p goes there
+  const leaves = (p, roads) => { for (const t of roadTiles(p)) if (!roads.has(t[1] * m.W + t[0])) return t; };
   for (const p of m.paths) {
-    if (p.opens <= lv) continue;
-    const pts = [{ x: p.spawn.x - Math.cos(p.dir) * T * 0.5, y: p.spawn.y - Math.sin(p.dir) * T * 0.5 }];
-    for (const [x, y] of roadTiles(p)) {
-      if (open.has(y * m.W + x)) break;
-      pts.push({ x: (x + 0.5) * T, y: (y + 0.5) * T });
+    if (roadOpen(p, lv)) {
+      if (p.closes === Infinity) continue;
+      const t = leaves(p, tilesOpenAt(p.closes));
+      if (t) label(c, `Closes wave ${waveOf(p.closes)}`, (t[0] + 0.5) * T, (t[1] + 0.5) * T + 5, 13, '#ffd0a0', 'center', 700);
+      continue;
     }
-    strokePoly(c, pts, T * 0.9, 'rgba(127,189,82,0.78)');
-    // the fence
-    const fx = p.waypoints[0].x - Math.cos(p.dir) * T * 0.2, fy = p.waypoints[0].y - Math.sin(p.dir) * T * 0.2;
-    c.save(); c.translate(fx, fy); c.rotate(p.dir + Math.PI / 2);
+    // grown over: every run of tiles no open road shares
+    let run = null, first = null, i = 0;
+    for (const [x, y, dx, dy] of roadTiles(p)) {
+      const k = y * m.W + x;
+      // under a hill the tunnel hides it anyway: the fence goes where it comes out
+      if (open.has(k) || m.tunnel.has(k)) { if (run) strokePoly(c, run, T * 0.9, 'rgba(127,189,82,0.78)'); run = null; }
+      else {
+        if (!run) run = i === 0 ? [{ x: p.spawn.x - Math.cos(p.dir) * T * 0.5, y: p.spawn.y - Math.sin(p.dir) * T * 0.5 }] : [{ x: (x - dx * 0.05 + 0.5) * T, y: (y - dy * 0.05 + 0.5) * T }]; // round ends: start inside the tile, off the open road
+        first ??= { x, y, dir: Math.atan2(dy, dx), mouth: i === 0 };
+        run.push({ x: (x + 0.5) * T, y: (y + 0.5) * T });
+      }
+      i++;
+    }
+    if (run) strokePoly(c, run, T * 0.9, 'rgba(127,189,82,0.78)');
+    if (!first) continue;
+    // the fence: across the road's mouth, or where it leaves the open roads
+    const at = first.mouth
+      ? { x: p.waypoints[0].x - Math.cos(p.dir) * T * 0.2, y: p.waypoints[0].y - Math.sin(p.dir) * T * 0.2, dir: p.dir }
+      : { x: (first.x + 0.5) * T - Math.cos(first.dir) * T * 0.3, y: (first.y + 0.5) * T - Math.sin(first.dir) * T * 0.3, dir: first.dir };
+    c.save(); c.translate(at.x, at.y); c.rotate(at.dir + Math.PI / 2);
     for (const k of [-0.45, 0, 0.45]) rrect(c, k * T - 4, -9, 8, 18, 3, '#9c6b3c', OUT, 2);
     for (const yy of [-5, 3]) rrect(c, -T * 0.55, yy - 2.5, T * 1.1, 5, 2, '#c08850', OUT, 1.5);
     c.restore();
-    let n = s.wave + 1;
-    while (levelOf(s, n) < p.opens) n++;
-    const k = T * (0.5 + Math.abs(Math.cos(p.dir)) * 1.1); // a little way in, so the edge doesn't cut it
-    label(c, `Opens wave ${n}`, p.waypoints[0].x + Math.cos(p.dir) * k, p.waypoints[0].y + Math.sin(p.dir) * k + 5, 13, '#ffe9a8', 'center', 700);
+    const text = p.opens > lv ? `Opens wave ${waveOf(p.opens)}` : 'Closed';
+    const k = first.mouth ? T * (0.5 + Math.abs(Math.cos(p.dir)) * 1.1) : T * 0.9; // a little way in, so the edge doesn't cut it
+    label(c, text, at.x + Math.cos(at.dir) * k, at.y + Math.sin(at.dir) * k + 5, 13, '#ffe9a8', 'center', 700);
   }
 }
 
+// A tiny overview of a map for the map picker.
 function drawMapThumb(c, m, x, y, w, h) {
   const sc = Math.min(w / m.worldW, h / m.worldH);
   const ox = x + (w - m.worldW * sc) / 2, oy = y + (h - m.worldH * sc) / 2;
@@ -2689,7 +2713,7 @@ export function render(c, s, ui) {
   drawBg(c, m, ui.dpr, camX, camY);
   c.translate(-camX, -camY);
   for (const path of m.paths) {
-    if (s && path.opens > Math.max(1, levelOf(s))) continue; // fenced off for now
+    if (s && !roadOpen(path, Math.max(1, levelOf(s)))) continue; // fenced off for now
     const ex = path.waypoints[0].x - Math.cos(path.dir) * T * 0.55, ey = path.waypoints[0].y - Math.sin(path.dir) * T * 0.55;
     for (let i = 0; i < 3; i++) {
       const a = time * 2 + i * 2.1;

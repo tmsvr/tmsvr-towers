@@ -653,8 +653,17 @@ function buildQueue(s, n, { share = 0 } = {}) {
   return q;
 }
 
-// Does a road that was fenced off open in wave w? (Sprint skips levels, so it goes by the step.)
-const roadOpens = (s, w) => s.m.paths.some((p) => p.opens > 1 && p.opens > levelOf(s, w - 1) && p.opens <= levelOf(s, w));
+// Do roads open or close in wave w? (Sprint skips levels, so it goes by the step.)
+// 'moves' when one closes and another opens: a landslide sends the monsters another way.
+const roadNews = (s, w) => {
+  const a = levelOf(s, w - 1), b = levelOf(s, w);
+  const opens = s.m.paths.some((p) => p.opens > 1 && p.opens > a && p.opens <= b);
+  const closes = s.m.paths.some((p) => p.closes > a && p.closes <= b);
+  return opens && closes ? 'moves' : opens ? 'opens' : closes ? 'closes' : '';
+};
+const NEWS_SHORT = { opens: ' New road!', closes: ' A road closes!', moves: ' The road moves!' };
+const NEWS = { opens: 'a new road opens!', closes: 'a road closes!', moves: 'landslide! The road moves!' };
+const NEWS_NEXT = { opens: 'a new road opens next wave', closes: 'a road closes next wave', moves: 'a landslide moves the road next wave' };
 
 function startWave(s) {
   s.wave++;
@@ -666,8 +675,8 @@ function startWave(s) {
   log.logWaveStart(s);
   staggerMapWide(s);
   const boss = s.queue.filter((e) => ENEMIES[e.type].boss).length;
-  const opens = roadOpens(s, s.wave);
-  banner(s, boss > 1 ? `Wave ${s.wave} — ${boss} BOSSES!${opens ? ' New road!' : ''}` : boss ? `Wave ${s.wave} — BOSS!${opens ? ' New road!' : ''}` : opens ? `Wave ${s.wave} — a new road opens!` : levelOf(s) === TOTAL_WAVES + 1 ? `Wave ${s.wave} — catch your breath` : `Wave ${s.wave}`);
+  const news = roadNews(s, s.wave), extra = NEWS_SHORT[news] || '';
+  banner(s, boss > 1 ? `Wave ${s.wave} — ${boss} BOSSES!${extra}` : boss ? `Wave ${s.wave} — BOSS!${extra}` : news ? `Wave ${s.wave} — ${NEWS[news]}` : levelOf(s) === TOTAL_WAVES + 1 ? `Wave ${s.wave} — catch your breath` : `Wave ${s.wave}`);
   ev(s, boss ? 'boss' : 'wave');
 }
 
@@ -717,7 +726,7 @@ function updateWaves(s, dt, ready) {
     const bonus = Math.round((ECONOMY.waveBonusBase + levelOf(s) * ECONOMY.waveBonusPerWave) * (s.players.length > 1 ? ECONOMY.coopBonusShare : 1));
     for (const p of s.players) p.coins += bonus;
     log.logWaveEnd(s, 'cleared');
-    banner(s, (bonus > 0 ? `Wave cleared!  +${bonus} each` : 'Wave cleared!') + (roadOpens(s, s.wave + 1) ? '  ·  a new road opens next wave' : ''));
+    banner(s, (bonus > 0 ? `Wave cleared!  +${bonus} each` : 'Wave cleared!') + (roadNews(s, s.wave + 1) ? `  ·  ${NEWS_NEXT[roadNews(s, s.wave + 1)]}` : ''));
     ev(s, 'clear');
     if (s.chestDue) openChest(s);
     saveCheckpoint(s);

@@ -31,7 +31,7 @@ await document.fonts.ready;
 const k = 0.5, time = 0;
 for (const m of MAPS) {
   const h = document.createElement('h2');
-  h.textContent = `${m.name} — ${m.desc} (${m.W}×${m.H}, ${m.paths.length} road${m.paths.length > 1 ? 's' : ''}${m.paths.some((p) => p.opens > 1) ? `, opening in waves ${m.paths.map((p) => p.opens).join('/')}` : ''}, waveSize ${m.waveSize})`;
+  h.textContent = `${m.name} — ${m.desc} (${m.W}×${m.H}, ${m.paths.length} road${m.paths.length > 1 ? 's' : ''}${m.paths.some((p) => p.opens > 1) ? `, opening in waves ${m.paths.map((p) => p.opens).join('/')}` : ''}${m.paths.some((p) => p.closes < Infinity) ? `, closing in waves ${m.paths.map((p) => (p.closes < Infinity ? p.closes : '–')).join('/')}` : ''}, waveSize ${m.waveSize})`;
   const cv = document.createElement('canvas');
   cv.width = Math.round(m.worldW * k); cv.height = Math.round(m.worldH * k);
   document.getElementById('maps').append(h, cv);
